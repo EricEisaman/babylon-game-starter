@@ -89,47 +89,7 @@ This approach means you can create entirely different games by changing configur
 
 ### System Component Relationships
 
-```mermaid
-graph TB
-    Entry[Playground Entry Point] --> SceneMgr[SceneManager]
-    SceneMgr --> CharCtrl[CharacterController]
-    SceneMgr --> CollectMgr[CollectiblesManager]
-    SceneMgr --> InvMgr[InventoryManager]
-    SceneMgr --> BehavMgr[BehaviorManager]
-    SceneMgr --> EffectsMgr[EffectsManager]
-    SceneMgr --> HUDMgr[HUDManager]
-    SceneMgr --> SkyMgr[SkyManager]
-    SceneMgr --> CameraMgr[CameraManager]
-    
-    CharCtrl --> AnimCtrl[AnimationController]
-    CharCtrl --> CameraCtrl[SmoothFollowCameraController]
-    
-    CollectMgr --> BehavMgr
-    CollectMgr --> EffectsMgr
-    CollectMgr --> InvMgr
-    
-    BehavMgr --> EffectsMgr
-    BehavMgr --> CollectMgr
-    
-    InvMgr --> CharCtrl
-    
-    EffectsMgr --> NodeMatMgr[NodeMaterialManager]
-    
-    Config[Configuration Files] -.-> SceneMgr
-    Config -.-> CollectMgr
-    Config -.-> EffectsMgr
-    Config -.-> CharCtrl
-    
-    UI[UI Components] --> SceneMgr
-    UI --> InvMgr
-    
-    Mobile[MobileInputManager] --> CharCtrl
-    
-    style Entry fill:#e1f5ff
-    style SceneMgr fill:#fff4e1
-    style Config fill:#f0f0f0
-    style UI fill:#e8f5e9
-```
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/System-Component-Relationships.svg" width="720px">
 
 ---
 
