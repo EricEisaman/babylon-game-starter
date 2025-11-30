@@ -306,42 +306,8 @@ The **MobileInputManager** provides:
 
 ### Manager Interaction Flow
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant SceneMgr as SceneManager
-    participant CharCtrl as CharacterController
-    participant CollectMgr as CollectiblesManager
-    participant BehavMgr as BehaviorManager
-    participant EffectsMgr as EffectsManager
-    participant InvMgr as InventoryManager
-    participant HUDMgr as HUDManager
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/Manager-Interaction-Flow.svg" width="720px">
 
-    User->>SceneMgr: Initialize Scene
-    SceneMgr->>CharCtrl: Create Character
-    SceneMgr->>BehavMgr: Initialize BehaviorManager
-    SceneMgr->>CollectMgr: Initialize CollectiblesManager
-    SceneMgr->>EffectsMgr: Initialize EffectsManager
-    SceneMgr->>HUDMgr: Initialize HUD
-    
-    SceneMgr->>SceneMgr: Load Environment
-    SceneMgr->>EffectsMgr: Create Particles
-    SceneMgr->>BehavMgr: Register Particle Behaviors
-    SceneMgr->>CollectMgr: Setup Items
-    
-    User->>CharCtrl: Move Character
-    CharCtrl->>BehavMgr: Update Position (via observer)
-    BehavMgr->>BehavMgr: Check Proximity Triggers
-    BehavMgr->>CollectMgr: Adjust Credits (if triggered)
-    BehavMgr->>EffectsMgr: Apply Glow Effect
-    
-    User->>CharCtrl: Collect Item
-    CharCtrl->>CollectMgr: Check Collision
-    CollectMgr->>InvMgr: Add to Inventory
-    CollectMgr->>EffectsMgr: Play Collection Sound
-    CollectMgr->>EffectsMgr: Show Collection Particles
-    CollectMgr->>HUDMgr: Update Credits Display
-```
 
 ### User Interaction Flow
 
