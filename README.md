@@ -271,82 +271,11 @@ The **MobileInputManager** provides:
 
 ### User Interaction Flow
 
-```mermaid
-graph LR
-    Start[User Starts Game] --> Load[Scene Loads]
-    Load --> Char[Character Spawns]
-    Char --> Input[User Input]
-    
-    Input --> Move[Move Character]
-    Input --> Collect[Collect Item]
-    Input --> Use[Use Inventory Item]
-    Input --> Settings[Open Settings]
-    
-    Move --> Behav[BehaviorManager Checks Proximity]
-    Behav --> Action[Execute Action]
-    Action --> Update[Update HUD]
-    
-    Collect --> Collision[Check Collision]
-    Collision --> AddInv[Add to Inventory]
-    AddInv --> Effect[Play Effect]
-    Effect --> Update
-    
-    Use --> Apply[Apply Item Effect]
-    Apply --> CharCtrl[CharacterController Applies Effect]
-    CharCtrl --> Update
-    
-    Settings --> Change[Change Character/Environment]
-    Change --> Reload[Reload Scene]
-    Reload --> Char
-    
-    Update --> Input
-    
-    style Start fill:#e1f5ff
-    style Input fill:#fff4e1
-    style Update fill:#e8f5e9
-```
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/User-Interaction-Flow.svg" width="720px">
 
 ### Initialization Sequence
 
-```mermaid
-graph TD
-    Start[Playground.CreateScene] --> Cleanup[Cleanup UI]
-    Cleanup --> CreateScene[Create SceneManager]
-    CreateScene --> InitScene[Initialize Scene]
-    
-    InitScene --> SetupLight[Setup Lighting]
-    InitScene --> SetupPhys[Setup Physics]
-    InitScene --> SetupSky[Setup Sky]
-    InitScene --> SetupEffects[Setup Effects]
-    
-    InitScene --> SetupChar[Setup Character]
-    SetupChar --> CreateCharCtrl[Create CharacterController]
-    SetupChar --> CreateCamera[Create Camera Controller]
-    SetupChar --> InitHUD[Initialize HUD]
-    SetupChar --> InitCollect[Initialize Collectibles]
-    SetupChar --> InitBehav[Initialize BehaviorManager]
-    
-    InitScene --> LoadEnv[Load Environment]
-    LoadEnv --> LoadModel[Load Environment Model]
-    LoadEnv --> CreateParticles[Create Particle Systems]
-    LoadEnv --> RegisterBehaviors[Register Behaviors]
-    LoadEnv --> SetupLights[Setup Environment Lights]
-    
-    InitScene --> LoadChar[Load Character Model]
-    LoadChar --> SetupAnim[Setup Animations]
-    LoadChar --> CreatePlayerFX[Create Player Effects]
-    
-    InitScene --> SetupItems[Setup Environment Items]
-    SetupItems --> CreateCollectibles[Create Collectibles]
-    SetupItems --> RegisterItemBehaviors[Register Item Behaviors]
-    
-    InitScene --> InitInv[Initialize Inventory]
-    
-    style Start fill:#e1f5ff
-    style InitScene fill:#fff4e1
-    style SetupChar fill:#e8f5e9
-    style LoadEnv fill:#fce4ec
-```
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/Initialization-Sequence.svg" width="720px">
 
 ---
 
