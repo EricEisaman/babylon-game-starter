@@ -962,7 +962,7 @@ Remember: The timeless way of building games is to do what feels right, test it,
 
 - [Babylon.js Documentation](https://doc.babylonjs.com/)
 - [Babylon.js Forum](https://forum.babylonjs.com/)
-- [Babylon.js Playground](https://playground.babylonjs.com/)
+- [Babylon.js Playground](https://playground.babylonjs.com/#7ZWAB5)
 - [Node Material Editor](https://nme.babylonjs.com/)
 - [Christopher Alexander - A Pattern Language](https://www.patternlanguage.com/)
 - [Jesse Schell - The Art of Game Design](https://www.artofgamedesign.com/)
