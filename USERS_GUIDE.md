@@ -195,6 +195,19 @@ Environments are complete 3D worlds that can be loaded and switched at runtime:
 }
 ```
 
+**Switching Environments:**
+
+You can programmatically switch between environments using the `switchToEnvironment` helper function:
+
+```typescript
+import { switchToEnvironment } from './utils/switch-environment';
+
+// Switch to a different environment
+await switchToEnvironment("Level Test");
+```
+
+This function handles all the necessary cleanup, physics pausing, and environment loading automatically.
+
 ### Collectibles & Inventory
 
 The **CollectiblesManager** handles item collection:
@@ -962,7 +975,7 @@ Remember: The timeless way of building games is to do what feels right, test it,
 
 - [Babylon.js Documentation](https://doc.babylonjs.com/)
 - [Babylon.js Forum](https://forum.babylonjs.com/)
-- [Babylon.js Playground](https://playground.babylonjs.com/#7ZWAB5)
+- [Babylon.js Playground](https://playground.babylonjs.com/?inspectorv2=true#7L56YQ)
 - [Node Material Editor](https://nme.babylonjs.com/)
 - [Christopher Alexander - A Pattern Language](https://www.patternlanguage.com/)
 - [Jesse Schell - The Art of Game Design](https://www.artofgamedesign.com/)
