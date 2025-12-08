@@ -89,47 +89,8 @@ This approach means you can create entirely different games by changing configur
 
 ### System Component Relationships
 
-```mermaid
-graph TB
-    Entry[Playground Entry Point] --> SceneMgr[SceneManager]
-    SceneMgr --> CharCtrl[CharacterController]
-    SceneMgr --> CollectMgr[CollectiblesManager]
-    SceneMgr --> InvMgr[InventoryManager]
-    SceneMgr --> BehavMgr[BehaviorManager]
-    SceneMgr --> EffectsMgr[EffectsManager]
-    SceneMgr --> HUDMgr[HUDManager]
-    SceneMgr --> SkyMgr[SkyManager]
-    SceneMgr --> CameraMgr[CameraManager]
-    
-    CharCtrl --> AnimCtrl[AnimationController]
-    CharCtrl --> CameraCtrl[SmoothFollowCameraController]
-    
-    CollectMgr --> BehavMgr
-    CollectMgr --> EffectsMgr
-    CollectMgr --> InvMgr
-    
-    BehavMgr --> EffectsMgr
-    BehavMgr --> CollectMgr
-    
-    InvMgr --> CharCtrl
-    
-    EffectsMgr --> NodeMatMgr[NodeMaterialManager]
-    
-    Config[Configuration Files] -.-> SceneMgr
-    Config -.-> CollectMgr
-    Config -.-> EffectsMgr
-    Config -.-> CharCtrl
-    
-    UI[UI Components] --> SceneMgr
-    UI --> InvMgr
-    
-    Mobile[MobileInputManager] --> CharCtrl
-    
-    style Entry fill:#e1f5ff
-    style SceneMgr fill:#fff4e1
-    style Config fill:#f0f0f0
-    style UI fill:#e8f5e9
-```
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/System-Component-Relationships.svg" width="720px">
+
 
 ---
 
@@ -319,121 +280,15 @@ The **MobileInputManager** provides:
 
 ### Manager Interaction Flow
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant SceneMgr as SceneManager
-    participant CharCtrl as CharacterController
-    participant CollectMgr as CollectiblesManager
-    participant BehavMgr as BehaviorManager
-    participant EffectsMgr as EffectsManager
-    participant InvMgr as InventoryManager
-    participant HUDMgr as HUDManager
-
-    User->>SceneMgr: Initialize Scene
-    SceneMgr->>CharCtrl: Create Character
-    SceneMgr->>BehavMgr: Initialize BehaviorManager
-    SceneMgr->>CollectMgr: Initialize CollectiblesManager
-    SceneMgr->>EffectsMgr: Initialize EffectsManager
-    SceneMgr->>HUDMgr: Initialize HUD
-    
-    SceneMgr->>SceneMgr: Load Environment
-    SceneMgr->>EffectsMgr: Create Particles
-    SceneMgr->>BehavMgr: Register Particle Behaviors
-    SceneMgr->>CollectMgr: Setup Items
-    
-    User->>CharCtrl: Move Character
-    CharCtrl->>BehavMgr: Update Position (via observer)
-    BehavMgr->>BehavMgr: Check Proximity Triggers
-    BehavMgr->>CollectMgr: Adjust Credits (if triggered)
-    BehavMgr->>EffectsMgr: Apply Glow Effect
-    
-    User->>CharCtrl: Collect Item
-    CharCtrl->>CollectMgr: Check Collision
-    CollectMgr->>InvMgr: Add to Inventory
-    CollectMgr->>EffectsMgr: Play Collection Sound
-    CollectMgr->>EffectsMgr: Show Collection Particles
-    CollectMgr->>HUDMgr: Update Credits Display
-```
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/Manager-Interaction-Flow.svg" width="720px">
 
 ### User Interaction Flow
 
-```mermaid
-graph LR
-    Start[User Starts Game] --> Load[Scene Loads]
-    Load --> Char[Character Spawns]
-    Char --> Input[User Input]
-    
-    Input --> Move[Move Character]
-    Input --> Collect[Collect Item]
-    Input --> Use[Use Inventory Item]
-    Input --> Settings[Open Settings]
-    
-    Move --> Behav[BehaviorManager Checks Proximity]
-    Behav --> Action[Execute Action]
-    Action --> Update[Update HUD]
-    
-    Collect --> Collision[Check Collision]
-    Collision --> AddInv[Add to Inventory]
-    AddInv --> Effect[Play Effect]
-    Effect --> Update
-    
-    Use --> Apply[Apply Item Effect]
-    Apply --> CharCtrl[CharacterController Applies Effect]
-    CharCtrl --> Update
-    
-    Settings --> Change[Change Character/Environment]
-    Change --> Reload[Reload Scene]
-    Reload --> Char
-    
-    Update --> Input
-    
-    style Start fill:#e1f5ff
-    style Input fill:#fff4e1
-    style Update fill:#e8f5e9
-```
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/User-Interaction-Flow.svg" width="720px">
 
 ### Initialization Sequence
 
-```mermaid
-graph TD
-    Start[Playground.CreateScene] --> Cleanup[Cleanup UI]
-    Cleanup --> CreateScene[Create SceneManager]
-    CreateScene --> InitScene[Initialize Scene]
-    
-    InitScene --> SetupLight[Setup Lighting]
-    InitScene --> SetupPhys[Setup Physics]
-    InitScene --> SetupSky[Setup Sky]
-    InitScene --> SetupEffects[Setup Effects]
-    
-    InitScene --> SetupChar[Setup Character]
-    SetupChar --> CreateCharCtrl[Create CharacterController]
-    SetupChar --> CreateCamera[Create Camera Controller]
-    SetupChar --> InitHUD[Initialize HUD]
-    SetupChar --> InitCollect[Initialize Collectibles]
-    SetupChar --> InitBehav[Initialize BehaviorManager]
-    
-    InitScene --> LoadEnv[Load Environment]
-    LoadEnv --> LoadModel[Load Environment Model]
-    LoadEnv --> CreateParticles[Create Particle Systems]
-    LoadEnv --> RegisterBehaviors[Register Behaviors]
-    LoadEnv --> SetupLights[Setup Environment Lights]
-    
-    InitScene --> LoadChar[Load Character Model]
-    LoadChar --> SetupAnim[Setup Animations]
-    LoadChar --> CreatePlayerFX[Create Player Effects]
-    
-    InitScene --> SetupItems[Setup Environment Items]
-    SetupItems --> CreateCollectibles[Create Collectibles]
-    SetupItems --> RegisterItemBehaviors[Register Item Behaviors]
-    
-    InitScene --> InitInv[Initialize Inventory]
-    
-    style Start fill:#e1f5ff
-    style InitScene fill:#fff4e1
-    style SetupChar fill:#e8f5e9
-    style LoadEnv fill:#fce4ec
-```
+<img src="https://raw.githubusercontent.com/EricEisaman/babylon-game-starter/main/resources/Initialization-Sequence.svg" width="720px">
 
 ---
 
