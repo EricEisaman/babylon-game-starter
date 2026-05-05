@@ -322,14 +322,6 @@ export const ASSETS = {
       spawnRotation: new BABYLON.Vector3(0, 0, 0),
       lights: [
         {
-          lightType: 'POINT' satisfies LightType,
-          name: 'MushroomVillagePointLight',
-          position: new BABYLON.Vector3(3, 2.5, 16.5),
-          diffuseColor: new BABYLON.Color3(0.83, 0.63, 0.63),
-          intensity: 1.0,
-          range: 100
-        },
-        {
           lightType: 'HEMISPHERIC' satisfies LightType,
           name: 'MushroomVillageHemisphericLight',
           direction: new BABYLON.Vector3(0, 1, 0),

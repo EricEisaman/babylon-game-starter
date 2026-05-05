@@ -308,7 +308,7 @@ export const CONFIG: GameConfig = {
   // `?mp=host` or `#mp=host` on the playground URL (see MULTIPLAYER.md).
   MULTIPLAYER: {
     ENABLED: true,
-    PRODUCTION_SERVER: 'bgs-mp.onrender.com',
+    PRODUCTION_SERVER: 'ali-207.onrender.com',
     LOCAL_SERVER: 'localhost:5000',
     // Render free-tier services sleep after ~15 min idle and take 10-30 s to
     // wake. The first probe after a cold start can easily exceed 15 s on
