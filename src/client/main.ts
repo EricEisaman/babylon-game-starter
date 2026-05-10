@@ -40,8 +40,7 @@ async function createEngine(canvas: HTMLCanvasElement): Promise<BABYLON.Engine> 
   };
 
   if (CONFIG.PERFORMANCE.WEBGPU_WHEN_AVAILABLE) {
-    const nav = navigator as Navigator & { gpu?: unknown };
-    if (nav.gpu) {
+    if (navigator.gpu) {
       try {
         const { WebGPUEngine } = await import('@babylonjs/core/Engines/webgpuEngine');
         const webgpu = new WebGPUEngine(canvas, {
@@ -61,46 +60,22 @@ async function createEngine(canvas: HTMLCanvasElement): Promise<BABYLON.Engine> 
 }
 
 async function initializeRuntimeGlobals(): Promise<void> {
-  const g = globalThis as typeof globalThis & {
-    BABYLON?: Record<string, unknown>;
-    HavokPhysics?: () => Promise<unknown>;
-    HK?: unknown;
-    __babylonAudioEngine?: typeof globalThis.__babylonAudioEngine;
-  };
-
   // Ensure v2 physics APIs are available on global BABYLON (Playground-style access).
-  if (g.BABYLON) {
-    Object.assign(g.BABYLON as Record<string, unknown>, PhysicsV2 as Record<string, unknown>);
-    (g.BABYLON as Record<string, unknown>).PhysicsCharacterController =
-      PhysicsV2.PhysicsCharacterController as unknown;
-    (g.BABYLON as Record<string, unknown>).CharacterSupportedState =
-      PhysicsV2.CharacterSupportedState as unknown;
-    (g.BABYLON as Record<string, unknown>).CreateAudioEngineAsync =
-      CreateAudioEngineAsync as unknown;
-
-    (g.BABYLON as Record<string, unknown>).CreateSoundAsync = CreateSoundAsync as unknown;
-    (g.BABYLON as Record<string, unknown>).CreateStreamingSoundAsync =
-      CreateStreamingSoundAsync as unknown;
+  if (globalThis.BABYLON) {
+    Object.assign(globalThis.BABYLON, PhysicsV2, {
+      PhysicsCharacterController: PhysicsV2.PhysicsCharacterController,
+      CharacterSupportedState: PhysicsV2.CharacterSupportedState,
+      CreateAudioEngineAsync,
+      CreateSoundAsync,
+      CreateStreamingSoundAsync
+    });
     // Babylon v9 rewrites default CDN paths to versioned URLs (e.g. /v9.2.0/...);
     // Draco decoder assets are not always published under versioned paths.
-    const bjs = g.BABYLON as {
-      Tools?: { ScriptBaseUrl?: string };
-      DracoCompression?: {
-        Configuration?: {
-          decoder?: {
-            wasmUrl?: string;
-            wasmBinaryUrl?: string;
-            fallbackUrl?: string;
-          };
-        };
-      };
-    };
-
-    if (bjs.Tools) {
-      bjs.Tools.ScriptBaseUrl = 'https://cdn.babylonjs.com';
+    if (globalThis.BABYLON.Tools) {
+      globalThis.BABYLON.Tools.ScriptBaseUrl = 'https://cdn.babylonjs.com';
     }
 
-    const decoder = bjs.DracoCompression?.Configuration?.decoder;
+    const decoder = globalThis.BABYLON.DracoCompression?.Configuration?.decoder;
     if (decoder) {
       decoder.wasmUrl = 'https://cdn.babylonjs.com/draco_wasm_wrapper_gltf.js';
       decoder.wasmBinaryUrl = 'https://cdn.babylonjs.com/draco_decoder_gltf.wasm';
@@ -109,23 +84,23 @@ async function initializeRuntimeGlobals(): Promise<void> {
   }
 
   // Mirror Playground runtime behavior: resolve HK from global HavokPhysics factory.
-  if (typeof g.HavokPhysics !== 'function') {
+  if (typeof globalThis.HavokPhysics !== 'function') {
     throw new Error(
       'HavokPhysics global is missing. Ensure HavokPhysics_umd.js is loaded before main.ts.'
     );
   }
 
-  if (typeof g.HK === 'undefined') {
-    g.HK = await g.HavokPhysics();
+  if (typeof globalThis.HK === 'undefined') {
+    globalThis.HK = await globalThis.HavokPhysics();
   }
 
-  if (!g.__babylonAudioEngine) {
+  if (!globalThis.__babylonAudioEngine) {
     const audioEngine = await CreateAudioEngineAsync({
       volume: 1,
       listenerEnabled: true,
       listenerAutoUpdate: true
     });
-    g.__babylonAudioEngine = audioEngine;
+    globalThis.__babylonAudioEngine = audioEngine;
   }
 }
 
