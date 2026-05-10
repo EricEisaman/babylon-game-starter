@@ -125,6 +125,7 @@ eslint.config.js
 - **[SERIALIZATION_QUICK_REF.md](SERIALIZATION_QUICK_REF.md)** — Cheat-sheet for the serialization helpers
 - **[src/deployment/DEPLOYMENT.md](src/deployment/DEPLOYMENT.md)** — Settings-driven deploy, Docker, host artifacts
 - **[NETLIFY_STATIC_SITE_DEPLOYMENT.md](NETLIFY_STATIC_SITE_DEPLOYMENT.md)** — Static Netlify deployment and multiplayer configuration
+- **[GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md)** — Static GitHub Pages deployment and multiplayer configuration
 - **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** — Production deploy on Render.com
 - **[STYLE.md](STYLE.md)** — TypeScript / ESLint / Prettier expectations for contributors
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — Dev setup, PR workflow, commit conventions, and SemVer policy
@@ -156,7 +157,7 @@ flowchart TD
   subgraph Sync [Multiplayer sync modules]
     direction LR
     mpMgr["MultiplayerManager"]
-    charSync["character_sync"]
+    peerProxy["remote_peer_proxy"]
     itemSync["item_sync / configured_items_sync"]
     auth["item_authority_tracker"]
     env["environment_physics_sync"]

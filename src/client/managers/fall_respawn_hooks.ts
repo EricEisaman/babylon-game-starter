@@ -30,6 +30,7 @@ export async function runFallRespawnHandler(id: string | undefined): Promise<voi
   await Promise.resolve(fn());
 }
 
+/** @expected-unused */
 export function setGlobalOnFellOffMapHook(fn: (() => void | Promise<void>) | null): void {
   globalOnFellOffMapHook = fn;
 }

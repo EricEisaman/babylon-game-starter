@@ -945,7 +945,7 @@ This appendix is informative; normative text is in sections [§1](#conformance)�
 |-------------|--------|
 | `PATCH` for state endpoints | Satisfied ([`datastar_client.ts`](src/client/datastar/datastar_client.ts)) |
 | SSE stream on `GET /api/multiplayer/stream` with Brotli transport compression and per-event flush ([§4.4](#44-server-sent-event-stream), [§9.1](#91-sse-transport-compression-non-normative)) | Satisfied ([`compression.go`](src/server/multiplayer/compression.go), [`handlers.go`](src/server/multiplayer/handlers.go) `handleSSE`) |
-| `characterModelId` on every `CharacterState` | Satisfied ([`multiplayer.ts`](src/client/types/multiplayer.ts), sampling in [`multiplayer_bootstrap.ts`](src/client/managers/multiplayer_bootstrap.ts) / [`character_sync.ts`](src/client/sync/character_sync.ts); server rejects empty in [`handlers.go`](src/server/multiplayer/handlers.go)) |
+| `characterModelId` on every `CharacterState` | Satisfied ([`multiplayer.ts`](src/client/types/multiplayer.ts), sampling in [`multiplayer_bootstrap.ts`](src/client/managers/multiplayer_bootstrap.ts); server rejects empty in [`handlers.go`](src/server/multiplayer/handlers.go)) |
 | Peer avatars load GLB by `characterModelId` | Satisfied ([`remote_peer_proxy.ts`](src/client/managers/remote_peer_proxy.ts) — imports the asset named in `characterModelId`, falls back to a box if unknown/failed) |
 
 ### Authority and security

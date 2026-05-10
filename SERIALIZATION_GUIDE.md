@@ -33,11 +33,11 @@ The multiplayer serialization system handles conversion between Babylon.js nativ
 |------|---------|
 | `src/client/utils/multiplayer_serialization.ts` | Serialization utilities & validation |
 | `src/client/types/multiplayer.ts` | TypeScript interfaces & types |
-| `src/client/sync/character_sync.ts` | Character state sampling & mesh application |
+| `src/client/managers/multiplayer_bootstrap.ts` | Character/item sampling and SSE routing |
+| `src/client/managers/remote_peer_proxy.ts` | Remote character loading and mesh application |
 | `src/client/sync/item_sync.ts` | Item state tracking & mesh application |
-| `src/client/sync/lights_sync.ts` | Light state tracking & mesh application |
-| `src/client/sync/effects_sync.ts` | Particle effect state tracking |
-| `src/client/sync/sky_sync.ts` | Sky effect state tracking |
+| `src/client/sync/configured_items_sync.ts` | Configured collectible/item sampling and apply routing |
+| `src/client/sync/environment_physics_sync.ts` | Environment physics-object sampling and apply routing |
 | `src/server/multiplayer/utils.go` | Server-side validation |
 
 ---
@@ -51,17 +51,14 @@ The multiplayer serialization system handles conversion between Babylon.js nativ
 **Network Size:** 3 numbers (24 bytes JSON)
 
 ```typescript
-// Serialization
 const pos = new BABYLON.Vector3(1.5, 2.3, -4.2);
-const serialized = serializeVector3(pos);  // [1.5, 2.3, -4.2]
+const serialized = [pos.x, pos.y, pos.z];  // [1.5, 2.3, -4.2]
 
 // Deserialization
-const deserialized = deserializeVector3(serialized);
+const deserialized = new BABYLON.Vector3(serialized[0], serialized[1], serialized[2]);
 // BABYLON.Vector3 { x: 1.5, y: 2.3, z: -4.2 }
 
-// Validation
-isValidWorldPosition([1.5, 2.3, -4.2]);  // true (within 10000 unit bounds)
-isFiniteVector3([1.5, 2.3, -4.2]);       // true (all components finite)
+// Server/client guards reject non-finite and out-of-bounds values before apply.
 ```
 
 ### Quaternion: [x, y, z, w]
@@ -72,16 +69,12 @@ isFiniteVector3([1.5, 2.3, -4.2]);       // true (all components finite)
 **Convention:** [x, y, z, w] (not w, x, y, z)
 
 ```typescript
-// Serialization
 const quat = new BABYLON.Quaternion(0.1, 0.2, 0.3, 0.95);
-const serialized = serializeQuaternion(quat);  // [0.1, 0.2, 0.3, 0.95]
+const serialized = [quat.x, quat.y, quat.z, quat.w];  // [0.1, 0.2, 0.3, 0.95]
 
 // Deserialization
 const deserialized = deserializeQuaternion(serialized);
 // BABYLON.Quaternion { x: 0.1, y: 0.2, z: 0.3, w: 0.95 }
-
-// Validation
-isValidQuaternion([0.1, 0.2, 0.3, 0.95], 0.01);  // true (length ≈ 1.0)
 
 // Normalization (if needed)
 const normalized = normalizeQuaternion([0.1, 0.2, 0.3, 0.95]);
@@ -91,21 +84,14 @@ const normalized = normalizeQuaternion([0.1, 0.2, 0.3, 0.95]);
 
 **Native Type:** `BABYLON.Vector3` (used as rotation)  
 **Serializable:** `Vector3Serializable = [number, number, number]`  
-**Range:** [-2π, 2π] per axis  
-**Convention:** Pitch (X) → Yaw (Y) → Roll (Z)
+**Status:** Authoring/local-control representation only; multiplayer payloads use quaternions.
 
 ```typescript
-// Current usage in CharacterState
+// Local-only authoring/control representation
 const rotation = mesh.rotation;  // BABYLON.Vector3 with Euler angles
-const serialized = [rotation.x, rotation.y, rotation.z];  // [0.1, 1.5, -0.2]
+const localEuler = [rotation.x, rotation.y, rotation.z];  // [0.1, 1.5, -0.2]
 
-// Validation
-isValidEulerAngles([0.1, 1.5, -0.2]);  // true
-hasSignificantAngleChange(0.1, 0.15, 0.05);  // true (5.7° difference > 2.9° threshold)
-
-// Conversion to Quaternion (for robust interpolation)
-const quat = eulerToQuaternion([0.1, 1.5, -0.2]);  // [x, y, z, w]
-const euler = quaternionToEuler(quat);  // [0.1, 1.5, -0.2] (recovered)
+// Character/item wire paths send quaternion [x, y, z, w], not Euler triples.
 ```
 
 ### Color3: [r, g, b]
@@ -116,13 +102,10 @@ const euler = quaternionToEuler(quat);  // [0.1, 1.5, -0.2] (recovered)
 **Network Size:** 3 numbers (24 bytes JSON)
 
 ```typescript
-// Serialization
 const color = new BABYLON.Color3(1.0, 0.5, 0.2);
-const serialized = serializeColor3(color);  // [1.0, 0.5, 0.2]
+const serialized = [color.r, color.g, color.b];  // [1.0, 0.5, 0.2]
 
-// Validation
-isValidColor([1.0, 0.5, 0.2]);  // true
-isValidColor([1.5, 0.5, 0.2]);  // false (> 1.0)
+// Server guards require each component to be finite and in [0, 1].
 ```
 
 ### Color4: [r, g, b, a]
@@ -133,13 +116,10 @@ isValidColor([1.5, 0.5, 0.2]);  // false (> 1.0)
 **Network Size:** 4 numbers (32 bytes JSON)
 
 ```typescript
-// Serialization
 const color = new BABYLON.Color4(1.0, 0.5, 0.2, 0.8);
-const serialized = serializeColor4(color);  // [1.0, 0.5, 0.2, 0.8]
+const serialized = [color.r, color.g, color.b, color.a];  // [1.0, 0.5, 0.2, 0.8]
 
-// Flexible deserialization (detects Color3 vs Color4)
-const deserialized = deserializeColor([1.0, 0.5, 0.2, 0.8]);  // BABYLON.Color4
-const deserialized2 = deserializeColor([1.0, 0.5, 0.2]);      // BABYLON.Color3
+const deserialized = new BABYLON.Color4(serialized[0], serialized[1], serialized[2], serialized[3]);
 ```
 
 ---
@@ -148,68 +128,28 @@ const deserialized2 = deserializeColor([1.0, 0.5, 0.2]);      // BABYLON.Color3
 
 ### Phase 1: State Sampling
 
-**Module:** `src/client/sync/character_sync.ts`
+**Module:** `src/client/managers/multiplayer_bootstrap.ts`
 
 ```typescript
-class CharacterSync {
-  sampleState(timestamp: number): CharacterState | null {
-    // 1. Check throttle (only sample every 50ms)
-    if (!this.throttle.shouldCall()) return null;
+function sampleLocalState(clientId, ctrl, environmentName): CharacterState | null {
+  const mesh = ctrl.getPlayerMesh();
+  if (!mesh || mesh.isDisposed()) return null;
 
-    // 2. Get mesh reference
-    const mesh = this.characterController.getCharacterMesh();
-    if (!mesh) return null;
-
-    // 3. Sample current state
-    const state: CharacterState = {
-      clientId: this.clientId,
-      position: serializeVector3(mesh.position),      // [x, y, z]
-      rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z],  // Euler [x, y, z]
-      velocity: serializeVector3(this.characterController.getVelocity()),
-      animationState: this.characterController.getCurrentState(),  // 'idle'|'walk'|'run'|'jump'|'fall'
-      animationFrame: 0,  // TODO: Extract from animation group
-      isJumping: this.characterController.getVelocity().y > 0.1,
-      isBoosting: this.characterController.getBoostStatus() !== 'Ready',
-      boostType: this.getBoostType(),  // 'superJump'|'invisibility'|undefined
-      boostTimeRemaining: 0,  // TODO: Track boost duration
-      timestamp  // Client clock time in ms since epoch
-    };
-
-    // 4. Detect significant changes
-    if (this.hasSignificantChange(state)) {
-      this.lastSentState = state;
-      return state;
-    }
-
-    return null;  // No change, suppress update
-  }
-
-  private hasSignificantChange(newState: CharacterState): boolean {
-    if (!this.lastSentState) return true;
-
-    // Position change threshold: 0.1 units
-    if (hasSignificantVector3Change(this.lastSentState.position, newState.position, 0.1)) {
-      return true;
-    }
-
-    // Rotation change threshold: 0.05 radians (≈2.9°)
-    if (hasSignificantAngleChange(this.lastSentState.rotation[1], newState.rotation[1], 0.05)) {
-      return true;
-    }
-
-    // Animation state change
-    if (this.lastSentState.animationState !== newState.animationState) {
-      return true;
-    }
-
-    // Jump/boost state change
-    if (this.lastSentState.isJumping !== newState.isJumping ||
-        this.lastSentState.isBoosting !== newState.isBoosting) {
-      return true;
-    }
-
-    return false;
-  }
+  return {
+    clientId,
+    environmentName,
+    characterModelId: ctrl.getCharacterModelId(),
+    position: [mesh.position.x, mesh.position.y, mesh.position.z],
+    rotation: yawRadiansToWireQuaternion(ctrl.getFacingYawRadians()),
+    velocity: [ctrl.getVelocity().x, ctrl.getVelocity().y, ctrl.getVelocity().z],
+    animationState: deriveWireAnimToken(ctrl),
+    animationFrame: ctrl.animationController.getNormalizedPlaybackPhase(),
+    isJumping: ctrl.animationController.getCurrentRole() === 'jump',
+    isBoosting: ctrl.isBoosting() || ctrl.getBoostStatus() !== 'Ready',
+    boostType: deriveBoostType(ctrl),
+    boostTimeRemaining: ctrl.getBoostTimeRemainingMs(),
+    timestamp: Date.now()
+  };
 }
 ```
 
@@ -223,7 +163,7 @@ class CharacterSync {
     {
       "clientId": "client-1234567890-abc123",
       "position": [10.5, 5.2, -15.3],
-      "rotation": [0.1, 1.5, -0.2],
+      "rotation": [0, 0.707, 0, 0.707],
       "velocity": [2.1, 0.0, -1.5],
       "animationState": "walk",
       "animationFrame": 0.45,
@@ -259,61 +199,21 @@ this.datastarClient.onSignal<CharacterStateUpdate>(
 // Listeners apply to meshes
 multiplayerManager.on('character-state-update', (update: CharacterStateUpdate) => {
   for (const charState of update.updates) {
-    // Find or create remote character mesh
-    const remoteMesh = scene.getMeshByName(`remote-${charState.clientId}`);
-    if (remoteMesh) {
-      // Apply transforms
-      CharacterSync.applyRemoteCharacterState(remoteMesh, charState);
-    }
+    applyRemotePeerState(scene, charState, sceneManager.getCurrentEnvironment());
   }
 });
 ```
 
 ### Phase 4: Mesh Application
 
-**Module:** `src/client/sync/character_sync.ts`
+**Module:** `src/client/managers/remote_peer_proxy.ts`
 
 ```typescript
-static applyRemoteCharacterState(
-  remoteMesh: BABYLON.AbstractMesh,
-  state: CharacterState
-): void {
-  if (!remoteMesh) return;
-
-  // Apply position
-  this.applyPosition(remoteMesh, state.position);
-
-  // Apply rotation from Euler angles
-  this.applyRotation(remoteMesh, state.rotation);
-}
-
-private static applyPosition(
-  mesh: BABYLON.AbstractMesh,
-  pos: Vector3Serializable
-): void {
-  try {
-    mesh.position.set(pos[0], pos[1], pos[2]);
-  } catch (e) {
-    console.warn('[CharacterSync] Failed to apply position:', e);
+function applyRemotePeerState(scene, state, currentEnvironmentName): void {
+  if (state.environmentName !== currentEnvironmentName) {
+    return;
   }
-}
-
-private static applyRotation(
-  mesh: BABYLON.AbstractMesh,
-  euler: Vector3Serializable
-): void {
-  try {
-    if (mesh.rotationQuaternion) {
-      // Use quaternion for better interpolation
-      const quat = BABYLON.Quaternion.FromEulerAngles(euler[0], euler[1], euler[2]);
-      mesh.rotationQuaternion.copyFrom(quat);
-    } else {
-      // Fallback to Euler angles
-      mesh.rotation.set(euler[0], euler[1], euler[2]);
-    }
-  } catch (e) {
-    console.warn('[CharacterSync] Failed to apply rotation:', e);
-  }
+  // Ensures the remote avatar exists, then writes position plus quaternion rotation.
 }
 ```
 
@@ -400,7 +300,7 @@ func validateTimestamp(timestamp int64) bool {
 
 ### Character Mesh Application
 
-**File:** `src/client/sync/character_sync.ts`
+**File:** `src/client/managers/remote_peer_proxy.ts`
 
 ```typescript
 /**
@@ -408,30 +308,26 @@ func validateTimestamp(timestamp int64) bool {
  * 
  * What gets applied:
  * - Position (direct)
- * - Rotation (Euler to quaternion conversion)
- * - Visibility (from animation state)
+ * - Rotation (quaternion)
+ * - Remote avatar visibility scoped by environment
  * 
  * What doesn't get applied directly:
  * - Velocity (handled by physics controller)
- * - Animation playback (requires animation group reference)
- * - Physics body (non-existent for remote characters)
  */
-static applyRemoteCharacterState(
-  remoteMesh: BABYLON.AbstractMesh,
-  state: CharacterState
+function applyRemotePeerState(
+  scene: BABYLON.Scene,
+  state: CharacterState,
+  currentEnvironmentName: string
 ): void {
-  if (!remoteMesh) return;
-  this.applyPosition(remoteMesh, state.position);
-  this.applyRotation(remoteMesh, state.rotation);
-  // Note: Animation state and velocity handled by higher-level managers
+  // Ensures the peer mesh exists, then applies `position` plus quaternion `rotation`.
 }
 ```
 
 **Expected Result:**
 
 ```text
-Before: remoteMesh.position = [0, 0, 0], remoteMesh.rotation.y = 0
-After:  remoteMesh.position = [10.5, 5.2, -15.3], remoteMesh.rotation.y = 1.5
+Before: remoteMesh.position = [0, 0, 0], remoteMesh.rotationQuaternion = identity
+After:  remoteMesh.position = [10.5, 5.2, -15.3], remoteMesh.rotationQuaternion = state.rotation
 ```
 
 ### Item Mesh Application
@@ -485,56 +381,12 @@ static applyRemoteItemState(
 }
 ```
 
-### Light Mesh Application
+### Light / Effect / Sky Channels
 
-**File:** `src/client/sync/lights_sync.ts`
-
-```typescript
-/**
- * Type-specific light state application
- * 
- * Common to all types:
- * - intensity
- * - enabled status
- * - diffuse color
- * - specular color
- * 
- * Type-specific:
- * - POINT: position, range
- * - DIRECTIONAL: direction
- * - SPOT: position, direction, angle, exponent
- * - HEMISPHERIC: (none - affects entire scene)
- * - RECTANGULAR_AREA: position, radius
- */
-static applyRemoteLightState(
-  light: BABYLON.Light,
-  state: LightState
-): void {
-  if (!light) return;
-
-  try {
-    light.intensity = state.intensity;
-    light.setEnabled(state.isEnabled);
-
-    if (state.diffuseColor) {
-      light.diffuse = new BABYLON.Color3(...);
-    }
-
-    if (state.specularColor) {
-      light.specular = new BABYLON.Color3(...);
-    }
-
-    switch (state.lightType) {
-      case 'POINT':
-        this.applyPointLightState(light as BABYLON.PointLight, state);
-        break;
-      // ... other types
-    }
-  } catch (e) {
-    console.warn('[LightsSync] Failed to apply light state:', e);
-  }
-}
-```
+The Go server and `MultiplayerManager` still expose effects, lights, and sky SSE channels.
+The current client does not publish or apply those channels. Treat them as extension points:
+add a focused sampler/apply module and wire it through `multiplayer_bootstrap.ts` before
+documenting them as active runtime behavior.
 
 ---
 
@@ -556,8 +408,8 @@ position.x = 0 / 0;  // NaN
 **Solution:**
 ```typescript
 // Validation in serialization
-function serializeVector3(v: BABYLON.Vector3): Vector3Serializable {
-  if (!isFiniteVector3([v.x, v.y, v.z])) {
+function serializeSafeVector3(v: BABYLON.Vector3): Vector3Serializable {
+  if (!Number.isFinite(v.x) || !Number.isFinite(v.y) || !Number.isFinite(v.z)) {
     console.warn('Invalid vector:', v);
     return [0, 0, 0];  // Safe fallback
   }
@@ -584,9 +436,13 @@ rotation = [Math.PI/2, angle, 0];  // Lock! X=90° causes gimbal lock
 **Solution:**
 ```typescript
 // Use quaternion interpolation for smooth rotations
-const from = eulerToQuaternion([0.1, 1.5, -0.2]);
-const to = eulerToQuaternion([0.15, 1.6, -0.19]);
-const interpolated = slerpQuaternion(from, to, 0.5);
+const from = yawRadiansToWireQuaternion(0.1);
+const to = yawRadiansToWireQuaternion(0.15);
+const interpolated = BABYLON.Quaternion.Slerp(
+  deserializeQuaternion(from),
+  deserializeQuaternion(to),
+  0.5
+);
 
 // Detect problematic angles
 private hasGimbalLock(euler: Vector3Serializable): boolean {
@@ -641,13 +497,14 @@ q = slerp(q, other2, 0.5);     // length ≈ 0.997
 **Solution:**
 ```typescript
 // Normalize after deserialization
-function deserializeQuaternion(q: QuaternionSerializable): BABYLON.Quaternion {
+function deserializeNormalizedQuaternion(q: QuaternionSerializable): BABYLON.Quaternion {
   const normalized = normalizeQuaternion(q);
   return new BABYLON.Quaternion(normalized[0], normalized[1], normalized[2], normalized[3]);
 }
 
 // Periodic renormalization
-if (!isValidQuaternion(storedQuat, 0.01)) {
+const lengthSq = storedQuat[0] ** 2 + storedQuat[1] ** 2 + storedQuat[2] ** 2 + storedQuat[3] ** 2;
+if (Math.abs(lengthSq - 1) >= 0.01) {
   storedQuat = normalizeQuaternion(storedQuat);
 }
 ```
@@ -664,8 +521,8 @@ if (!isValidQuaternion(storedQuat, 0.01)) {
 
 **Solution:**
 ```typescript
-// CharacterSync doesn't directly apply animation
-// Instead, broadcast animation state + frame to listeners
+// Remote peer application writes transform state; animation state/frame are
+// carried on CharacterState for higher-level remote avatar handling.
 
 // Higher-level integration (TODO):
 multiplayerManager.on('character-state-update', (update) => {
@@ -690,7 +547,7 @@ multiplayerManager.on('character-state-update', (update) => {
 
 - [x] Vector3 serialization: `[x, y, z]`
 - [x] Quaternion serialization: `[x, y, z, w]`
-- [x] Euler angle serialization: `[x, y, z]`
+- [x] Quaternion rotation serialization: `[x, y, z, w]`
 - [x] Color3 serialization: `[r, g, b]`
 - [x] Color4 serialization: `[r, g, b, a]`
 - [x] CharacterState includes all fields
@@ -703,7 +560,7 @@ multiplayerManager.on('character-state-update', (update) => {
 
 - [x] Vector3 deserialization with bounds check
 - [x] Quaternion deserialization with normalization
-- [x] Euler angle deserialization with range check
+- [x] Quaternion deserialization with normalization
 - [x] Color deserialization with component validation
 - [x] Timestamp validation (within 30s)
 - [x] Animation state validation
@@ -712,7 +569,7 @@ multiplayerManager.on('character-state-update', (update) => {
 ### Mesh application
 
 - [x] Character position application
-- [x] Character rotation application (Euler + Quaternion support)
+- [x] Character rotation application (quaternion support)
 - [x] Item position application
 - [x] Item rotation application
 - [x] Item collection status application
@@ -732,11 +589,10 @@ multiplayerManager.on('character-state-update', (update) => {
 ### Validation layers
 
 **Client-Side (Pre-Network):**
-- [x] `isFiniteVector3()` - Checks for NaN/Infinity
-- [x] `isValidWorldPosition()` - Bounds checking
-- [x] `isValidEulerAngles()` - Range validation
-- [x] `isValidColor()` - Component range validation
-- [x] `isValidQuaternion()` - Normalization check
+- [x] Finite-number checks before writing local state
+- [x] Bounds checks in wire guards and server validation
+- [x] Color component range checks for dormant color channels
+- [x] Quaternion normalization through `normalizeQuaternion()`
 
 **Server-Side (Post-Network):**
 - [x] `validateVector3()` - Finite + bounds
@@ -769,7 +625,7 @@ multiplayerManager.on('character-state-update', (update) => {
 
 ## Integration
 
-Multiplayer integration is wired in [`src/client/managers/multiplayer_bootstrap.ts`](src/client/managers/multiplayer_bootstrap.ts), which subscribes to every SSE signal and routes remote state into the sync modules documented above. Extending multiplayer state typically means either adding a new `src/client/sync/` module with its own `sampleState` / `applyRemoteState` pair, or extending an existing module and adding a listener inside the bootstrap. See [`MULTIPLAYER.md`](MULTIPLAYER.md#how-the-client-is-wired) for the end-to-end picture.
+Multiplayer integration is wired in [`src/client/managers/multiplayer_bootstrap.ts`](src/client/managers/multiplayer_bootstrap.ts), which subscribes to SSE signals and routes remote state into active sync/apply helpers. Extending multiplayer state typically means adding a focused `src/client/sync/` module with its own `sampleState` / `applyRemoteState` pair, or extending an existing module and adding a listener inside the bootstrap. See [`MULTIPLAYER.md`](MULTIPLAYER.md#how-the-client-is-wired) for the end-to-end picture.
 
 ## References
 
@@ -784,7 +640,7 @@ Multiplayer integration is wired in [`src/client/managers/multiplayer_bootstrap.
 For issues with serialization or deserialization:
 
 1. Check server logs for validation failures ([`src/server/multiplayer/utils.go`](src/server/multiplayer/utils.go)).
-2. Check the browser console for application failures — the `[CharacterSync]`, `[ItemSync]`, and `[LightsSync]` prefixes are the relevant ones.
+2. Check the browser console for application failures — the `[ItemSync]`, `[RemotePeerProxy]`, and multiplayer manager prefixes are the relevant ones.
 3. Confirm timestamps are within 30 seconds of server time; the server rejects older payloads.
 4. Confirm rotations are in **radians**, not degrees.
 5. Confirm item payloads carry `{ pos, rot }` only — no `matrix`, `rotation` (Euler), `velocity`, or `scale` on the item wire (Invariant P).

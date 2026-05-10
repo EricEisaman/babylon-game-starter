@@ -110,16 +110,6 @@ export class AudioManager {
   }
 
   /**
-   * Attaches the audio listener to a camera
-   * @param camera The camera to attach the audio listener to
-   */
-  public static attachAudioListener(camera: BABYLON.Camera): void {
-    void camera;
-    // Note: Audio listener attachment may not be needed in current Babylon.js version
-    // Audio is spatial by default when position is set
-  }
-
-  /**
    * Creates a sound and stores it for later retrieval
    * @param name The name of the sound
    * @param url The URL of the sound file (optional, can be set later)
@@ -159,18 +149,6 @@ export class AudioManager {
    */
   public static getSound(name: string): ManagedSound | null {
     return this.activeSounds.get(name) ?? null;
-  }
-
-  /**
-   * Removes a sound by name
-   * @param name The name of the sound
-   */
-  public static removeSound(name: string): void {
-    const sound = this.activeSounds.get(name);
-    if (sound) {
-      sound.dispose();
-      this.activeSounds.delete(name);
-    }
   }
 
   /**
@@ -284,7 +262,9 @@ export class AudioManager {
    * Sets up ambient sounds for an environment
    * @param ambientSounds The ambient sound configurations
    */
-  public static async setupAmbientSounds(ambientSounds: AmbientSoundConfig[]): Promise<void> {
+  public static async setupAmbientSounds(
+    ambientSounds: readonly AmbientSoundConfig[]
+  ): Promise<void> {
     // Remove existing ambient sounds
     this.removeAmbientSounds();
 

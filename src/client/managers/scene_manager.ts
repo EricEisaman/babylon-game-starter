@@ -268,35 +268,8 @@ export class SceneManager {
       return;
     }
 
-    // Fade out and dispose the previous environment's BGM immediately. Otherwise the old
-    // track keeps playing for the entire ImportMeshAsync duration of the new environment.
-    try {
-      await AudioManager.stopAndDisposeBackgroundMusic(1000);
-    } catch {
-      // Ignore background music errors
-    }
-
-    // Disable character during environment switch
-    let transitionRotationApplied = false;
-    if (this.characterController) {
-      this.characterController.pausePhysics();
-
-      // Set character to transition position/rotation if provided
-      if (environment.transitionPosition !== undefined) {
-        this.characterController.setPosition(environment.transitionPosition);
-      }
-      if (environment.transitionRotation !== undefined) {
-        this.characterController.setRotation(environment.transitionRotation);
-        transitionRotationApplied = true;
-      }
-
-      // Also hide the character mesh
-      const playerMesh = this.characterController.getPlayerMesh();
-      if (playerMesh) {
-        playerMesh.isVisible = false;
-        playerMesh.setEnabled(false);
-      }
-    }
+    await this.stopBackgroundMusicForSwitch();
+    const transitionRotationApplied = this.prepareCharacterForEnvironmentSwitch(environment);
 
     // Clear existing environment particles before creating new ones
     VisualEffectsManager.removeEnvironmentParticles();
@@ -330,71 +303,15 @@ export class SceneManager {
       // Keep env invisible until character GLB is attached and physics is resumed (boot + switch).
       this.stashEnvironmentMeshesHidden(result.meshes);
 
-      // Handle background music crossfade
-      try {
-        if (environment.backgroundMusic) {
-          await AudioManager.crossfadeBackgroundMusic(
-            environment.backgroundMusic.url,
-            environment.backgroundMusic.volume,
-            1000
-          );
-        } else {
-          await AudioManager.stopAndDisposeBackgroundMusic(1000);
-        }
-      } catch {
-        // Ignore background music errors
-      }
-
-      // Set up environment-specific sky if configured
-      if (environment.sky !== undefined) {
-        try {
-          const skyMesh = SkyManager.createSky(this.scene, environment.sky);
-          this.stashEnvironmentMeshesHidden([skyMesh]);
-        } catch {
-          // Ignore sky creation errors
-        }
-      }
+      await this.applyEnvironmentBackgroundMusic(environment);
+      this.createEnvironmentSky(environment);
 
       this.setupEnvironmentPhysics(environment);
 
       // Set up environment-specific lights if configured
       this.setupEnvironmentLights(environment);
 
-      // Set up environment-specific particles if configured
-      if (environment.particles) {
-        try {
-          for (const particle of environment.particles) {
-            const particleSystem = await VisualEffectsManager.createParticleSystem(
-              particle.name,
-              particle.position
-            );
-
-            // Apply environment-specific settings if provided
-            if (particleSystem != null && particle.updateSpeed !== undefined) {
-              particleSystem.updateSpeed = particle.updateSpeed;
-            }
-
-            // Register behavior if configured
-            if (particleSystem != null && 'behavior' in particle) {
-              const behavior = particle.behavior;
-              if (behavior !== undefined) {
-                const identifier =
-                  'instanceName' in particle && particle.instanceName !== undefined
-                    ? particle.instanceName
-                    : `particle_${particle.name}_${particle.position.x}_${particle.position.y}_${particle.position.z}`;
-                BehaviorManager.registerInstance(
-                  identifier,
-                  particleSystem,
-                  behavior,
-                  particle.position
-                );
-              }
-            }
-          }
-        } catch {
-          // Ignore particle creation errors
-        }
-      }
+      await this.setupEnvironmentParticles(environment);
 
       // Process any existing meshes for node materials
       try {
@@ -403,14 +320,7 @@ export class SceneManager {
         // Ignore node material processing errors in Playground
       }
 
-      // Ambient sounds setup (positional, looped)
-      if (environment.ambientSounds && environment.ambientSounds.length > 0) {
-        try {
-          await AudioManager.setupAmbientSounds(environment.ambientSounds);
-        } catch {
-          // Ignore ambient sound setup errors
-        }
-      }
+      await this.setupEnvironmentAmbientSounds(environment);
 
       // Environment items will be set up after character is fully loaded
       // This ensures CollectiblesManager is properly initialized
@@ -445,20 +355,126 @@ export class SceneManager {
         this.characterController.setRotation(environment.spawnRotation);
       }
     } catch {
-      this.revealEnvironmentWhenCharacterReady();
-      // Ignore environment loading errors for playground compatibility
-      // Re-enable character even if there was an error
-      if (this.characterController) {
-        this.characterController.resumePhysics();
-        // Only re-enable the player mesh if it is a real character model, not the
-        // display capsule (which should remain hidden until the model finishes loading)
-        const playerMesh = this.characterController.getPlayerMesh();
-        const displayCapsule = this.characterController.getDisplayCapsule();
-        if (playerMesh && playerMesh !== displayCapsule) {
-          playerMesh.isVisible = true;
-          playerMesh.setEnabled(true);
+      this.recoverFromEnvironmentLoadFailure();
+    }
+  }
+
+  private async stopBackgroundMusicForSwitch(): Promise<void> {
+    // Fade out and dispose the previous environment's BGM immediately. Otherwise the old
+    // track keeps playing for the entire ImportMeshAsync duration of the new environment.
+    try {
+      await AudioManager.stopAndDisposeBackgroundMusic(1000);
+    } catch {
+      // Ignore background music errors
+    }
+  }
+
+  private prepareCharacterForEnvironmentSwitch(environment: Environment): boolean {
+    if (!this.characterController) {
+      return false;
+    }
+
+    this.characterController.pausePhysics();
+    if (environment.transitionPosition !== undefined) {
+      this.characterController.setPosition(environment.transitionPosition);
+    }
+
+    const transitionRotationApplied = environment.transitionRotation !== undefined;
+    if (transitionRotationApplied) {
+      this.characterController.setRotation(environment.transitionRotation);
+    }
+
+    const playerMesh = this.characterController.getPlayerMesh();
+    if (playerMesh) {
+      playerMesh.isVisible = false;
+      playerMesh.setEnabled(false);
+    }
+
+    return transitionRotationApplied;
+  }
+
+  private async applyEnvironmentBackgroundMusic(environment: Environment): Promise<void> {
+    try {
+      if (environment.backgroundMusic) {
+        await AudioManager.crossfadeBackgroundMusic(
+          environment.backgroundMusic.url,
+          environment.backgroundMusic.volume,
+          1000
+        );
+      } else {
+        await AudioManager.stopAndDisposeBackgroundMusic(1000);
+      }
+    } catch {
+      // Ignore background music errors
+    }
+  }
+
+  private createEnvironmentSky(environment: Environment): void {
+    if (environment.sky === undefined) {
+      return;
+    }
+    try {
+      const skyMesh = SkyManager.createSky(this.scene, environment.sky);
+      this.stashEnvironmentMeshesHidden([skyMesh]);
+    } catch {
+      // Ignore sky creation errors
+    }
+  }
+
+  private async setupEnvironmentParticles(environment: Environment): Promise<void> {
+    if (!environment.particles) {
+      return;
+    }
+    try {
+      for (const particle of environment.particles) {
+        const particleSystem = await VisualEffectsManager.createParticleSystem(
+          particle.name,
+          particle.position
+        );
+        if (particleSystem != null && particle.updateSpeed !== undefined) {
+          particleSystem.updateSpeed = particle.updateSpeed;
+        }
+        if (particleSystem != null && 'behavior' in particle && particle.behavior !== undefined) {
+          const identifier =
+            'instanceName' in particle && particle.instanceName !== undefined
+              ? particle.instanceName
+              : `particle_${particle.name}_${particle.position.x}_${particle.position.y}_${particle.position.z}`;
+          BehaviorManager.registerInstance(
+            identifier,
+            particleSystem,
+            particle.behavior,
+            particle.position
+          );
         }
       }
+    } catch {
+      // Ignore particle creation errors
+    }
+  }
+
+  private async setupEnvironmentAmbientSounds(environment: Environment): Promise<void> {
+    if (!environment.ambientSounds || environment.ambientSounds.length === 0) {
+      return;
+    }
+    try {
+      await AudioManager.setupAmbientSounds(environment.ambientSounds);
+    } catch {
+      // Ignore ambient sound setup errors
+    }
+  }
+
+  private recoverFromEnvironmentLoadFailure(): void {
+    this.revealEnvironmentWhenCharacterReady();
+    if (!this.characterController) {
+      return;
+    }
+
+    this.characterController.resumePhysics();
+    const playerMesh = this.characterController.getPlayerMesh();
+    const displayCapsule = this.characterController.getDisplayCapsule();
+    if (playerMesh && playerMesh !== displayCapsule) {
+      playerMesh.isVisible = true;
+      playerMesh.setEnabled(true);
     }
   }
 

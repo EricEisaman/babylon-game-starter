@@ -4,7 +4,6 @@
 
 // /// <reference path="../types/babylon.d.ts" />
 
-import { ASSETS } from '../config/assets';
 import { CHARACTER_STATES } from '../config/character_states';
 import { CONFIG } from '../config/game_config';
 import { INPUT_KEYS } from '../config/input_keys';
@@ -171,14 +170,6 @@ export class CharacterController {
     }
   }
 
-  /**
-   * Clears all custom animation handlers when character is dismissed
-   */
-  private clearCustomAnimationHandlers(): void {
-    this.customAnimationHandlers.clear();
-    this.activeLoopingCustomAnimationKey = null;
-  }
-
   private handleKeyboard = (kbInfo: BABYLON.KeyboardInfo): void => {
     const key = kbInfo.event.key.toLowerCase();
 
@@ -325,83 +316,73 @@ export class CharacterController {
 
   private updateMobileInput(): void {
     // Only update mobile input if this is a mobile device
-    if (this.isMobileDevice) {
-      // Get mobile input direction
-      const mobileDirection = MobileInputManager.getInputDirection();
+    if (!this.isMobileDevice) {
+      return;
+    }
 
-      // For iPads with keyboards, allow both keyboard and touch input to work together
-      if (this.isIPadWithKeyboard) {
-        // Only allow touch input for rotation (X-axis) when not in air
-        if (this.state !== CHARACTER_STATES.IN_AIR && Math.abs(mobileDirection.x) > 0.1) {
-          const rotationSpeed = this.currentCharacter?.rotationSpeed ?? 0.05;
-          this.targetRotationY += mobileDirection.x * rotationSpeed;
-        }
+    const mobileDirection = MobileInputManager.getInputDirection();
+    if (this.isIPadWithKeyboard) {
+      this.applyIPadMobileInput(mobileDirection);
+    } else {
+      this.applyStandardMobileInput(mobileDirection);
+    }
 
-        // For movement (Z-axis), use keyboard if available, otherwise use touch
-        const hasKeyboardMovement =
-          this.keysDown.has('w') ||
-          this.keysDown.has('s') ||
-          this.keysDown.has('arrowup') ||
-          this.keysDown.has('arrowdown');
+    // Always update particle system to ensure proper on/off state
+    this.updateParticleSystem();
+  }
 
-        if (!hasKeyboardMovement && Math.abs(mobileDirection.z) > 0.1) {
-          // Use touch input for forward/backward movement when no keyboard movement
-          this.inputDirection.z = mobileDirection.z;
-        } else if (!hasKeyboardMovement) {
-          // Reset Z movement when no input
-          this.inputDirection.z = 0;
-        }
+  private applyMobileRotation(mobileDirection: BABYLON.Vector3): void {
+    if (this.state !== CHARACTER_STATES.IN_AIR && Math.abs(mobileDirection.x) > 0.1) {
+      const rotationSpeed = this.currentCharacter?.rotationSpeed ?? 0.05;
+      this.targetRotationY += mobileDirection.x * rotationSpeed;
+    }
+  }
 
-        // For actions (jump/boost), allow both keyboard and touch
-        const mobileWantJump = MobileInputManager.getWantJump();
-        const mobileWantBoost = MobileInputManager.getWantBoost();
+  private hasKeyboardForwardMovement(): boolean {
+    return (
+      this.keysDown.has('w') ||
+      this.keysDown.has('s') ||
+      this.keysDown.has('arrowup') ||
+      this.keysDown.has('arrowdown')
+    );
+  }
 
-        // Use keyboard input if available, otherwise use touch input
-        if (!this.keysDown.has(' ') && mobileWantJump) {
-          this.wantJump = true;
-        } else if (!this.keysDown.has(' ') && !mobileWantJump) {
-          this.wantJump = false;
-        }
-        if (!this.keysDown.has('shift') && mobileWantBoost) {
-          this.boostActive = true;
-        } else if (!this.keysDown.has('shift') && !mobileWantBoost) {
-          this.boostActive = false;
-        }
-      } else {
-        // Standard mobile behavior - replace keyboard input with touch input
-        this.inputDirection.copyFrom(mobileDirection);
+  private applyIPadMobileInput(mobileDirection: BABYLON.Vector3): void {
+    // For iPads with keyboards, allow both keyboard and touch input to work together.
+    this.applyMobileRotation(mobileDirection);
 
-        // Only update player rotation based on X-axis (left/right) when not in air
-        if (this.state !== CHARACTER_STATES.IN_AIR && Math.abs(mobileDirection.x) > 0.1) {
-          const rotationSpeed = this.currentCharacter?.rotationSpeed ?? 0.05;
-          this.targetRotationY += mobileDirection.x * rotationSpeed;
-        }
+    // For movement (Z-axis), use keyboard if available, otherwise use touch.
+    if (!this.hasKeyboardForwardMovement()) {
+      this.inputDirection.z = Math.abs(mobileDirection.z) > 0.1 ? mobileDirection.z : 0;
+    }
 
-        // Set forward/backward movement based on Y-axis
-        if (Math.abs(mobileDirection.z) > 0.1) {
-          this.inputDirection.z = mobileDirection.z;
-        } else {
-          this.inputDirection.z = 0;
-        }
+    // Use keyboard input if available, otherwise use touch input.
+    if (!this.keysDown.has(' ')) {
+      this.wantJump = MobileInputManager.getWantJump();
+    }
+    if (!this.keysDown.has('shift')) {
+      this.boostActive = MobileInputManager.getWantBoost();
+    }
+  }
 
-        // Clear X movement since we're using it for rotation
-        this.inputDirection.x = 0;
+  private applyStandardMobileInput(mobileDirection: BABYLON.Vector3): void {
+    // Standard mobile behavior - replace keyboard input with touch input.
+    this.inputDirection.copyFrom(mobileDirection);
+    this.applyMobileRotation(mobileDirection);
 
-        // Use mobile input for actions
-        // On touch-capable devices with a physical keyboard, preserve keyboard actions.
-        const keyboardJumpPressed = INPUT_KEYS.JUMP.some((key) => this.keysDown.has(key));
-        const keyboardBoostPressed = INPUT_KEYS.BOOST.some((key) => this.keysDown.has(key));
+    // Set forward/backward movement based on Y-axis and reserve X for rotation.
+    this.inputDirection.z = Math.abs(mobileDirection.z) > 0.1 ? mobileDirection.z : 0;
+    this.inputDirection.x = 0;
 
-        if (!keyboardJumpPressed) {
-          this.wantJump = MobileInputManager.getWantJump();
-        }
-        if (!keyboardBoostPressed) {
-          this.boostActive = MobileInputManager.getWantBoost();
-        }
-      }
+    // On touch-capable devices with a physical keyboard, preserve keyboard actions.
+    const keyboardJumpPressed = INPUT_KEYS.JUMP.some((key) => this.keysDown.has(key));
+    const keyboardBoostPressed = INPUT_KEYS.BOOST.some((key) => this.keysDown.has(key));
 
-      // Always update particle system to ensure proper on/off state
-      this.updateParticleSystem();
+    if (!keyboardJumpPressed) {
+      this.wantJump = MobileInputManager.getWantJump();
+    }
+    if (!keyboardBoostPressed) {
+      this.boostActive = MobileInputManager.getWantBoost();
     }
   }
 
@@ -847,14 +828,6 @@ export class CharacterController {
     return this.displayCapsule.rotation.y;
   }
 
-  public getPhysicsCharacterController(): BABYLON.PhysicsCharacterController {
-    return this.characterController;
-  }
-
-  public getCurrentCharacter(): Character | null {
-    return this.currentCharacter;
-  }
-
   public updateCharacterPhysics(character: Character, spawnPosition: BABYLON.Vector3): void {
     // Update character position to spawn point
     this.characterController.setPosition(spawnPosition);
@@ -897,10 +870,6 @@ export class CharacterController {
     }
   }
 
-  public getPlayerParticleSystem(): BABYLON.IParticleSystem | null {
-    return this.playerParticleSystem;
-  }
-
   public setThrusterSound(sound: ManagedAudioSound): void {
     this.thrusterSound = sound;
     // Start with sound stopped
@@ -910,14 +879,6 @@ export class CharacterController {
     if (this.boostActive && !sound.isActive()) {
       sound.play();
     }
-  }
-
-  /**
-   * Gets whether the character is currently moving
-   * @returns True if character is moving, false otherwise
-   */
-  public isMoving(): boolean {
-    return this.isAnyMovementKeyPressed();
   }
 
   /**
@@ -1006,32 +967,6 @@ export class CharacterController {
     });
 
     this.lastAppliedInvisibility = this.invisibilityActive;
-  }
-
-  /**
-   * Gets the current character state
-   * @returns The current character state
-   */
-  public getState(): CharacterState {
-    return this.state;
-  }
-
-  /**
-   * Gets whether the character is on the ground
-   * @returns True if character is on ground, false otherwise
-   */
-  public isOnGround(): boolean {
-    return this.state === CHARACTER_STATES.ON_GROUND;
-  }
-
-  /**
-   * Gets the physics body of the character controller
-   * @returns The physics body or null if not available
-   */
-  public getPhysicsBody(): null {
-    // PhysicsCharacterController doesn't expose its physics body directly
-    // We'll use the display capsule for collision detection instead
-    return null;
   }
 
   /**
@@ -1135,28 +1070,6 @@ export class CharacterController {
    */
   public isPhysicsPaused(): boolean {
     return this.physicsPaused;
-  }
-
-  /**
-   * Resets the character to the starting position
-   */
-  public resetToStartPosition(): void {
-    // Use environment spawn point instead of character start position
-    const environment = ASSETS.ENVIRONMENTS.find((env) => env.name === 'Level Test');
-    const spawnPoint = environment?.spawnPoint ?? new BABYLON.Vector3(0, 0, 0);
-    this.characterController.setPosition(spawnPoint);
-    this.characterController.setVelocity(this.zeroLinearVelocity);
-    this.inputDirection.setAll(0);
-    this.wantJump = false;
-    this.boostActive = false;
-    this.state = CHARACTER_STATES.IN_AIR;
-  }
-
-  /**
-   * Public method to clear custom animation handlers (called when character is switched/dismissed)
-   */
-  public dismissCustomAnimationHandlers(): void {
-    this.clearCustomAnimationHandlers();
   }
 
   public dispose(): void {

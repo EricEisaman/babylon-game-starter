@@ -78,16 +78,13 @@ src/client/
   datastar/datastar_client.ts            # SSE wrapper
   managers/multiplayer_manager.ts        # MP session + message bus
   managers/multiplayer_bootstrap.ts      # Wires MP into the scene (entry point)
+  managers/remote_peer_proxy.ts          # Remote avatar loading / transform application
   sync/
-    character_sync.ts
     item_sync.ts
     configured_items_sync.ts
     environment_physics_sync.ts
     item_authority_tracker.ts
     proximity_claim_observer.ts
-    effects_sync.ts
-    lights_sync.ts
-    sky_sync.ts
     multiplayer_wire_guards.ts
   types/multiplayer.ts
   utils/multiplayer_serialization.ts
@@ -410,8 +407,8 @@ npm run dev:multiplayer
 ### Characters move locally but not on other clients
 
 - Check `mp.isMultiplayerActive()` and that you are seeing `character-state-update` events in the SSE stream.
-- Confirm `CharacterSync.applyRemoteCharacterState()` is reached for the remote client id.
-- Throttle may be too aggressive (50 ms default) for the movement scale; temporarily lower `CHAR_SIGNIFICANT_POS_DELTA` in the sync module.
+- Confirm `applyRemotePeerState()` in `src/client/managers/remote_peer_proxy.ts` is reached for the remote client id.
+- Throttle may be too aggressive for the movement scale; temporarily inspect `SYNC_INTERVAL_MS` in `src/client/managers/multiplayer_bootstrap.ts`.
 
 ### Item stays DYNAMIC on non-owner
 
