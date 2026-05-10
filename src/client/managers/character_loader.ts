@@ -38,7 +38,7 @@ export class CharacterLoader {
     groups: readonly BABYLON.AnimationGroup[]
   ): void {
     for (const group of groups) {
-      const meta = (group.metadata ??= {}) as Record<string, unknown>;
+      const meta = (group.metadata ??= {});
       meta[CHARACTER_ANIM_META_KEY] = characterName;
     }
   }
@@ -59,7 +59,7 @@ export class CharacterLoader {
     characterName: string
   ): void {
     for (const group of scene.animationGroups.slice()) {
-      const meta = group.metadata as Record<string, unknown> | undefined;
+      const meta = group.metadata;
       if (meta?.[CHARACTER_ANIM_META_KEY] === characterName) {
         group.dispose();
       }
@@ -276,7 +276,7 @@ export class CharacterLoader {
     characterName: string
   ): void {
     for (const group of scene.animationGroups.slice()) {
-      const meta = group.metadata as Record<string, unknown> | undefined;
+      const meta = group.metadata;
       if (meta?.[CHARACTER_ANIM_META_KEY] === characterName) {
         try {
           group.stop();
