@@ -40,7 +40,7 @@ async function createEngine(canvas: HTMLCanvasElement): Promise<BABYLON.Engine> 
   };
 
   if (CONFIG.PERFORMANCE.WEBGPU_WHEN_AVAILABLE) {
-    const nav = navigator as Navigator & { gpu?: GPU };
+    const nav = navigator as Navigator & { gpu?: unknown };
     if (nav.gpu) {
       try {
         const { WebGPUEngine } = await import('@babylonjs/core/Engines/webgpuEngine');
