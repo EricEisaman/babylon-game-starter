@@ -800,8 +800,8 @@ export class CollectiblesManager {
       }
       this.collectibleBodies.delete(id);
       this.physicsItemBodies.delete(id);
-      if ('physicsBody' in mesh && (mesh as { physicsBody?: unknown }).physicsBody) {
-        (mesh as { physicsBody: BABYLON.PhysicsBody | null }).physicsBody = null;
+      if (mesh.physicsBody) {
+        mesh.physicsBody = null;
       }
     }
 

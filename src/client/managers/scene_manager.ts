@@ -122,7 +122,7 @@ export class SceneManager {
 
   private setupPhysics(): void {
     try {
-      const hk = (globalThis as typeof globalThis & { HK?: unknown }).HK;
+      const hk = globalThis.HK;
       if (!hk) {
         throw new Error('HK runtime is not initialized on globalThis');
       }

@@ -104,10 +104,9 @@ export class CharacterController {
   }
 
   /**
-   * Type guard: checks if a value is a custom animation config object
-   * Uses runtime checks to avoid user-defined type guards
+   * Checks whether a custom animation entry has the expected runtime fields.
    */
-  private isCustomAnimationConfig(value: unknown): boolean {
+  private isCustomAnimationConfig(value: object): boolean {
     return (
       value !== null &&
       typeof value === 'object' &&

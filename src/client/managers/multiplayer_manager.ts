@@ -32,7 +32,29 @@ export interface MultiplayerManagerConfig {
   updateThrottleMs?: number;
 }
 
-type MultiplayerEmitHandler = (data?: unknown) => void;
+interface MultiplayerEventMap {
+  connected: MultiplayerClientState;
+  disconnected: undefined;
+  error: Error;
+  'character-state-update': CharacterStateUpdate;
+  'item-state-update': ItemStateUpdate;
+  'effects-state-update': EffectStateUpdate;
+  'lights-state-update': LightStateUpdate;
+  'sky-effects-state-update': SkyEffectStateUpdate;
+  'synchronizer-changed': SynchronizerChangedMessage;
+  'item-authority-changed': ItemAuthorityChangedMessage;
+  'env-item-authority-changed': EnvItemAuthorityChangedMessage;
+  'client-joined': ClientConnectionEvent;
+  'client-left': ClientConnectionEvent;
+}
+
+type MultiplayerEventName = keyof MultiplayerEventMap;
+type MultiplayerEmitHandler<K extends MultiplayerEventName> = (
+  data: MultiplayerEventMap[K]
+) => void;
+type MultiplayerListeners = {
+  [K in MultiplayerEventName]: Set<MultiplayerEmitHandler<K>>;
+};
 
 /**
  * Manages client-side multiplayer synchronization
@@ -51,7 +73,21 @@ export class MultiplayerManager {
   private mpHttpOrigin: string | null = null;
   private datastarClient: DatastarClient;
   private isConnected = false;
-  private listeners = new Map<string, Set<MultiplayerEmitHandler>>();
+  private listeners: MultiplayerListeners = {
+    connected: new Set(),
+    disconnected: new Set(),
+    error: new Set(),
+    'character-state-update': new Set(),
+    'item-state-update': new Set(),
+    'effects-state-update': new Set(),
+    'lights-state-update': new Set(),
+    'sky-effects-state-update': new Set(),
+    'synchronizer-changed': new Set(),
+    'item-authority-changed': new Set(),
+    'env-item-authority-changed': new Set(),
+    'client-joined': new Set(),
+    'client-left': new Set()
+  };
 
   // Signal unsubscribers
   private unsubscribers: (() => void)[] = [];
@@ -124,7 +160,7 @@ export class MultiplayerManager {
     } catch (error) {
       this.mpHttpOrigin = null;
       console.error('[MultiplayerManager] Join failed:', error);
-      this.emit('error', error);
+      this.emit('error', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -161,7 +197,7 @@ export class MultiplayerManager {
       this.isConnected = false;
       this.clientState = null;
       this.mpHttpOrigin = null;
-      this.emit('disconnected');
+      this.emit('disconnected', undefined);
     } catch (error) {
       console.error('[MultiplayerManager] Leave failed:', error);
     }
@@ -488,31 +524,15 @@ export class MultiplayerManager {
   /**
    * Subscribes to state updates
    */
-  public on(
-    eventName:
-      | 'connected'
-      | 'disconnected'
-      | 'error'
-      | 'character-state-update'
-      | 'item-state-update'
-      | 'effects-state-update'
-      | 'lights-state-update'
-      | 'sky-effects-state-update'
-      | 'synchronizer-changed'
-      | 'item-authority-changed'
-      | 'env-item-authority-changed'
-      | 'client-joined'
-      | 'client-left',
-    listener: MultiplayerEmitHandler
+  public on<K extends MultiplayerEventName>(
+    eventName: K,
+    listener: MultiplayerEmitHandler<K>
   ): () => void {
-    if (!this.listeners.has(eventName)) {
-      this.listeners.set(eventName, new Set());
-    }
-    this.listeners.get(eventName)!.add(listener);
+    this.listeners[eventName].add(listener);
 
     // Return unsubscriber
     return () => {
-      this.listeners.get(eventName)?.delete(listener);
+      this.listeners[eventName].delete(listener);
     };
   }
 
@@ -529,7 +549,7 @@ export class MultiplayerManager {
     this.datastarClient.addEventListener('disconnected', () => {
       console.log('[MultiplayerManager] SSE disconnected');
       if (this.isConnected) {
-        this.emit('disconnected');
+        this.emit('disconnected', undefined);
         this.isConnected = false;
       }
     });
@@ -636,15 +656,13 @@ export class MultiplayerManager {
     this.emit('synchronizer-changed', message);
   }
 
-  private emit(eventName: string, data?: unknown): void {
-    const listeners = this.listeners.get(eventName);
-    if (listeners) {
-      for (const listener of listeners) {
-        try {
-          listener(data);
-        } catch (error) {
-          console.error(`[MultiplayerManager] Error in listener for ${eventName}:`, error);
-        }
+  private emit<K extends MultiplayerEventName>(eventName: K, data: MultiplayerEventMap[K]): void {
+    const listeners = this.listeners[eventName];
+    for (const listener of listeners) {
+      try {
+        listener(data);
+      } catch (error) {
+        console.error(`[MultiplayerManager] Error in listener for ${eventName}:`, error);
       }
     }
   }

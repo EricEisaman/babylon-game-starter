@@ -40,10 +40,7 @@ export function stampScenePerfConsoleContext(
   options: StampScenePerfConsoleContextOptions
 ): void {
   const prev = scene.metadata;
-  const bag =
-    prev != null && typeof prev === 'object' && !Array.isArray(prev)
-      ? { ...(prev as Record<string, unknown>) }
-      : {};
+  const bag = prev != null && typeof prev === 'object' && !Array.isArray(prev) ? { ...prev } : {};
   if (options.environmentName !== undefined) {
     bag[META_ENV] = options.environmentName;
   }
@@ -61,12 +58,11 @@ export function readScenePerfConsoleContext(scene: BABYLON.Scene): ScenePerfCons
   let environmentName = '(unknown)';
   let characterName = '(unknown)';
   if (meta != null && typeof meta === 'object' && !Array.isArray(meta)) {
-    const bag = meta as Record<string, unknown>;
-    const env = bag[META_ENV];
+    const env = meta[META_ENV];
     if (typeof env === 'string' && env !== '') {
       environmentName = env;
     }
-    const ch = bag[META_CHARACTER];
+    const ch = meta[META_CHARACTER];
     if (typeof ch === 'string' && ch !== '') {
       characterName = ch;
     }

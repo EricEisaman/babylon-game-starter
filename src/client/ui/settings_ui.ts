@@ -975,22 +975,12 @@ export class SettingsUI {
                   // Ignore errors stopping background music
                 }
 
-                const sceneCutData = cutSceneData as Record<string, unknown>;
-
-                let concurrent = false;
-                if ('concurrent' in sceneCutData) {
-                  concurrent = sceneCutData.concurrent === true;
-                }
-
-                let fadeInEnabled = false;
-                if ('fadeInEnabled' in sceneCutData) {
-                  fadeInEnabled = sceneCutData.fadeInEnabled === true;
-                }
-                let fadeOutEnabled = false;
-                if ('fadeOutEnabled' in sceneCutData) {
-                  fadeOutEnabled = sceneCutData.fadeOutEnabled === true;
-                }
-                const fadeDurationCandidate = sceneCutData.fadeDurationMs;
+                const concurrent = cutSceneData.concurrent ?? false;
+                const fadeInEnabled =
+                  'fadeInEnabled' in cutSceneData ? cutSceneData.fadeInEnabled : false;
+                const fadeOutEnabled = cutSceneData.fadeOutEnabled ?? false;
+                const fadeDurationCandidate =
+                  'fadeDurationMs' in cutSceneData ? cutSceneData.fadeDurationMs : undefined;
                 const fadeDurationMs =
                   typeof fadeDurationCandidate === 'number' &&
                   Number.isFinite(fadeDurationCandidate) &&
