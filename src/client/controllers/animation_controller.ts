@@ -229,7 +229,7 @@ export class AnimationController {
     }
 
     const tagged = this.scene.animationGroups.filter((g) => {
-      const meta = (g.metadata ?? {}) as Record<string, unknown>;
+      const meta = g.metadata ?? {};
       return meta[CHARACTER_ANIM_META_KEY] === char.name;
     });
     if (tagged.length === 0) {
@@ -288,7 +288,7 @@ export class AnimationController {
       return [];
     }
     return this.scene.animationGroups.filter((g) => {
-      const meta = (g.metadata ?? {}) as Record<string, unknown>;
+      const meta = g.metadata ?? {};
       return meta[CHARACTER_ANIM_META_KEY] === char.name;
     });
   }
