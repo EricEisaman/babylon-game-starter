@@ -274,10 +274,23 @@ export interface ClientConnectionEvent {
 /**
  * Server error message
  */
+export type ServerErrorDetailValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly ServerErrorDetailValue[]
+  | ServerErrorDetailObject;
+
+// Recursive JSON-like object types need an index signature; `Record` aliases are rejected by TS 5.3 here.
+export interface ServerErrorDetailObject {
+  readonly [key: string]: ServerErrorDetailValue;
+}
+
 export interface ServerErrorMessage {
   readonly code: string;
   readonly message: string;
-  readonly details?: Record<string, unknown>;
+  readonly details?: Readonly<Record<string, ServerErrorDetailValue>>;
   readonly timestamp: number;
 }
 

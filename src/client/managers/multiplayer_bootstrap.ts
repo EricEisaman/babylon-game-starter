@@ -41,6 +41,7 @@ import type { CharacterController } from '../controllers/character_controller';
 import type {
   CharacterState,
   CharacterStateUpdate,
+  EnvItemAuthorityChangedMessage,
   ItemAuthorityChangedMessage,
   ItemCollectionEvent,
   ItemInstanceState,
@@ -139,12 +140,11 @@ export async function initMultiplayerAfterCharacterReady(
   const scene = sceneManager.getScene();
 
   /** Subscribe before join so SSE snapshot(s) sent on connect are not dropped. */
-  const unsubState = mp.on('character-state-update', (raw: unknown) => {
+  const unsubState = mp.on('character-state-update', (msg: CharacterStateUpdate) => {
     const myId = mp.getClientID();
     if (!myId) {
       return;
     }
-    const msg = raw as CharacterStateUpdate;
     if (!msg?.updates?.length) {
       return;
     }
@@ -157,16 +157,8 @@ export async function initMultiplayerAfterCharacterReady(
     }
   });
 
-  const unsubLeft = mp.on('client-left', (raw: unknown) => {
-    let id = '';
-    if (
-      raw !== null &&
-      typeof raw === 'object' &&
-      'clientId' in raw &&
-      typeof (raw as { clientId: unknown }).clientId === 'string'
-    ) {
-      id = (raw as { clientId: string }).clientId;
-    }
+  const unsubLeft = mp.on('client-left', (event) => {
+    const id = event.clientId;
     if (id) {
       removeRemotePeer(id);
     }
@@ -304,8 +296,7 @@ export async function initMultiplayerAfterCharacterReady(
     }
   };
 
-  const unsubItems = mp.on('item-state-update', (raw: unknown) => {
-    const msg = raw as ItemStateUpdate;
+  const unsubItems = mp.on('item-state-update', (msg: ItemStateUpdate) => {
     if (!msg || (!msg.updates?.length && !msg.collections?.length)) {
       return;
     }
@@ -330,8 +321,7 @@ export async function initMultiplayerAfterCharacterReady(
     }
   });
 
-  const unsubAuthority = mp.on('item-authority-changed', (raw: unknown) => {
-    const msg = raw as ItemAuthorityChangedMessage;
+  const unsubAuthority = mp.on('item-authority-changed', (msg: ItemAuthorityChangedMessage) => {
     if (!msg?.instanceId) {
       return;
     }
@@ -381,34 +371,36 @@ export async function initMultiplayerAfterCharacterReady(
   // listener MUST be attached before `await mp.join()` below — the previous post-join
   // placement caused the snapshot replay to be dropped, leaving every client with an
   // empty envAuthority map and breaking the tier-2 owner resolution.
-  const unsubEnvAuthority = mp.on('env-item-authority-changed', (raw: unknown) => {
-    const msg = raw as { environmentName?: string; newAuthorityId?: string | null } | null;
-    const envName = msg?.environmentName; // §6.9 field name
-    if (!envName) {
-      return;
-    }
-    const newAuth = msg?.newAuthorityId ?? null;
-    authorityTracker.applyEnvAuthorityChange(envName, newAuth);
-    authorityTracker.markSnapshotApplied(envName);
-    // Only re-seed motion types once self identity is known; until then the tier-2
-    // resolution in `isOwnedBySelf` cannot distinguish "self is env-auth" from
-    // "peer is env-auth". The bootstrap calls seedMotionTypesForEnv explicitly
-    // after `setSelfClientId` (Fix 3) to cover the snapshot-replay-arrived-first
-    // race.
-    if (authorityTracker.getSelfClientId() && envName === sceneManager.getCurrentEnvironment()) {
-      seedMotionTypesForEnv(envName);
-      // Re-apply the last received item snapshot now that items have been set to their
-      // correct motion types. This covers the race where the item-transform bootstrap
-      // arrived BEFORE the auth snapshot (server now sends auth first, but this is
-      // defense-in-depth): with the mesh-direct apply (§B.9), the mesh write itself
-      // always succeeds, but on a still-DYNAMIC body the post-step would overwrite it
-      // with simulated position. Re-applying after seedMotionTypesForEnv flips items
-      // to ANIMATED ensures the authoritative positions stick.
-      if (knownItemStates.size > 0) {
-        applyItemSnapshot(buildFullSnapshot());
+  const unsubEnvAuthority = mp.on(
+    'env-item-authority-changed',
+    (msg: EnvItemAuthorityChangedMessage) => {
+      const envName = msg?.environmentName; // §6.9 field name
+      if (!envName) {
+        return;
+      }
+      const newAuth = msg?.newAuthorityId ?? null;
+      authorityTracker.applyEnvAuthorityChange(envName, newAuth);
+      authorityTracker.markSnapshotApplied(envName);
+      // Only re-seed motion types once self identity is known; until then the tier-2
+      // resolution in `isOwnedBySelf` cannot distinguish "self is env-auth" from
+      // "peer is env-auth". The bootstrap calls seedMotionTypesForEnv explicitly
+      // after `setSelfClientId` (Fix 3) to cover the snapshot-replay-arrived-first
+      // race.
+      if (authorityTracker.getSelfClientId() && envName === sceneManager.getCurrentEnvironment()) {
+        seedMotionTypesForEnv(envName);
+        // Re-apply the last received item snapshot now that items have been set to their
+        // correct motion types. This covers the race where the item-transform bootstrap
+        // arrived BEFORE the auth snapshot (server now sends auth first, but this is
+        // defense-in-depth): with the mesh-direct apply (§B.9), the mesh write itself
+        // always succeeds, but on a still-DYNAMIC body the post-step would overwrite it
+        // with simulated position. Re-applying after seedMotionTypesForEnv flips items
+        // to ANIMATED ensures the authoritative positions stick.
+        if (knownItemStates.size > 0) {
+          applyItemSnapshot(buildFullSnapshot());
+        }
       }
     }
-  });
+  );
 
   try {
     await mp.join(environmentName, characterModelId);
