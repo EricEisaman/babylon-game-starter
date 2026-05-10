@@ -1,4 +1,4 @@
-/** @type {import('../types/settings').DeploymentSettings<'render.com'>} */
+/** @type {import('../types/settings').DeploymentSettings<'netlify'>} */
 const deploymentSettings = {
   host: 'netlify',
   type: 'static',
