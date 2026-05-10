@@ -1,0 +1,193 @@
+name: Sync Feature Tag To Deployment Branches
+
+on:
+  push:
+    tags:
+      - 'feature/**'
+  workflow_dispatch:
+    inputs:
+      feature_ref:
+        description: 'Feature branch, tag, or commit SHA to sync'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-feature-tag-${{ github.event_name == 'workflow_dispatch' && inputs.feature_ref || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-deployment-pr:
+    name: Prepare ${{ matrix.target_branch }} sync PR
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target_branch: render-deploy
+            deployment_name: Render
+          - target_branch: netlify-deployment
+            deployment_name: Netlify
+          - target_branch: gh-deploy
+            deployment_name: GitHub Pages
+
+    env:
+      SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.feature_ref || github.sha }}
+      FEATURE_LABEL: ${{ github.event_name == 'workflow_dispatch' && inputs.feature_ref || github.ref_name }}
+      TARGET_BRANCH: ${{ matrix.target_branch }}
+      DEPLOYMENT_NAME: ${{ matrix.deployment_name }}
+
+    steps:
+      - name: Checkout full repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve source commit
+        id: source
+        run: |
+          set -euo pipefail
+
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+
+          if git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            source_sha="$(git rev-parse "${SOURCE_REF}^{commit}")"
+          elif git rev-parse --verify --quiet "origin/${SOURCE_REF}^{commit}" >/dev/null; then
+            source_sha="$(git rev-parse "origin/${SOURCE_REF}^{commit}")"
+          else
+            echo "Could not resolve source ref: ${SOURCE_REF}" >&2
+            exit 1
+          fi
+
+          safe_label="$(printf '%s' "${FEATURE_LABEL}" | tr '/:@' '---' | tr -cd 'A-Za-z0-9._-')"
+          sync_branch="sync/${TARGET_BRANCH}/${safe_label}"
+
+          echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "sync_branch=${sync_branch}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare sync branch and preserve deployment settings
+        id: prepare
+        run: |
+          set -euo pipefail
+
+          settings_dir="$(mktemp -d)"
+          settings_files=(
+            "src/deployment/settings/settings.mjs"
+            "src/deployment/settings/settings.mjs.d.ts"
+            "src/deployment/settings/settings.d.mts"
+          )
+
+          git switch --force-create "${{ steps.source.outputs.sync_branch }}" "origin/${TARGET_BRANCH}"
+
+          for file in "${settings_files[@]}"; do
+            mkdir -p "${settings_dir}/$(dirname "${file}")"
+            cp "${file}" "${settings_dir}/${file}"
+          done
+
+          {
+            echo "src/deployment/settings/settings.mjs merge=ours"
+            echo "src/deployment/settings/settings.mjs.d.ts merge=ours"
+            echo "src/deployment/settings/settings.d.mts merge=ours"
+          } >> .git/info/attributes
+          git config merge.ours.driver true
+
+          git merge --no-ff --no-commit "${{ steps.source.outputs.source_sha }}"
+
+          for file in "${settings_files[@]}"; do
+            cp "${settings_dir}/${file}" "${file}"
+            git add "${file}"
+          done
+
+          if git diff --cached --quiet && git diff --quiet; then
+            git merge --abort || true
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to sync into ${TARGET_BRANCH}."
+            exit 0
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node
+        if: steps.prepare.outputs.has_changes == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.prepare.outputs.has_changes == 'true'
+        run: npm ci
+
+      - name: Export Playground artifact
+        if: steps.prepare.outputs.has_changes == 'true'
+        run: npm run export:playground
+
+      - name: Typecheck
+        if: steps.prepare.outputs.has_changes == 'true'
+        run: npm run typecheck
+
+      - name: Lint
+        if: steps.prepare.outputs.has_changes == 'true'
+        run: npm run lint
+
+      - name: Format check
+        if: steps.prepare.outputs.has_changes == 'true'
+        run: npm run format:check
+
+      - name: Commit sync branch
+        if: steps.prepare.outputs.has_changes == 'true'
+        run: |
+          set -euo pipefail
+
+          git add --all
+          git commit -m "Sync ${FEATURE_LABEL} into ${TARGET_BRANCH}"
+          git push --force-with-lease origin "${{ steps.source.outputs.sync_branch }}"
+
+      - name: Open or update deployment sync PR
+        if: steps.prepare.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          title="Sync ${FEATURE_LABEL} into ${DEPLOYMENT_NAME} deployment"
+          body="$(cat <<EOF
+          ## Summary
+          - Syncs feature ref \`${FEATURE_LABEL}\` into \`${TARGET_BRANCH}\`.
+          - Preserves branch-owned deployment settings files from \`${TARGET_BRANCH}\`.
+          - Runs export, typecheck, lint, and format validation before opening this PR.
+
+          ## Preserved files
+          - \`src/deployment/settings/settings.mjs\`
+          - \`src/deployment/settings/settings.mjs.d.ts\`
+          - \`src/deployment/settings/settings.d.mts\`
+
+          Source commit: \`${{ steps.source.outputs.source_sha }}\`
+          EOF
+          )"
+
+          pr_url="$(gh pr list \
+            --head "${{ steps.source.outputs.sync_branch }}" \
+            --base "${TARGET_BRANCH}" \
+            --state open \
+            --json url \
+            --jq '.[0].url // empty')"
+
+          if [ -n "${pr_url}" ]; then
+            gh pr edit "${pr_url}" --title "${title}" --body "${body}"
+            echo "Updated ${pr_url}"
+          else
+            gh pr create \
+              --base "${TARGET_BRANCH}" \
+              --head "${{ steps.source.outputs.sync_branch }}" \
+              --title "${title}" \
+              --body "${body}"
+          fi
