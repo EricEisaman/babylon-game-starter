@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    "src/client/index.html",
+    "src/client/main.ts",
+    "src/client/config/local_dev.ts",
+    "src/client/index.ts",
+    "src/deployment/scripts/runtime-install-plan.mjs",
+    "src/deployment/settings/settings.mjs",
+    "src/deployment/settings/settings.ts",
+    "src/deployment/types/settings.ts",
+    "src/server/api/index.ts"
+  ],
+  "dynamicallyLoaded": [
+    "src/deployment/settings/settings.*"
+  ],
+  "ignorePatterns": [
+    "dist/**",
+    "src/client/public/playground.json",
+    "src/client/playground/playground.json"
+  ],
+  "ignoreDependencies": [
+    "@babylonjs/havok"
+  ],
+  "duplicates": {
+    "ignore": [
+      "src/client/public/playground.json",
+      "src/client/playground/playground.json"
+    ],
+    "ignoreImports": true
+  },
+  "rules": {
+    "unresolved-imports": "warn",
+    "unlisted-dependencies": "error",
+    "unused-files": "warn",
+    "unused-exports": "warn",
+    "unused-types": "warn",
+    "unused-dependencies": "warn",
+    "unused-dev-dependencies": "warn",
+    "unused-optional-dependencies": "warn",
+    "unused-enum-members": "warn",
+    "unused-class-members": "warn",
+    "duplicate-exports": "warn",
+    "type-only-dependencies": "warn",
+    "test-only-dependencies": "warn",
+    "circular-dependencies": "warn",
+    "boundary-violation": "warn",
+    "coverage-gaps": "off",
+    "stale-suppressions": "warn"
+  }
+}

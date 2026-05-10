@@ -216,46 +216,6 @@ export class DatastarClient {
   }
 
   /**
-   * Sends a POST request to the server
-   */
-  public async post(
-    path: string,
-    data: Record<string, unknown>,
-    options?: { headers?: Record<string, string> }
-  ): Promise<Response> {
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options?.headers
-    };
-
-    const response = await fetch(path, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data)
-    });
-
-    if (!response.ok) {
-      throw new Error(`POST ${path} failed: ${response.status} ${response.statusText}`);
-    }
-
-    return response;
-  }
-
-  /**
-   * Checks if connected to server
-   */
-  public isConnected(): boolean {
-    return this.eventSource?.readyState === EventSource.OPEN;
-  }
-
-  /**
-   * Gets current message index (for deduplication)
-   */
-  public getMessageIndex(): number {
-    return this.messageIndex;
-  }
-
-  /**
    * Subscribes to connection events
    */
   public addEventListener<K extends keyof DatastarEventMap>(
@@ -629,6 +589,7 @@ export function getDatastarClient(): DatastarClient {
 
 /**
  * Sets a custom global Datastar client (for testing)
+ * @expected-unused
  */
 export function setDatastarClient(client: DatastarClient | null): void {
   globalDatastarClient = client;

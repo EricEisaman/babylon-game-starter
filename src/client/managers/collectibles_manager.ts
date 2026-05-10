@@ -84,6 +84,12 @@ export class CollectiblesManager {
     this.scene = scene;
     this.characterController = characterController;
     this.totalCredits = 0;
+    BehaviorManager.setCreditHandlers({
+      getTotalCredits: () => this.getTotalCredits(),
+      adjustCredits: (amount) => {
+        this.adjustCredits(amount);
+      }
+    });
     return Promise.resolve();
   }
 
@@ -1168,5 +1174,6 @@ export class CollectiblesManager {
 
     this.scene = null;
     this.characterController = null;
+    BehaviorManager.setCreditHandlers(null);
   }
 }

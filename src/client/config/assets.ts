@@ -6,8 +6,14 @@ import { OBJECT_ROLE } from '../types/environment';
 
 import type { BehaviorConfig } from '../types/behaviors';
 import type { Character } from '../types/character';
-import type { SkyType, EffectType } from '../types/effects';
-import type { Environment, LightType, LightmappedMesh, PhysicsObject } from '../types/environment';
+import type { EffectType } from '../types/effects';
+import type {
+  Environment,
+  LightType,
+  LightmappedMesh,
+  PhysicsObject,
+  SkyType
+} from '../types/environment';
 
 const EMPTY_LIGHTMAPPED_MESHES: readonly LightmappedMesh[] = [];
 const EMPTY_PHYSICS_OBJECTS: readonly PhysicsObject[] = [];

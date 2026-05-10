@@ -2,9 +2,6 @@
 // BEHAVIOR MANAGER
 // ============================================================================
 
-import { switchToEnvironment } from '../utils/switch_environment';
-
-import { CollectiblesManager } from './collectibles_manager';
 import {
   registerFallRespawnHandler,
   runFallRespawnHandler,
@@ -29,6 +26,11 @@ const DEFAULT_FALL_DEPTH_BELOW_SPAWN = 100;
 export interface FallRespawnHandlers {
   readonly resetToSpawn: () => void;
   readonly switchEnvironment: (name: string) => Promise<void>;
+}
+
+export interface CreditHandlers {
+  readonly getTotalCredits: () => number;
+  readonly adjustCredits: (amount: number) => void;
 }
 
 /**
@@ -58,12 +60,17 @@ export class BehaviorManager {
   private static instances = new Map<string, BehaviorInstance>();
   private static updateObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
   private static fallHandlers: FallRespawnHandlers | null = null;
+  private static creditHandlers: CreditHandlers | null = null;
 
   /**
    * Scene callbacks for fall respawn (avoids importing SceneManager).
    */
   public static setFallRespawnHandlers(handlers: FallRespawnHandlers | null): void {
     this.fallHandlers = handlers;
+  }
+
+  public static setCreditHandlers(handlers: CreditHandlers | null): void {
+    this.creditHandlers = handlers;
   }
 
   /**
@@ -74,9 +81,9 @@ export class BehaviorManager {
     this.characterController = characterController;
     this.instances.clear();
     registerFallRespawnHandler('dystopiaStripCreditsOnFallRespawn', () => {
-      const total = CollectiblesManager.getTotalCredits();
+      const total = this.creditHandlers?.getTotalCredits() ?? 0;
       if (total > 0) {
-        CollectiblesManager.adjustCredits(-total);
+        this.creditHandlers?.adjustCredits(-total);
       }
     });
     this.startUpdateLoop();
@@ -181,6 +188,7 @@ export class BehaviorManager {
     this.scene = null;
     this.characterController = null;
     this.fallHandlers = null;
+    this.creditHandlers = null;
   }
 
   /**
@@ -468,9 +476,9 @@ export class BehaviorManager {
   private static executeAction(instance: BehaviorInstance, action: BehaviorAction): void {
     void instance;
     if (action.actionType === 'adjustCredits') {
-      CollectiblesManager.adjustCredits(action.amount);
+      this.creditHandlers?.adjustCredits(action.amount);
     } else if (action.actionType === 'portal') {
-      void switchToEnvironment(action.target);
+      void this.fallHandlers?.switchEnvironment(action.target);
     }
   }
 }

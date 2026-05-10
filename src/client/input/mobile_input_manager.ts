@@ -660,13 +660,6 @@ export class MobileInputManager {
     }
   }
 
-  public static isVisible(): boolean {
-    if (this.joystickContainer) {
-      return this.joystickContainer.style.display !== 'none';
-    }
-    return false;
-  }
-
   /**
    * Updates the position of mobile controls
    * @param controlType The type of control ('joystick', 'jump', 'boost')
@@ -735,101 +728,12 @@ export class MobileInputManager {
   }
 
   /**
-   * Gets the current position of a mobile control
-   * @param controlType The type of control ('joystick', 'jump', 'boost')
-   * @returns The current position object
-   */
-  public static getControlPosition(controlType: 'joystick' | 'jump' | 'boost'): {
-    top?: number;
-    bottom?: number;
-    left?: number;
-    right?: number;
-  } {
-    let element: HTMLDivElement | null = null;
-
-    switch (controlType) {
-      case 'joystick':
-        element = this.joystickContainer;
-        break;
-      case 'jump':
-        element = this.jumpButton;
-        break;
-      case 'boost':
-        element = this.boostButton;
-        break;
-    }
-
-    if (element) {
-      const rect = element.getBoundingClientRect();
-      return {
-        top: rect.top,
-        bottom: window.innerHeight - rect.bottom,
-        left: rect.left,
-        right: window.innerWidth - rect.right
-      };
-    }
-
-    return {};
-  }
-
-  /**
-   * Resets all mobile controls to their default positions
-   */
-  public static resetToDefaultPositions(): void {
-    this.updateControlPosition('joystick', {
-      bottom: MOBILE_CONTROLS.POSITIONS.JOYSTICK.BOTTOM,
-      left: MOBILE_CONTROLS.POSITIONS.JOYSTICK.LEFT
-    });
-
-    this.updateControlPosition('jump', {
-      bottom: MOBILE_CONTROLS.POSITIONS.JUMP_BUTTON.BOTTOM,
-      right: MOBILE_CONTROLS.POSITIONS.JUMP_BUTTON.RIGHT
-    });
-
-    this.updateControlPosition('boost', {
-      bottom: MOBILE_CONTROLS.POSITIONS.BOOST_BUTTON.BOTTOM,
-      right: MOBILE_CONTROLS.POSITIONS.BOOST_BUTTON.RIGHT
-    });
-  }
-
-  /**
    * Applies visibility settings from the config
    */
   private static applyVisibilitySettings(): void {
     this.setControlVisibility('joystick', MOBILE_CONTROLS.VISIBILITY.SHOW_JOYSTICK);
     this.setControlVisibility('jump', MOBILE_CONTROLS.VISIBILITY.SHOW_JUMP_BUTTON);
     this.setControlVisibility('boost', MOBILE_CONTROLS.VISIBILITY.SHOW_BOOST_BUTTON);
-  }
-
-  /**
-   * Forces a reset of all mobile control states
-   * Call this if controls get stuck
-   */
-  public static forceResetAllStates(): void {
-    // Reset all active states
-    this.joystickActive = false;
-    this.jumpActive = false;
-    this.boostActive = false;
-
-    // Reset all touch IDs
-    this.joystickTouchId = null;
-    // Reset input direction
-    this.inputDirection.set(0, 0, 0);
-
-    // Reset button states
-    this.wantJump = false;
-    this.wantBoost = false;
-
-    // Reset joystick visual
-    this.resetJoystick();
-
-    // Reset button colors
-    if (this.jumpButton) {
-      this.jumpButton.style.backgroundColor = MOBILE_CONTROLS.COLORS.BUTTON_BG;
-    }
-    if (this.boostButton) {
-      this.boostButton.style.backgroundColor = MOBILE_CONTROLS.COLORS.BUTTON_BG;
-    }
   }
 
   /**

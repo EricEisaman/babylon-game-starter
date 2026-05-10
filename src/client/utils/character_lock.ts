@@ -5,13 +5,24 @@
 // ============================================================================
 
 import { ASSETS } from '../config/assets';
-import { SettingsUI } from '../ui/settings_ui';
 
 import type { Character } from '../types/character';
+
+interface CharacterLockUiHooks {
+  getCurrentCharacterName(): string | null;
+  getLastSelectedCharacterName(): string | null;
+  changeCharacter(name: string): void;
+  regenerateSections(): void;
+}
 
 export class CharacterLock {
   // Map to track runtime lock state (since ASSETS is 'as const' and cannot be mutated)
   private static characterLockState = new Map<string, boolean>();
+  private static uiHooks: CharacterLockUiHooks | null = null;
+
+  public static setUiHooks(hooks: CharacterLockUiHooks | null): void {
+    this.uiHooks = hooks;
+  }
 
   /**
    * Sets the runtime lock state for a character by name
@@ -33,24 +44,24 @@ export class CharacterLock {
 
     // If locking the current character, switch to an unlocked character
     if (locked) {
-      const currentCharacterName = SettingsUI.getCurrentCharacterName();
+      const currentCharacterName = this.uiHooks?.getCurrentCharacterName() ?? null;
       if (currentCharacterName === name) {
         // Try to get the last selected character if unlocked
         const lastSelectedCharacter = this.getLastSelectedCharacterIfUnlocked();
         if (lastSelectedCharacter !== null) {
-          SettingsUI.changeCharacter(lastSelectedCharacter.name);
+          this.uiHooks?.changeCharacter(lastSelectedCharacter.name);
         } else {
           // Fall back to first unlocked character
           const firstUnlockedCharacter = this.getFirstUnlockedCharacter();
           if (firstUnlockedCharacter !== null) {
-            SettingsUI.changeCharacter(firstUnlockedCharacter.name);
+            this.uiHooks?.changeCharacter(firstUnlockedCharacter.name);
           }
         }
       }
     }
 
     // Trigger reactive UI refresh of Settings UI dropdown
-    SettingsUI.regenerateSections();
+    this.uiHooks?.regenerateSections();
   }
 
   /**
@@ -94,7 +105,7 @@ export class CharacterLock {
   public static resetCharacterLock(name: string): void {
     this.characterLockState.delete(name);
     // Trigger reactive UI refresh
-    SettingsUI.regenerateSections();
+    this.uiHooks?.regenerateSections();
   }
 
   /**
@@ -115,7 +126,7 @@ export class CharacterLock {
    * @returns Last selected character if unlocked, otherwise null
    */
   private static getLastSelectedCharacterIfUnlocked(): Character | null {
-    const lastSelectedName = SettingsUI.getLastSelectedCharacterName();
+    const lastSelectedName = this.uiHooks?.getLastSelectedCharacterName() ?? null;
     if (lastSelectedName === null) {
       return null;
     }

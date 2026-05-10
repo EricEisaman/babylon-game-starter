@@ -50,23 +50,3 @@ export function fromAbstractSound(sound: BABYLON.AbstractSound): ManagedAudioSou
     isActive: () => sound.activeInstancesCount > 0
   };
 }
-
-export function fromLegacySound(sound: BABYLON.Sound): ManagedAudioSound {
-  return {
-    play: () => {
-      sound.play();
-    },
-    stop: () => {
-      sound.stop();
-    },
-    dispose: () => {
-      sound.dispose();
-    },
-    setVolume: (volume: number, ramp?: Partial<AudioVolumeRampOptions> | null) => {
-      void ramp;
-      sound.setVolume(volume);
-    },
-    getVolume: () => sound.getVolume(),
-    isActive: () => sound.isPlaying
-  };
-}

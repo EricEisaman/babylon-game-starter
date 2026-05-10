@@ -29,10 +29,26 @@ export interface HUDConfig {
     readonly SHOW_BOOST_STATUS: boolean;
     readonly SHOW_CREDITS: boolean;
   };
+  readonly IPadWithKeyboard: {
+    readonly SHOW_COORDINATES: boolean;
+    readonly SHOW_TIME: boolean;
+    readonly SHOW_FPS: boolean;
+    readonly SHOW_STATE: boolean;
+    readonly SHOW_BOOST_STATUS: boolean;
+    readonly SHOW_CREDITS: boolean;
+  };
 }
 
 export type UIElementType = 'toggle' | 'dropdown';
 export type VisibilityType = 'all' | 'mobile' | 'iPadWithKeyboard';
+export type SettingsActionId =
+  | 'screen-controls'
+  | 'character'
+  | 'environment'
+  | 'playground-ui'
+  | 'split-rendering'
+  | 'game-hud'
+  | 'inspector';
 
 export interface SettingsSection {
   readonly title: string;
@@ -40,7 +56,7 @@ export interface SettingsSection {
   readonly visibility: VisibilityType;
   readonly defaultValue?: boolean | string;
   readonly options?: string[]; // For dropdown elements
-  readonly onChange?: (_value: boolean | string) => void | Promise<void>;
+  readonly actionId?: SettingsActionId;
 }
 
 export interface SettingsConfig {

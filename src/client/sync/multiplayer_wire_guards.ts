@@ -11,7 +11,7 @@ import type {
 } from '../types/multiplayer';
 
 /** World-space limits (meters); rejects absurd/grief payloads before Havok sees them. */
-export const MAX_ABS_WORLD_COORD = 5e6;
+const MAX_ABS_WORLD_COORD = 5e6;
 
 export function clampCoordComponent(n: number): number {
   if (!Number.isFinite(n)) {
@@ -21,7 +21,7 @@ export function clampCoordComponent(n: number): number {
 }
 
 /** Position or linear velocity in world units (clamped). */
-export function coerceWorldVector3(raw: unknown): [number, number, number] | null {
+function coerceWorldVector3(raw: unknown): [number, number, number] | null {
   if (!Array.isArray(raw) || raw.length !== 3) {
     return null;
   }
@@ -34,18 +34,13 @@ export function coerceWorldVector3(raw: unknown): [number, number, number] | nul
   return [clampCoordComponent(a), clampCoordComponent(b), clampCoordComponent(c)];
 }
 
-/** @deprecated alias — world-space triplets (position / velocity). */
-export function coerceTriplet(raw: unknown): [number, number, number] | null {
-  return coerceWorldVector3(raw);
-}
-
 /**
  * Wire rotation for **character sync** and **item sync**: unit quaternion [x, y, z, w].
  * Items carry a `pos` + `rot` pose pair on the wire — Invariant P in
  * [MULTIPLAYER_SYNCH.md §5.2](../../../MULTIPLAYER_SYNCH.md#52-item-state). `rot` is
  * validated and normalized via this function.
  */
-export function coerceQuaternion(raw: unknown): QuaternionSerializable | null {
+function coerceQuaternion(raw: unknown): QuaternionSerializable | null {
   if (!Array.isArray(raw) || raw.length !== 4) {
     return null;
   }

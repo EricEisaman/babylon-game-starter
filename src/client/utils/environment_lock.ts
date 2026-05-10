@@ -5,13 +5,24 @@
 // ============================================================================
 
 import { ASSETS } from '../config/assets';
-import { SettingsUI } from '../ui/settings_ui';
 
 import type { Environment } from '../types/environment';
+
+interface EnvironmentLockUiHooks {
+  getCurrentEnvironmentName(): string | null;
+  getLastSelectedEnvironmentName(): string | null;
+  changeEnvironment(name: string): void | Promise<void>;
+  regenerateSections(): void;
+}
 
 export class EnvironmentLock {
   // Map to track runtime lock state (since ASSETS is 'as const' and cannot be mutated)
   private static environmentLockState = new Map<string, boolean>();
+  private static uiHooks: EnvironmentLockUiHooks | null = null;
+
+  public static setUiHooks(hooks: EnvironmentLockUiHooks | null): void {
+    this.uiHooks = hooks;
+  }
 
   /**
    * Sets the runtime lock state for an environment by name
@@ -33,24 +44,24 @@ export class EnvironmentLock {
 
     // If locking the current environment, switch to an unlocked environment
     if (locked) {
-      const currentEnvironmentName = SettingsUI.getCurrentEnvironmentName();
+      const currentEnvironmentName = this.uiHooks?.getCurrentEnvironmentName() ?? null;
       if (currentEnvironmentName === name) {
         // Try to get the last selected environment if unlocked
         const lastSelectedEnvironment = this.getLastSelectedEnvironmentIfUnlocked();
         if (lastSelectedEnvironment !== null) {
-          void SettingsUI.changeEnvironment(lastSelectedEnvironment.name);
+          void this.uiHooks?.changeEnvironment(lastSelectedEnvironment.name);
         } else {
           // Fall back to first unlocked environment
           const firstUnlockedEnvironment = this.getFirstUnlockedEnvironment();
           if (firstUnlockedEnvironment !== null) {
-            void SettingsUI.changeEnvironment(firstUnlockedEnvironment.name);
+            void this.uiHooks?.changeEnvironment(firstUnlockedEnvironment.name);
           }
         }
       }
     }
 
     // Trigger reactive UI refresh of Settings UI dropdown
-    SettingsUI.regenerateSections();
+    this.uiHooks?.regenerateSections();
   }
 
   /**
@@ -94,7 +105,7 @@ export class EnvironmentLock {
   public static resetEnvironmentLock(name: string): void {
     this.environmentLockState.delete(name);
     // Trigger reactive UI refresh
-    SettingsUI.regenerateSections();
+    this.uiHooks?.regenerateSections();
   }
 
   /**
@@ -115,7 +126,7 @@ export class EnvironmentLock {
    * @returns Last selected environment if unlocked, otherwise null
    */
   private static getLastSelectedEnvironmentIfUnlocked(): Environment | null {
-    const lastSelectedName = SettingsUI.getLastSelectedEnvironmentName();
+    const lastSelectedName = this.uiHooks?.getLastSelectedEnvironmentName() ?? null;
     if (lastSelectedName === null) {
       return null;
     }

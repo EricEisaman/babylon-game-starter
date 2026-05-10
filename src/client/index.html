@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Babylon Game Starter</title>
-    <link rel="icon" type="image/png" href="/branding/images/logo.png">
+    <link rel="icon" type="image/png" href="%BASE_URL%branding/images/logo.png">
     <style>
         * {
             margin: 0;
@@ -140,7 +140,7 @@
     <!-- Loading screen -->
     <div id="loadingScreen">
         <div class="loading-content">
-            <img id="loadingBrandImage" class="loading-brand-image" alt="Brand logo" width="256" height="256" src="/branding/images/Babylon_logo.png">
+            <img id="loadingBrandImage" class="loading-brand-image" alt="Brand logo" width="256" height="256" src="%BASE_URL%branding/images/Babylon_logo.png">
             <div class="spinner"></div>
             <h1 id="loadingTitle">Babylon Game Starter</h1>
             <p id="loadingSubtitle">Loading your game ...</p>
@@ -165,10 +165,19 @@
     <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
 
     <!-- Main script -->
-    <script type="module" src="/main.ts"></script>
+    <script type="module" src="./main.ts"></script>
 
     <script type="module">
-        import { LOCAL_DEV_DEBUG } from '/config/local_dev.ts';
+        import { LOCAL_DEV_DEBUG } from './config/local_dev.ts';
+
+        const APP_BASE_URL = import.meta.env.BASE_URL;
+        const withAppBasePath = (path) => {
+            if (/^(?:[a-z][a-z\d+\-.]*:)?\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) {
+                return path;
+            }
+
+            return `${APP_BASE_URL}${path.replace(/^\/+/, '')}`;
+        };
 
         const debugInfoEl = document.getElementById('debugInfo');
         const fpsCounterEl = document.getElementById('fpsCounter');
@@ -176,7 +185,7 @@
         const debugContentEl = document.getElementById('debugContent');
 
         const DEFAULT_BRANDING = {
-            image: '/branding/images/Babylon_logo.png',
+            image: withAppBasePath('/branding/images/Babylon_logo.png'),
             imageWidth: 256,
             imageHeight: 256,
             bgColor: '#ffffff',
@@ -214,7 +223,7 @@
 
             if (imageEl instanceof HTMLImageElement) {
                 const imgSrc = typeof brandingConfig.image === 'string' && brandingConfig.image.length > 0
-                    ? brandingConfig.image
+                    ? withAppBasePath(brandingConfig.image)
                     : DEFAULT_BRANDING.image;
                 const imgW = typeof brandingConfig.imageWidth === 'number' ? brandingConfig.imageWidth : DEFAULT_BRANDING.imageWidth;
                 const imgH = typeof brandingConfig.imageHeight === 'number' ? brandingConfig.imageHeight : DEFAULT_BRANDING.imageHeight;
@@ -243,7 +252,7 @@
 
         async function loadBrandingConfig() {
             try {
-                const response = await fetch('/branding/config.json', { cache: 'no-store' });
+                const response = await fetch(withAppBasePath('/branding/config.json'), { cache: 'no-store' });
                 if (!response.ok) {
                     applyBranding(DEFAULT_BRANDING);
                     return;

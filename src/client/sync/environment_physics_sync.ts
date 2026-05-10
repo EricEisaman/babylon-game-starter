@@ -10,9 +10,8 @@
 //   - §7.5 Item authority authorization
 //     (../../../MULTIPLAYER_SYNCH.md#75-item-authority-authorization)
 //
-// `setEnvironmentPhysicsKinematic()` flips bodies between ANIMATED (kinematic, receivers) and
-// DYNAMIC (owner). A future per-item tracker will flip each body independently; today's
-// blanket non-synchronizer flip is a coarser approximation of the same invariant.
+// `setEnvironmentPhysicsMeshKinematic()` flips individual bodies between ANIMATED
+// (kinematic, receivers) and DYNAMIC (owner) as per-item authority changes.
 
 import { ASSETS } from '../config/assets';
 import { applyPoseToMesh, sampleMeshPose } from '../utils/multiplayer_serialization';
@@ -153,16 +152,6 @@ export function applyRemoteEnvironmentPhysicsState(
 }
 
 /**
- * Flips every `env.physicsObjects` mesh (mass > 0) between kinematic (`ANIMATED`) and
- * dynamic (`DYNAMIC`) motion types.
- *
- * Non-owner clients set `kinematic=true` so Havok does not fight the authoritative
- * mesh-direct writes from the owner (prevents gravity / local collisions from
- * knocking replicated bodies around between snapshots). On promotion to owner,
- * callers flip back to `kinematic=false` to resume the authoritative simulation.
- * See MULTIPLAYER_SYNCH.md §B.9 for the apply primitive rationale.
- */
-/**
  * Flips a single environment physics mesh's motion type. Used by the per-item authority
  * pipeline so a dynamic mesh is kinematic on non-owners and dynamic on the owner.
  * Returns true on a successful flip (or no-op when already in the requested state).
@@ -202,48 +191,5 @@ export function setEnvironmentPhysicsMeshKinematic(
     return true;
   } catch {
     return false;
-  }
-}
-
-export function setEnvironmentPhysicsKinematic(
-  scene: BABYLON.Scene,
-  environmentName: string,
-  kinematic: boolean
-): void {
-  const env = ASSETS.ENVIRONMENTS.find((e) => e.name === environmentName);
-  if (!env) {
-    return;
-  }
-
-  const motionType = kinematic
-    ? BABYLON.PhysicsMotionType.ANIMATED
-    : BABYLON.PhysicsMotionType.DYNAMIC;
-
-  for (const po of env.physicsObjects) {
-    if (po.mass <= 0 || !po.name || po.name.trim() === '') {
-      continue;
-    }
-    const mesh = scene.getMeshByName(po.name);
-    if (!mesh || mesh.isDisposed()) {
-      continue;
-    }
-    const node = mesh as BABYLON.TransformNode & { physicsBody?: BABYLON.PhysicsBody };
-    const body = node.physicsBody;
-    if (!body || body.isDisposed) {
-      continue;
-    }
-    try {
-      if (body.getMotionType() !== motionType) {
-        body.setMotionType(motionType);
-      }
-      // body.disablePreStep stays at its default (false) — see
-      // setEnvironmentPhysicsMeshKinematic() rationale and §B.9.
-      if (kinematic) {
-        body.setLinearVelocity(BABYLON.Vector3.Zero());
-        body.setAngularVelocity(BABYLON.Vector3.Zero());
-      }
-    } catch {
-      /* Havok edge cases — retry next frame */
-    }
   }
 }

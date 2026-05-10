@@ -2,12 +2,10 @@
 // GAME CONFIGURATION
 // ============================================================================
 
-import { MobileInputManager } from '../input/mobile_input_manager';
-import { SettingsUI } from '../ui/settings_ui';
-
 import { ASSETS } from './assets';
 
-import type { GameConfig, HUDPosition } from '../types/config';
+import type { GameConfig } from '../types/config';
+import type { HUDPosition } from '../types/ui';
 
 export const CONFIG: GameConfig = {
   // Character Settings
@@ -214,12 +212,7 @@ export const CONFIG: GameConfig = {
         uiElement: 'toggle',
         visibility: 'iPadWithKeyboard',
         defaultValue: true, // Default to showing controls
-        onChange: (value: boolean | string) => {
-          // Control mobile input visibility
-          if (typeof MobileInputManager !== 'undefined' && typeof value === 'boolean') {
-            MobileInputManager.setVisibility(value);
-          }
-        }
+        actionId: 'screen-controls'
       },
       {
         title: 'Character',
@@ -227,11 +220,7 @@ export const CONFIG: GameConfig = {
         visibility: 'all',
         defaultValue: 'Red', // Default to first character (Red)
         options: ASSETS.CHARACTERS.map((character) => character.name),
-        onChange: (value: boolean | string) => {
-          if (typeof value === 'string' && !SettingsUI.isInitializing) {
-            SettingsUI.changeCharacter(value);
-          }
-        }
+        actionId: 'character'
       },
       {
         title: 'Environment',
@@ -240,55 +229,35 @@ export const CONFIG: GameConfig = {
         defaultValue:
           ASSETS.ENVIRONMENTS.find((e) => e.isDefault)?.name ?? ASSETS.ENVIRONMENTS[0]?.name ?? '', // Default to isDefault env or first
         options: ASSETS.ENVIRONMENTS.map((environment) => environment.name),
-        onChange: async (value: boolean | string) => {
-          if (typeof value === 'string') {
-            await SettingsUI.changeEnvironment(value);
-          }
-        }
+        actionId: 'environment'
       },
       {
         title: 'Babylon Playground UI',
         uiElement: 'toggle',
         visibility: 'all',
         defaultValue: true, // Default to showing playground UI elements
-        onChange: (value: boolean | string) => {
-          if (typeof value === 'boolean') {
-            SettingsUI.togglePlaygroundUI(value);
-          }
-        }
+        actionId: 'playground-ui'
       },
       {
         title: 'Full Screen',
         uiElement: 'toggle',
         visibility: 'all',
         defaultValue: false, // Default state, will be synced with actual element state
-        onChange: (value: boolean | string) => {
-          if (typeof value === 'boolean') {
-            SettingsUI.toggleSplitRendering(value);
-          }
-        }
+        actionId: 'split-rendering'
       },
       {
         title: 'Game HUD',
         uiElement: 'toggle',
         visibility: 'all',
         defaultValue: true, // Default to showing HUD elements
-        onChange: (value: boolean | string) => {
-          if (typeof value === 'boolean') {
-            SettingsUI.toggleGameHUD(value);
-          }
-        }
+        actionId: 'game-hud'
       },
       {
         title: 'Inspector',
         uiElement: 'toggle',
         visibility: 'all',
         defaultValue: false, // Default state, will be synced with actual element state
-        onChange: (value: boolean | string) => {
-          if (typeof value === 'boolean') {
-            SettingsUI.toggleInspector(value);
-          }
-        }
+        actionId: 'inspector'
       }
     ]
   },

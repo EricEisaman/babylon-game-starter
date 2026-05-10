@@ -4,6 +4,7 @@
 
 import { ASSETS } from '../config/assets';
 import { CONFIG } from '../config/game_config';
+import { MobileInputManager } from '../input/mobile_input_manager';
 import { AudioManager } from '../managers/audio_manager';
 import { CutSceneManager } from '../managers/cut_scene_manager';
 import { HUDManager } from '../managers/hud_manager';
@@ -93,12 +94,77 @@ export class SettingsUI {
     }
   }
 
+  private static async runSectionAction(
+    actionId: SettingsSection['actionId'],
+    value: boolean | string
+  ): Promise<void> {
+    if (!actionId) {
+      return;
+    }
+
+    switch (actionId) {
+      case 'screen-controls':
+        if (typeof value === 'boolean') {
+          MobileInputManager.setVisibility(value);
+        }
+        break;
+      case 'character':
+        if (typeof value === 'string' && !this.isInitializing) {
+          this.changeCharacter(value);
+        }
+        break;
+      case 'environment':
+        if (typeof value === 'string') {
+          await this.changeEnvironment(value);
+        }
+        break;
+      case 'playground-ui':
+        if (typeof value === 'boolean') {
+          this.togglePlaygroundUI(value);
+        }
+        break;
+      case 'split-rendering':
+        if (typeof value === 'boolean') {
+          this.toggleSplitRendering(value);
+        }
+        break;
+      case 'game-hud':
+        if (typeof value === 'boolean') {
+          this.toggleGameHUD(value);
+        }
+        break;
+      case 'inspector':
+        if (typeof value === 'boolean') {
+          this.toggleInspector(value);
+        }
+        break;
+    }
+  }
+
   public static initialize(canvas: HTMLCanvasElement, sceneManager?: SceneManager): void {
     // Clean up first
     this.cleanup();
 
     this.isInitializing = true; // Prevent onChange during initialization
     this.sceneManager = sceneManager ?? null;
+    CharacterLock.setUiHooks({
+      getCurrentCharacterName: () => this.getCurrentCharacterName(),
+      getLastSelectedCharacterName: () => this.getLastSelectedCharacterName(),
+      changeCharacter: (name) => {
+        this.changeCharacter(name);
+      },
+      regenerateSections: () => {
+        this.regenerateSections();
+      }
+    });
+    EnvironmentLock.setUiHooks({
+      getCurrentEnvironmentName: () => this.getCurrentEnvironmentName(),
+      getLastSelectedEnvironmentName: () => this.getLastSelectedEnvironmentName(),
+      changeEnvironment: (name) => this.changeEnvironment(name),
+      regenerateSections: () => {
+        this.regenerateSections();
+      }
+    });
     this.createSettingsButton(canvas);
     this.createSettingsPanel(canvas);
     this.setupEventListeners();
@@ -498,9 +564,7 @@ export class SettingsUI {
             return;
           }
 
-          if (section.onChange) {
-            await section.onChange(target.checked);
-          }
+          await this.runSectionAction(section.actionId, target.checked);
         })();
       });
     });
@@ -582,8 +646,8 @@ export class SettingsUI {
             target.setAttribute('data-previous-value', target.value);
           }
 
-          if (section.onChange && !this.isInitializing) {
-            await section.onChange(target.value);
+          if (!this.isInitializing) {
+            await this.runSectionAction(section.actionId, target.value);
           }
         })();
       });

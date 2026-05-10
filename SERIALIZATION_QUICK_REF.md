@@ -4,7 +4,7 @@
 > For the full reference (pipeline diagrams, server-side validation rules, rationale), see [`SERIALIZATION_GUIDE.md`](SERIALIZATION_GUIDE.md). This page is a cheat-sheet for the common import + call patterns.
 
 > [!IMPORTANT]
-> **Item paths are pose-only.** Per Invariants P and E in [`MULTIPLAYER_SYNCH.md §5.2`](MULTIPLAYER_SYNCH.md#52-item-state), every `ItemInstanceState` row carries exactly `pos: readonly [number, number, number]` (world-space position) and `rot: readonly [number, number, number, number]` (unit quaternion `[x,y,z,w]`). No `matrix`, no Euler `rotation`, no `velocity`, and no `scale` on item paths. The Euler / quaternion serializers below are used by **character sync only**; item sync uses `sampleMeshPose` and `applyPoseToMesh` in [`src/client/utils/multiplayer_serialization.ts`](src/client/utils/multiplayer_serialization.ts).
+> **Item paths are pose-only.** Per Invariants P and E in [`MULTIPLAYER_SYNCH.md §5.2`](MULTIPLAYER_SYNCH.md#52-item-state), every `ItemInstanceState` row carries exactly `pos: readonly [number, number, number]` (world-space position) and `rot: readonly [number, number, number, number]` (unit quaternion `[x,y,z,w]`). No `matrix`, no Euler `rotation`, no `velocity`, and no `scale` on item paths. Item sync uses `sampleMeshPose` and `applyPoseToMesh` in [`src/client/utils/multiplayer_serialization.ts`](src/client/utils/multiplayer_serialization.ts).
 
 ## Contents
 
@@ -19,8 +19,17 @@
 ### Character state
 
 ```typescript
-const state = characterSync.sampleState(Date.now());
-CharacterSync.applyRemoteCharacterState(remoteMesh, state);
+// Current character replication is wired in multiplayer_bootstrap.ts.
+// Remote avatar transforms are applied by remote_peer_proxy.ts.
+const state = {
+  clientId,
+  environmentName,
+  characterModelId,
+  position: [mesh.position.x, mesh.position.y, mesh.position.z],
+  rotation: yawRadiansToWireQuaternion(characterController.getFacingYawRadians()),
+  velocity: [velocity.x, velocity.y, velocity.z],
+  timestamp: Date.now(),
+};
 ```
 
 ### Item state (pose-only, Invariant P)
@@ -39,12 +48,11 @@ itemSync.updateItemState({
 ItemSync.applyRemoteItemState(itemMesh, itemState);
 ```
 
-### Light state
+### Effects, light, and sky state
 
-```typescript
-lightsSync.updateLight({ lightType: 'POINT', position: [5, 10, 15], intensity: 1.0 });
-LightsSync.applyRemoteLightState(babylonLight, lightState);
-```
+The server and `MultiplayerManager` still expose effects/light/sky channels, but no
+client-side sampler currently publishes those channels. Add a focused sync module and
+wire it through `multiplayer_bootstrap.ts` before treating them as active paths.
 
 ## Wire formats
 
@@ -61,49 +69,30 @@ LightsSync.applyRemoteLightState(babylonLight, lightState);
 
 The repository does not configure a `@/` path alias; imports are always relative to the importing file. Examples below assume a caller in `src/client/**`.
 
-### Serialization and deserialization helpers
+### Serialization and pose helpers
 
 ```typescript
 import {
-  serializeVector3,
-  serializeQuaternion,
-  serializeColor3,
-  deserializeVector3,
   deserializeQuaternion,
-  deserializeColor3,
-  eulerToQuaternion,
-  quaternionToEuler,
-  slerpQuaternion,
   sampleMeshPose,
   applyPoseToMesh,
 } from '../utils/multiplayer_serialization';
 ```
 
-### Validation helpers
+### Wire guards
 
 ```typescript
-import {
-  isFiniteVector3,
-  isValidWorldPosition,
-  isValidEulerAngles,
-  isValidQuaternion,
-  isValidColor,
-  hasSignificantVector3Change,
-  hasSignificantAngleChange,
-  hasSignificantQuaternionChange,
-} from '../utils/multiplayer_serialization';
+import { coerceCharacterState, coerceItemInstanceState } from '../sync/multiplayer_wire_guards';
 ```
 
 ### Mesh application entry points
 
 ```typescript
-import { CharacterSync } from '../sync/character_sync';
 import { ItemSync } from '../sync/item_sync';
-import { LightsSync } from '../sync/lights_sync';
+import { applyRemotePeerState } from '../managers/remote_peer_proxy';
 
-CharacterSync.applyRemoteCharacterState(mesh, characterState);
+applyRemotePeerState(scene, characterState, currentEnvironmentName);
 ItemSync.applyRemoteItemState(mesh, itemState);
-LightsSync.applyRemoteLightState(light, lightState);
 ```
 
 ## Bandwidth rough order
@@ -120,7 +109,7 @@ LightsSync.applyRemoteLightState(light, lightState);
 
 | Stage | Check |
 |-------|-------|
-| Pre-serialize (client) | Finite; position within ±10000; Euler within `[-2π, 2π]`; color components in `[0, 1]`; timestamp within ±30 s |
+| Pre-serialize (client) | Finite; position within ±10000; color components in `[0, 1]`; timestamp within ±30 s |
 | Server validation ([`src/server/multiplayer/utils.go`](src/server/multiplayer/utils.go)) | NaN / Infinity rejection; bounds check; quaternion normalization (length ≈ 1.0); enum validation (animation states); timestamp freshness |
 | Mesh application | Quaternion-first (`mesh.rotationQuaternion` — never Euler on item paths); safe fallback to disable on error |
 
