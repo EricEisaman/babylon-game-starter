@@ -234,14 +234,14 @@ export const CONFIG: GameConfig = {
       {
         title: 'Babylon Playground UI',
         uiElement: 'toggle',
-        visibility: 'all',
+        visibility: 'playground',
         defaultValue: true, // Default to showing playground UI elements
         actionId: 'playground-ui'
       },
       {
         title: 'Full Screen',
         uiElement: 'toggle',
-        visibility: 'all',
+        visibility: 'playground',
         defaultValue: false, // Default state, will be synced with actual element state
         actionId: 'split-rendering'
       },
