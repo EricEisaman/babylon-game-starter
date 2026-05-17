@@ -154,6 +154,7 @@ Deploy the generated site through Netlify as usual:
 
 ## Troubleshooting
 
+- If the page loads without favicon or loading-screen logo, check that `static.basePath` matches the deployed path; branding assets under `src/client/public/branding/` use the same Vite base path as the rest of the build.
 - If the site loads but multiplayer fails, open the browser console and confirm the client is probing the expected host.
 - If using a custom host, confirm the server responds to `/api/multiplayer/health` and that CORS allows the site origin.
 - If multiplayer should be disabled, verify `CONFIG.MULTIPLAYER.ENABLED` is `false` and not overwritten by another build-time setting.
