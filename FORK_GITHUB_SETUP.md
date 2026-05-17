@@ -107,10 +107,19 @@ See **[FEATURE_RELEASE.md](FEATURE_RELEASE.md)**.
 | **Sync feature ref to main and deployment branches** | Open sync PRs from a **`feature/**`** tag or manual **`feature_ref`** |
 | **Deploy GitHub Pages** | Build **`dist/`** and deploy to Pages from **`gh-deploy`** only |
 
+## Repo sidebar: `github-pages` deployment badge
+
+GitHub shows the **latest** deployment to the **`github-pages`** environment on the repo home page. A red **X** usually means the newest deployment **failed** (often a stale attempt from **`main`** before **Pages → Source** was set to **GitHub Actions**).
+
+**Clear it:** merge to **`gh-deploy`** and push, or run **Deploy GitHub Pages** from **`gh-deploy`**. After a **successful** deploy from **`gh-deploy`**, refresh the repo page; the badge should show success. Live site: `https://<user>.github.io/<repo>/`.
+
+Pushes to **`main`** should **not** run **Deploy GitHub Pages**; they only update the badge if something else still targets **`github-pages`** from **`main`** (fix **Pages → Source** in step 2).
+
 ## Troubleshooting
 
 | Symptom | Fix |
 | ------- | --- |
+| Red **X** on repo home under **Deployments** | Successful **Deploy GitHub Pages** from **`gh-deploy`** (see above) |
 | **`pages build and deployment`** fails on **`main`** | **Settings → Pages → Source** → **GitHub Actions** (step 2) |
 | **`Branch "main" is not allowed...`** on **Deploy GitHub Pages** | Run workflow from **`gh-deploy`**, not **`main`** |
 | **`Branch "gh-deploy" is not allowed...`** | Allow **`gh-deploy`** in **Environments → github-pages** (step 3) |

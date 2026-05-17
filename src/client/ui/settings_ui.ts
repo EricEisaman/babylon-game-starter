@@ -13,6 +13,15 @@ import { hideAllRemotePeers } from '../managers/remote_peer_proxy';
 import { CharacterLock } from '../utils/character_lock';
 import { EnvironmentLock } from '../utils/environment_lock';
 
+import {
+  applyOverlayButtonBaseStyles,
+  bindOutsideClose,
+  bindOverlayPressFeedback,
+  bindOverlayToggle,
+  bindPreventTextSelection
+} from './overlay_button_utils';
+
+import type { OutsideCloseBinding, OverlayToggleBinding } from './overlay_button_utils';
 import type { SceneManager } from '../managers/scene_manager';
 import type { CutScene } from '../types/environment';
 import type { SettingsSection, VisibilityType } from '../types/ui';
@@ -33,6 +42,10 @@ export class SettingsUI {
   private static hudDisplayCache: string | null = null;
   // Cache for Inspector button element
   private static inspectorButton: HTMLElement | null = null;
+  private static toggleBinding: OverlayToggleBinding | null = null;
+  private static pressBinding: OverlayToggleBinding | null = null;
+  private static selectionBinding: OverlayToggleBinding | null = null;
+  private static outsideCloseBinding: OutsideCloseBinding | null = null;
 
   // Device detection methods
   private static isMobileDevice(): boolean {
@@ -183,42 +196,19 @@ export class SettingsUI {
             </svg>
         `;
 
-    // Style the button
-    this.settingsButton.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 50px;
-            height: 50px;
-            background: rgba(0, 0, 0, 0.7);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: white;
-            z-index: 2000;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-        `;
-
-    // Add hover effects
-    this.settingsButton.addEventListener('mouseenter', () => {
-      if (this.settingsButton) {
-        this.settingsButton.style.background = 'rgba(0, 0, 0, 0.9)';
-        this.settingsButton.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-        this.settingsButton.style.transform = 'scale(1.1)';
-      }
+    applyOverlayButtonBaseStyles(this.settingsButton, {
+      corner: 'bottom-left',
+      zIndex: CONFIG.SETTINGS.BUTTON_Z_INDEX
     });
-
-    this.settingsButton.addEventListener('mouseleave', () => {
-      if (this.settingsButton) {
-        this.settingsButton.style.background = 'rgba(0, 0, 0, 0.7)';
-        this.settingsButton.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-        this.settingsButton.style.transform = 'scale(1)';
-      }
-    });
+    this.settingsButton.style.background = 'rgba(0, 0, 0, 0.7)';
+    this.settingsButton.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+    this.settingsButton.style.color = 'white';
+    this.settingsButton.style.backdropFilter = 'blur(10px)';
+    const svg = this.settingsButton.querySelector('svg');
+    if (svg instanceof SVGElement) {
+      svg.style.pointerEvents = 'none';
+      svg.style.userSelect = 'none';
+    }
 
     document.body.appendChild(this.settingsButton);
   }
@@ -694,32 +684,43 @@ export class SettingsUI {
   }
 
   private static setupEventListeners(): void {
-    // Settings button click
-    if (!this.settingsButton) return;
-    this.settingsButton.addEventListener('click', () => {
+    this.removeOverlayBindings();
+
+    if (!this.settingsButton || !this.settingsPanel) return;
+
+    this.selectionBinding = bindPreventTextSelection(this.settingsButton);
+    this.pressBinding = bindOverlayPressFeedback(this.settingsButton);
+    this.toggleBinding = bindOverlayToggle(this.settingsButton, () => {
       this.togglePanel();
     });
-
-    // Close panel when clicking outside
-    document.addEventListener('click', (e) => {
-      if (this.isPanelOpen && this.settingsPanel && this.settingsButton) {
-        const target = e.target;
-        if (
-          target instanceof Node &&
-          !this.settingsPanel.contains(target) &&
-          !this.settingsButton.contains(target)
-        ) {
-          this.closePanel();
-        }
+    this.outsideCloseBinding = bindOutsideClose({
+      panel: this.settingsPanel,
+      trigger: this.settingsButton,
+      isOpen: () => this.isPanelOpen,
+      onClose: () => {
+        this.closePanel();
       }
     });
 
-    // Handle window resize
-    window.addEventListener('resize', () => {
-      if (this.isPanelOpen) {
-        this.updatePanelWidth();
-      }
-    });
+    window.addEventListener('resize', this.handleWindowResize);
+  }
+
+  private static handleWindowResize = (): void => {
+    if (this.isPanelOpen) {
+      this.updatePanelWidth();
+    }
+  };
+
+  private static removeOverlayBindings(): void {
+    this.toggleBinding?.remove();
+    this.pressBinding?.remove();
+    this.selectionBinding?.remove();
+    this.outsideCloseBinding?.remove();
+    this.toggleBinding = null;
+    this.pressBinding = null;
+    this.selectionBinding = null;
+    this.outsideCloseBinding = null;
+    window.removeEventListener('resize', this.handleWindowResize);
   }
 
   private static togglePanel(): void {
@@ -1767,6 +1768,8 @@ export class SettingsUI {
    * Global cleanup method to remove all SettingsUI elements from DOM
    */
   public static cleanup(): void {
+    this.removeOverlayBindings();
+
     // Remove ALL settings buttons and panels (more aggressive)
     const allButtons = document.querySelectorAll('#settings-button');
     allButtons.forEach((button) => {
