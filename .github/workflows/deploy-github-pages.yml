@@ -3,6 +3,7 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: ["gh-deploy"]
+  # Manual runs must use branch gh-deploy (UI or gh --ref) so environment rules evaluate gh-deploy, not main.
   workflow_dispatch:
 
 permissions:
