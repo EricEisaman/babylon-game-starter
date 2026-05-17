@@ -15,3 +15,5 @@ dist
 
 # Debug/test screenshots
 *.png
+!src/client/public/branding/images/Babylon_logo.png
+!src/client/public/branding/images/logo.png
