@@ -63,7 +63,11 @@ const deploymentSettings = {
     }
   ],
   static: {
-    basePath: '/babylon-game-starter/'
+    basePath: '/babylon-game-starter/',
+    githubPages: {
+      deployBranch: 'gh-deploy',
+      environmentName: 'github-pages'
+    }
   }
 };
 
@@ -75,6 +79,9 @@ export default deploymentSettings;
 - `basePath` controls the deployed base URL. For a GitHub Pages project site, set it to the repository path with leading and trailing slashes, for example `/babylon-game-starter/`.
 - If you deploy to a user or organization Pages site at the domain root, use `basePath: '/'`.
 - If you use a custom domain that serves the app from the domain root, use `basePath: '/'`. If the custom domain serves the app from a subpath, use that subpath.
+- **`static.githubPages`** (optional) drives the generated GitHub Actions workflow:
+  - `deployBranch` — branch whose `push` events trigger a Pages deploy (default `gh-deploy`). Keep it aligned with **Settings → Environments → Deployment branches** for `environmentName`, and with the **`gh-deploy`** target used by [`sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml) when you ship via feature tags.
+  - `environmentName` — Actions `environment` name for the deploy job (default `github-pages`).
 
 ### Step 2: Prepare deployment artifacts
 
@@ -84,22 +91,26 @@ Run:
 npm run deploy:prepare
 ```
 
-This script validates the deployment settings and generates the GitHub Pages workflow at `.github/workflows/deploy-github-pages.yml`.
+This script validates the deployment settings and generates the GitHub Pages workflow at `.github/workflows/deploy-github-pages.yml`. The workflow’s `on.push.branches` and `deploy.environment.name` come from `static.githubPages` (defaults above if omitted).
 
-The generated workflow pins the static build and Pages deployment path:
+The generated workflow pins the static build and Pages deployment path. Shown here with default `githubPages` settings:
 
 ```yaml
 name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [gh-deploy]
+    branches: ["gh-deploy"]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -117,6 +128,9 @@ jobs:
           path: dist
 
   deploy:
+    environment:
+      name: "github-pages"
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -144,21 +158,25 @@ In the GitHub repository:
 - Set **Source** to **GitHub Actions**.
 - Confirm Actions are enabled for the repository.
 - Confirm repository Actions settings allow workflows to create Pages deployments. The generated workflow requests `pages: write` and `id-token: write`.
-- Open **Settings -> Environments -> github-pages** and confirm the deployment branch policy allows `gh-deploy`. If the environment is restricted to selected branches, add `gh-deploy` to the allowed deployment branches. Otherwise, choose unrestricted deployment branches if that matches your repo policy.
+- Open **Settings -> Environments** and select the environment named in `static.githubPages.environmentName` (default **`github-pages`**). Confirm the **deployment branch** policy allows every branch that can **trigger** a run that reaches the deploy job:
+  - For **`push`**, allow at least `static.githubPages.deployBranch` (default `gh-deploy`).
+  - For **`workflow_dispatch`**, GitHub uses the **branch you run the workflow from** as the deployment ref. If you dispatch from `main`, the allowed list must include **`main`**, even when `on.push.branches` only lists `gh-deploy`. Prefer dispatching from `deployBranch`, or widen the environment’s allowed branches.
 
-The generated workflow deploys to the `github-pages` environment:
+The generated workflow deploys to the environment named in settings:
 
 ```yaml
 deploy:
   environment:
-    name: github-pages
+    name: "github-pages"
 ```
 
-GitHub checks this environment's deployment protection rules after the workflow starts. If `gh-deploy` is not allowed there, the build can succeed but the deploy job will fail with:
+GitHub checks this environment's deployment protection rules after the workflow starts. If the triggering branch is not allowed there, the build can succeed but the deploy job will fail with:
 
 ```text
-Branch "gh-deploy" is not allowed to deploy to github-pages due to environment protection rules.
+Branch "<branch>" is not allowed to deploy to github-pages due to environment protection rules.
 ```
+
+Common cases: `"gh-deploy"` when `push` is used but the environment only allows `main`; or `"main"` when **`workflow_dispatch`** was started from `main` while the environment only allows `gh-deploy`.
 
 ### Step 5: Configure GitHub Actions environment variables
 
@@ -189,9 +207,11 @@ If you want to disable multiplayer entirely, do not set `VITE_MULTIPLAYER_HOST`;
 
 Deploy through GitHub Actions:
 
-- Commit the generated `.github/workflows/deploy-github-pages.yml`.
-- Push to `gh-deploy`, or run the workflow manually from the GitHub Actions tab.
+- Commit the generated `.github/workflows/deploy-github-pages.yml` (typically on your default branch; then propagate — see below).
+- Push to **`static.githubPages.deployBranch`** (default `gh-deploy`), or run the workflow manually from the GitHub Actions tab **from a branch allowed by the `github-pages` environment** (see Step 4).
 - After deployment, GitHub Pages serves the uploaded `dist/` artifact.
+
+**Shipping changes via a feature branch and feature tag:** Workflow and client changes are usually merged to `main` first. To open sync pull requests into **`gh-deploy`**, **`netlify-deployment`**, and **`render-deploy`** without overwriting each branch’s own `settings.mjs`, push a tag matching `feature/**` (or run [`sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml) manually with `feature_ref`). Merge the PR into **`gh-deploy`** when you want the updated Pages workflow and build on the branch that receives `push` deploys.
 
 For the default project-site URL, the published app is expected at:
 
@@ -234,7 +254,7 @@ If the page loads without styles, JavaScript, favicon, or loading-screen logo, c
 ## Troubleshooting
 
 - If the site loads without assets, verify `static.basePath` matches the GitHub Pages URL path, including leading and trailing slashes.
-- If the deploy job says `Branch "gh-deploy" is not allowed to deploy to github-pages due to environment protection rules`, open **Settings -> Environments -> github-pages** and allow `gh-deploy` in the deployment branch policy.
+- If the deploy job reports **`Branch "<branch>" is not allowed to deploy to github-pages`** (for example `gh-deploy` or `main`), open **Settings → Environments** for `static.githubPages.environmentName` and allow the branch that **triggered** the run (`push` branch or the branch you chose for **`workflow_dispatch`**).
 - If the workflow does not deploy, confirm Pages source is set to **GitHub Actions** and the workflow has `pages: write` and `id-token: write` permissions.
 - If the site loads but multiplayer fails, open the browser console and confirm the client is probing the expected host.
 - If using a custom host, confirm the server responds to `/api/multiplayer/health` and that CORS allows the GitHub Pages origin.
