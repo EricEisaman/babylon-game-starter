@@ -11,7 +11,13 @@ import {
   bindOutsideClose,
   bindOverlayPressFeedback,
   bindOverlayToggle,
-  bindPreventTextSelection
+  bindPreventTextSelection,
+  isolatePanelPointerEvents,
+  muteOutsideClose,
+  repositionOverlayButton,
+  notifyOverlayPanelOpening,
+  onOtherOverlayPanelOpening,
+  setInventoryPanelOpen
 } from './overlay_button_utils';
 
 import type { OutsideCloseBinding, OverlayToggleBinding } from './overlay_button_utils';
@@ -25,6 +31,8 @@ export class InventoryUI {
   private static toggleBinding: OverlayToggleBinding | null = null;
   private static pressBinding: OverlayToggleBinding | null = null;
   private static selectionBinding: OverlayToggleBinding | null = null;
+  private static panelIsolationBinding: OverlayToggleBinding | null = null;
+  private static otherPanelBinding: OverlayToggleBinding | null = null;
   private static outsideCloseBinding: OutsideCloseBinding | null = null;
 
   /**
@@ -40,7 +48,19 @@ export class InventoryUI {
     this.createInventoryButton(canvas);
     this.createInventoryPanel(canvas);
     this.setupEventListeners();
-    this.updateInventoryButton(); // Initialize button state
+    this.updateInventoryButton();
+    this.scheduleOverlayReposition();
+  }
+
+  private static scheduleOverlayReposition(): void {
+    const reposition = (): void => {
+      if (this.inventoryButton) {
+        repositionOverlayButton(this.inventoryButton, 'bottom-right');
+      }
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(reposition);
+    });
   }
 
   /**
@@ -100,6 +120,8 @@ export class InventoryUI {
             color: white;
             font-family: Arial, sans-serif;
             overflow-y: auto;
+            pointer-events: auto;
+            touch-action: manipulation;
         `;
 
     this.updateInventoryContent();
@@ -232,8 +254,9 @@ export class InventoryUI {
                 top: 0;
                 z-index: 1;
                 display: flex;
-                justify-content: center;
+                justify-content: space-between;
                 align-items: center;
+                gap: 12px;
                 padding: 20px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.2);
                 background: rgba(255, 255, 255, 0.05);
@@ -245,7 +268,22 @@ export class InventoryUI {
                     font-size: 24px;
                     font-weight: bold;
                     color: white;
+                    flex: 1;
+                    text-align: center;
                 ">${CONFIG.INVENTORY.HEADING_TEXT}</h2>
+                <button type="button" class="overlay-panel-close" aria-label="Close inventory" style="
+                    flex: 0 0 auto;
+                    width: 44px;
+                    height: 44px;
+                    border: 1px solid rgba(255, 255, 255, 0.35);
+                    border-radius: 8px;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    font-size: 22px;
+                    line-height: 1;
+                    cursor: pointer;
+                    touch-action: manipulation;
+                ">✕</button>
             </div>
             <div class="inventory-content" style="
                 padding: 20px;
@@ -343,11 +381,35 @@ export class InventoryUI {
         this.closePanel();
       }
     });
+    this.panelIsolationBinding = isolatePanelPointerEvents(this.inventoryPanel);
+    this.otherPanelBinding = onOtherOverlayPanelOpening('inventory', () => {
+      this.closePanel();
+    });
 
+    this.inventoryPanel.addEventListener('click', this.handlePanelClick);
+    window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('resize', this.handleWindowResize);
   }
 
+  private static handlePanelClick = (e: MouseEvent): void => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('.overlay-panel-close')) {
+      e.stopPropagation();
+      this.closePanel();
+    }
+  };
+
+  private static handleKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && this.isPanelOpen) {
+      this.closePanel();
+    }
+  };
+
   private static handleWindowResize = (): void => {
+    if (this.inventoryButton) {
+      repositionOverlayButton(this.inventoryButton, 'bottom-right');
+    }
     if (this.isPanelOpen) {
       this.updatePanelWidth();
     }
@@ -357,11 +419,19 @@ export class InventoryUI {
     this.toggleBinding?.remove();
     this.pressBinding?.remove();
     this.selectionBinding?.remove();
+    this.panelIsolationBinding?.remove();
+    this.otherPanelBinding?.remove();
     this.outsideCloseBinding?.remove();
     this.toggleBinding = null;
     this.pressBinding = null;
     this.selectionBinding = null;
+    this.panelIsolationBinding = null;
+    this.otherPanelBinding = null;
     this.outsideCloseBinding = null;
+    if (this.inventoryPanel) {
+      this.inventoryPanel.removeEventListener('click', this.handlePanelClick);
+    }
+    window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('resize', this.handleWindowResize);
   }
 
@@ -381,15 +451,15 @@ export class InventoryUI {
    */
   private static openPanel(): void {
     if (this.inventoryPanel) {
+      notifyOverlayPanelOpening('inventory');
+      muteOutsideClose();
+      this.updatePanelWidth();
       this.inventoryPanel.style.right = '0';
+      this.inventoryPanel.style.zIndex = String(CONFIG.INVENTORY.BUTTON_Z_INDEX + 50);
       this.isPanelOpen = true;
       this.updateInventoryContent();
       this.updateInventoryButton();
-      // Keep the button visible and on top - no transform animation
-      if (this.inventoryButton) {
-        this.inventoryButton.style.background = 'rgba(0, 0, 0, 0.9)';
-        this.inventoryButton.style.zIndex = CONFIG.INVENTORY.BUTTON_Z_INDEX.toString();
-      }
+      setInventoryPanelOpen(true);
     }
   }
 
@@ -399,10 +469,12 @@ export class InventoryUI {
   private static closePanel(): void {
     if (this.inventoryPanel) {
       this.inventoryPanel.style.right = '-100%';
+      this.inventoryPanel.style.zIndex = String(CONFIG.INVENTORY.Z_INDEX);
       this.isPanelOpen = false;
+      setInventoryPanelOpen(false);
       if (this.inventoryButton) {
+        this.inventoryButton.dataset.panelOpen = 'false';
         this.inventoryButton.style.background = 'rgba(0, 0, 0, 0.7)';
-        this.inventoryButton.style.zIndex = CONFIG.INVENTORY.BUTTON_Z_INDEX.toString();
       }
     }
   }
