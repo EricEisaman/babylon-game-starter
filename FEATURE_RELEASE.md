@@ -1,6 +1,6 @@
 # Feature release example (Monochrome + Rainbow Bright)
 
-This guide walks through a concrete content change in [`src/client/config/assets.ts`](src/client/config/assets.ts) and the repository’s standard way to propagate that work to **deployment branches** using a **feature branch** and a **`feature/**` tag**.
+This guide walks through a concrete content change in [`src/client/config/assets.ts`](src/client/config/assets.ts) and the repository’s standard way to propagate that work to **`main`** and **deployment branches** using a **feature branch** and a **`feature/**` tag**.
 
 ## Purpose
 
@@ -8,7 +8,7 @@ You will:
 
 1. Add a new collectible item to the **Monochrome** environment.
 2. Verify it locally.
-3. Push a **feature branch**, tag the commit with a name matching `feature/**`, and let GitHub Actions open sync pull requests into **`gh-deploy`**, **`netlify-deployment`**, and **`render-deploy`**.
+3. Push a **feature branch**, tag the commit with a name matching `feature/**`, and let GitHub Actions open sync pull requests into **`main`**, **`gh-deploy`**, **`netlify-deployment`**, and **`render-deploy`**.
 
 This is documentation only: the snippets below are the example you would apply on a real feature branch.
 
@@ -69,14 +69,14 @@ git commit -m "Add Rainbow Bright collectible to Monochrome"
 git push -u origin feature/rainbow-bright-monochrome
 ```
 
-Optional but common: open a normal **pull request into `main`** for code review. That is separate from the **deployment sync** PRs described below.
+Optional but common: open a **pull request into `main`** yourself for early review. The sync workflow also opens (or updates) a **`sync/main/...` → `main`** PR with the same feature commit, so you can rely on that PR instead when you prefer a single automated path.
 
 ## Feature tag and what runs when you push it
 
-The workflow [`.github/workflows/sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml) runs when:
+The workflow [`.github/workflows/sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml) (**Sync feature ref to main and deployment branches** in the Actions UI) runs when:
 
 - A tag matching **`feature/**`** is **pushed**, or
-- You use **Actions → Sync Feature Tag To Deployment Branches → Run workflow** (see [Manual dispatch](#manual-dispatch-without-a-new-tag)).
+- You use **Actions → Sync feature ref to main and deployment branches → Run workflow** (see [Manual dispatch](#manual-dispatch-without-a-new-tag)).
 
 ### Create and push the tag
 
@@ -96,18 +96,26 @@ git push origin refs/tags/feature/rainbow-bright-monochrome
 
 ### What GitHub Actions does
 
-For each deployment branch (**`render-deploy`**, **`netlify-deployment`**, **`gh-deploy`**), the workflow:
+The workflow runs **four** matrix jobs in parallel (one target each):
+
+**`main`**
+
+1. Creates `sync/main/<label>` from `origin/main` and merges the feature commit with a **normal** merge (no special handling of deployment settings files).
+2. Runs **`npm run export:playground`**, **`npm run typecheck`**, **`npm run lint`**, and **`npm run format:check`**.
+3. Opens or updates a pull request **into `main`** (title like *Merge feature … into main*).
+
+**Each deployment branch** (`render-deploy`, `netlify-deployment`, `gh-deploy`)
 
 1. Merges your feature commit into a branch based off that deployment branch.
 2. **Restores** branch-specific deployment settings from files such as [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) so host-specific config is not overwritten by `main`-style defaults.
 3. Runs **`npm run export:playground`**, **`npm run typecheck`**, **`npm run lint`**, and **`npm run format:check`**.
-4. Force-pushes a branch like `sync/<deploy-branch>/<label>` and **opens or updates a pull request** titled along the lines of *Sync `feature/...` into &lt;Host&gt; deployment*.
+4. Force-pushes `sync/<deploy-branch>/<label>` and **opens or updates a pull request** titled along the lines of *Sync `feature/...` into &lt;Host&gt; deployment*.
 
-You then **merge** those PRs when you are ready for each host to pick up the feature. For **GitHub Pages**, merging into **`gh-deploy`** is what lets the Pages build/deploy workflow see the change (after the usual push to that branch).
+You then **merge** those PRs when you are ready. For **GitHub Pages**, merging into **`gh-deploy`** is what lets the Pages build/deploy workflow see the change (after the usual push to that branch). Merge the **`main`** PR when you want the default branch to include the feature without manually fast-forwarding.
 
 ## Manual dispatch (without a new tag)
 
-In the GitHub UI: **Actions** → **Sync Feature Tag To Deployment Branches** → **Run workflow**. Set **`feature_ref`** to a branch name, tag, or commit SHA. The same matrix jobs and PR behavior apply as for a tag push.
+In the GitHub UI: **Actions** → **Sync feature ref to main and deployment branches** → **Run workflow**. Set **`feature_ref`** to a branch name, tag, or commit SHA. The same matrix jobs and PR behavior apply as for a tag push.
 
 ## Related docs
 
