@@ -151,7 +151,7 @@ flowchart TD
 | Render web-service | Updates `render.yaml`, Docker-oriented defaults |
 | Render static | Static-site style in `render.yaml` |
 | Netlify static | `netlify.toml` with SPA fallback |
-| GitHub Pages static | `.github/workflows/deploy-github-pages.yml` |
+| GitHub Pages static | `.github/workflows/deploy-github-pages.yml` (`static.githubPages.deployBranch`, default `gh-deploy`) |
 
 ---
 
@@ -212,7 +212,7 @@ preserved settings files (on deployment targets) fail the affected matrix job an
 
 ### Static host quick notes
 
-- **github.io** — `host: github.io`, `type: static`, prepare, commit workflow.
+- **github.io** — `host: github.io`, `type: static`, set `static.basePath` and optional `static.githubPages`, run `npm run deploy:prepare`, commit workflow. **Forks:** [FORK_GITHUB_SETUP.md](../../FORK_GITHUB_SETUP.md). **Pages:** [GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](../../GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md).
 - **netlify** — `host: netlify`, `type: static`, prepare, commit `netlify.toml`. Include any backend services (e.g. the Go multiplayer server) in `services[]` with a `localPort` so the Vite dev proxy routes local API calls correctly. `localPort` is ignored by Netlify at deploy time — it only activates the dev proxy.
 - **render static** — `host: render.com`, `type: static`, prepare.
 

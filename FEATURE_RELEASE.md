@@ -1,6 +1,8 @@
 # Feature release example (Monochrome + Rainbow Bright)
 
-This guide walks through a concrete content change in [`src/client/config/assets.ts`](src/client/config/assets.ts) and the repository’s standard way to propagate that work to **`main`** and **deployment branches** using a **feature branch** and a **`feature/**` tag**.
+This guide walks through a concrete content change in [`src/client/config/assets.ts`](src/client/config/assets.ts) and the standard way to propagate that work to **`main`** and deployment branches using a **feature branch** and a **`feature/**` tag**.
+
+**Fork:** Pushing a tag to **your fork** opens sync PRs on **your fork**. Complete **[FORK_GITHUB_SETUP.md](FORK_GITHUB_SETUP.md)** first so Pages and Actions match upstream.
 
 ## Purpose
 
@@ -111,13 +113,16 @@ The workflow runs **four** matrix jobs in parallel (one target each):
 3. Runs **`npm run export:playground`**, **`npm run typecheck`**, **`npm run lint`**, and **`npm run format:check`**.
 4. Force-pushes `sync/<deploy-branch>/<label>` and **opens or updates a pull request** titled along the lines of *Sync `feature/...` into &lt;Host&gt; deployment*.
 
-You then **merge** those PRs when you are ready. For **GitHub Pages**, merging into **`gh-deploy`** is what lets the Pages build/deploy workflow see the change (after the usual push to that branch). Merge the **`main`** PR when you want the default branch to include the feature without manually fast-forwarding.
+Merge those PRs when ready. For **GitHub Pages**, merge into **`gh-deploy`** so a **push** (or **Deploy GitHub Pages** from **`gh-deploy`**) publishes the site. Merge the **`main`** PR when you want the default branch updated without a manual fast-forward.
 
 ## Manual dispatch (without a new tag)
 
 In the GitHub UI: **Actions** → **Sync feature ref to main and deployment branches** → **Run workflow**. Set **`feature_ref`** to a branch name, tag, or commit SHA. The same matrix jobs and PR behavior apply as for a tag push.
 
+**Deploy GitHub Pages** is separate: manual redeploy only from **`gh-deploy`** ([GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md)).
+
 ## Related docs
 
-- **[GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md)** — GitHub Pages source, `github-pages` environment, and branch alignment.
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Local setup, PR expectations, and CI.
+- **[FORK_GITHUB_SETUP.md](FORK_GITHUB_SETUP.md)** — One-time GitHub settings for forks
+- **[GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md)** — Pages deploy and multiplayer
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Local setup and PR expectations
