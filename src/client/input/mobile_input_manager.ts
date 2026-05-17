@@ -5,6 +5,7 @@
 // /// <reference path="../types/babylon.d.ts" />
 
 import { MOBILE_CONTROLS } from '../config/mobile_controls';
+import { repositionAllOverlayButtons } from '../ui/overlay_button_utils';
 // No imports needed
 
 export class MobileInputManager {
@@ -18,6 +19,8 @@ export class MobileInputManager {
   private static boostButton: HTMLDivElement | null = null;
   private static jumpActive = false;
   private static boostActive = false;
+  private static jumpTouchId: number | null = null;
+  private static boostTouchId: number | null = null;
 
   private static inputDirection = new BABYLON.Vector3(0, 0, 0);
   private static wantJump = false;
@@ -50,6 +53,7 @@ export class MobileInputManager {
 
     // Apply visibility settings from config
     this.applyVisibilitySettings();
+    repositionAllOverlayButtons();
 
     this.isInitialized = true;
   }
@@ -85,6 +89,8 @@ export class MobileInputManager {
     this.jumpActive = false;
     this.boostActive = false;
     this.joystickTouchId = null;
+    this.jumpTouchId = null;
+    this.boostTouchId = null;
     this.inputDirection.set(0, 0, 0);
     this.wantJump = false;
     this.wantBoost = false;
@@ -176,7 +182,7 @@ export class MobileInputManager {
             background-color: ${MOBILE_CONTROLS.COLORS.JOYSTICK_BG};
             opacity: ${MOBILE_CONTROLS.OPACITY};
             border: 2px solid rgba(255, 255, 255, 0.3);
-            z-index: 1000;
+            z-index: ${MOBILE_CONTROLS.GAME_CONTROL_Z_INDEX};
             pointer-events: auto;
             user-select: none;
             touch-action: none;
@@ -229,7 +235,7 @@ export class MobileInputManager {
             font-size: 14px;
             opacity: ${MOBILE_CONTROLS.OPACITY};
             border: 2px solid rgba(255, 255, 255, 0.3);
-            z-index: 1000;
+            z-index: ${MOBILE_CONTROLS.GAME_CONTROL_Z_INDEX};
             pointer-events: auto;
             user-select: none;
             touch-action: none;
@@ -256,7 +262,7 @@ export class MobileInputManager {
             font-size: 14px;
             opacity: ${MOBILE_CONTROLS.OPACITY};
             border: 2px solid rgba(255, 255, 255, 0.3);
-            z-index: 1000;
+            z-index: ${MOBILE_CONTROLS.GAME_CONTROL_Z_INDEX};
             pointer-events: auto;
             user-select: none;
             touch-action: none;
@@ -351,35 +357,37 @@ export class MobileInputManager {
         passive: false
       });
     }
+  }
 
-    // Global touch end handler to catch any missed touch events
-    document.addEventListener('touchend', this.handleGlobalTouchEnd.bind(this), { passive: false });
-    document.addEventListener('touchcancel', this.handleGlobalTouchEnd.bind(this), {
-      passive: false
-    });
-    document.addEventListener('pointerup', this.handleGlobalTouchEnd.bind(this), {
-      passive: false
-    });
-    document.addEventListener('mouseup', this.handleGlobalTouchEnd.bind(this), { passive: false });
-
-    // Add specific boost area touch end handler
-    if (this.boostButton) {
-      const boostArea = this.boostButton.parentElement;
-      if (boostArea) {
-        boostArea.addEventListener('touchend', this.handleBoostTouchEnd.bind(this), {
-          passive: false
-        });
-        boostArea.addEventListener('touchcancel', this.handleBoostTouchEnd.bind(this), {
-          passive: false
-        });
-        boostArea.addEventListener('pointerup', this.handleBoostTouchEnd.bind(this), {
-          passive: false
-        });
-        boostArea.addEventListener('mouseup', this.handleBoostTouchEnd.bind(this), {
-          passive: false
-        });
-      }
+  private static touchIdFromEvent(e: TouchEvent | PointerEvent): number | null {
+    if ('touches' in e && e.changedTouches.length > 0) {
+      return e.changedTouches.item(0)?.identifier ?? null;
     }
+    if ('pointerId' in e) {
+      return e.pointerId;
+    }
+    return null;
+  }
+
+  private static touchEndedForId(
+    e: TouchEvent | PointerEvent | MouseEvent,
+    trackedId: number | null
+  ): boolean {
+    if (trackedId === null) {
+      return false;
+    }
+    if ('changedTouches' in e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches.item(i)?.identifier === trackedId) {
+          return true;
+        }
+      }
+      return false;
+    }
+    if ('pointerId' in e) {
+      return e.pointerId === trackedId;
+    }
+    return e.type === 'mouseup';
   }
 
   /**
@@ -429,12 +437,13 @@ export class MobileInputManager {
    * @param e Touch, Pointer, or Mouse event
    */
   private static handleJoystickTouchEnd(e: TouchEvent | PointerEvent | MouseEvent): void {
+    if (!this.touchEndedForId(e, this.joystickTouchId)) {
+      return;
+    }
     this.preventDefaultIfCancelable(e);
     this.joystickActive = false;
     this.joystickTouchId = null;
     this.resetJoystick();
-
-    // Force reset movement input to ensure it stops
     this.inputDirection.set(0, 0, 0);
   }
 
@@ -540,7 +549,12 @@ export class MobileInputManager {
    */
   private static handleJumpTouchStart(e: TouchEvent | PointerEvent): void {
     this.preventDefaultIfCancelable(e);
+    const touchId = this.touchIdFromEvent(e);
+    if (this.jumpActive && this.jumpTouchId !== null && touchId !== this.jumpTouchId) {
+      return;
+    }
     this.jumpActive = true;
+    this.jumpTouchId = touchId;
     this.wantJump = true;
 
     if (this.jumpButton) {
@@ -553,15 +567,16 @@ export class MobileInputManager {
    * @param e Touch, Pointer, or Mouse event
    */
   private static handleJumpTouchEnd(e: TouchEvent | PointerEvent | MouseEvent): void {
+    if (!this.touchEndedForId(e, this.jumpTouchId)) {
+      return;
+    }
     this.preventDefaultIfCancelable(e);
     this.jumpActive = false;
+    this.jumpTouchId = null;
     this.wantJump = false;
     if (this.jumpButton) {
       this.jumpButton.style.backgroundColor = MOBILE_CONTROLS.COLORS.BUTTON_BG;
     }
-
-    // Force reset jump input to ensure it stops
-    this.wantJump = false;
   }
 
   /**
@@ -570,8 +585,12 @@ export class MobileInputManager {
    */
   private static handleBoostTouchStart(e: TouchEvent | PointerEvent): void {
     this.preventDefaultIfCancelable(e);
-
+    const touchId = this.touchIdFromEvent(e);
+    if (this.boostActive && this.boostTouchId !== null && touchId !== this.boostTouchId) {
+      return;
+    }
     this.boostActive = true;
+    this.boostTouchId = touchId;
     this.wantBoost = true;
 
     if (this.boostButton) {
@@ -584,32 +603,16 @@ export class MobileInputManager {
    * @param e Touch, Pointer, or Mouse event
    */
   private static handleBoostTouchEnd(e: TouchEvent | PointerEvent | MouseEvent): void {
+    if (!this.touchEndedForId(e, this.boostTouchId)) {
+      return;
+    }
     this.preventDefaultIfCancelable(e);
-    e.stopPropagation();
-
-    // Reset all boost states immediately
     this.boostActive = false;
+    this.boostTouchId = null;
     this.wantBoost = false;
-    // Reset visual state
     if (this.boostButton) {
       this.boostButton.style.backgroundColor = MOBILE_CONTROLS.COLORS.BUTTON_BG;
     }
-
-    // Force reset boost input to ensure it stops
-    this.wantBoost = false;
-    this.boostActive = false;
-  }
-
-  /**
-   * Global touch/pointer end handler to catch any missed touch events
-   * @param e Touch, Pointer, or Mouse event
-   */
-  private static handleGlobalTouchEnd(): void {
-    // Reset all inputs when any touch ends to prevent stuck controls
-    this.wantJump = false;
-    this.wantBoost = false;
-    this.boostActive = false;
-    this.inputDirection.set(0, 0, 0);
   }
 
   /**
@@ -740,10 +743,6 @@ export class MobileInputManager {
    * Disposes mobile input manager
    */
   public static dispose(): void {
-    // Remove event listeners
-    document.removeEventListener('touchend', this.handleGlobalTouchEnd.bind(this));
-    document.removeEventListener('touchcancel', this.handleGlobalTouchEnd.bind(this));
-
     // Clean up all existing controls
     this.cleanupExistingControls();
 
