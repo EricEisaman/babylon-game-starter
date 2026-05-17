@@ -1,0 +1,115 @@
+# Feature release example (Monochrome + Rainbow Bright)
+
+This guide walks through a concrete content change in [`src/client/config/assets.ts`](src/client/config/assets.ts) and the repository’s standard way to propagate that work to **deployment branches** using a **feature branch** and a **`feature/**` tag**.
+
+## Purpose
+
+You will:
+
+1. Add a new collectible item to the **Monochrome** environment.
+2. Verify it locally.
+3. Push a **feature branch**, tag the commit with a name matching `feature/**`, and let GitHub Actions open sync pull requests into **`gh-deploy`**, **`netlify-deployment`**, and **`render-deploy`**.
+
+This is documentation only: the snippets below are the example you would apply on a real feature branch.
+
+## Example: add Rainbow Bright to Monochrome
+
+The **Monochrome** environment is defined under `ASSETS.ENVIRONMENTS` in [`src/client/config/assets.ts`](src/client/config/assets.ts) (`name: 'Monochrome'`). Today it sets sky, spawn, and camera fields but **does not define `items`**. Add an **`items`** array to that environment object (for example after `cameraOffset`), using the same item shape as other environments in the same file.
+
+```ts
+items: [
+  {
+    name: 'Rainbow Bright',
+    url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/items/RainbowBright.glb',
+    collectible: true,
+    creditValue: 500,
+    minImpulseForCollection: 0.3,
+    inventory: false,
+    instances: [
+      {
+        position: new BABYLON.Vector3(5, 2, 3),
+        scale: 1.0,
+        rotation: new BABYLON.Vector3(0, 0, 0),
+        mass: 10,
+        colliderType: 'CONVEX_HULL',
+        friction: 0.9
+      }
+    ]
+  }
+]
+```
+
+**Notes:**
+
+- **`collectible: true`** — the item can be picked up for credits (`creditValue`).
+- **`minImpulseForCollection`** — collection requires at least this collision impulse.
+- **`instances`** — placement and physics for each spawned copy; adjust `position` if you want the mesh elsewhere in the scene.
+
+### Local verification
+
+```bash
+npm install   # if needed
+npm run dev
+```
+
+Open the game, switch to the **Monochrome** environment (in-game settings / UI), and confirm the Rainbow Bright mesh appears and collects as expected.
+
+## Branch workflow
+
+From your default branch (usually `main`):
+
+```bash
+git fetch origin
+git switch main
+git pull
+git switch -c feature/rainbow-bright-monochrome
+# edit src/client/config/assets.ts as above
+git add src/client/config/assets.ts
+git commit -m "Add Rainbow Bright collectible to Monochrome"
+git push -u origin feature/rainbow-bright-monochrome
+```
+
+Optional but common: open a normal **pull request into `main`** for code review. That is separate from the **deployment sync** PRs described below.
+
+## Feature tag and what runs when you push it
+
+The workflow [`.github/workflows/sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml) runs when:
+
+- A tag matching **`feature/**`** is **pushed**, or
+- You use **Actions → Sync Feature Tag To Deployment Branches → Run workflow** (see [Manual dispatch](#manual-dispatch-without-a-new-tag)).
+
+### Create and push the tag
+
+Create a lightweight tag on the commit you want deployed (often the tip of your feature branch):
+
+```bash
+git tag feature/rainbow-bright-monochrome
+```
+
+Push the tag to GitHub:
+
+```bash
+git push origin refs/tags/feature/rainbow-bright-monochrome
+```
+
+**Ref name collision:** If a **branch** and a **tag** share the same name (for example both `feature/rainbow-bright-monochrome`), `git push origin feature/rainbow-bright-monochrome` may fail with *refspec matches more than one*. Pushing with **`refs/tags/...`** as above avoids that. Alternatively, use different names for the branch and the tag.
+
+### What GitHub Actions does
+
+For each deployment branch (**`render-deploy`**, **`netlify-deployment`**, **`gh-deploy`**), the workflow:
+
+1. Merges your feature commit into a branch based off that deployment branch.
+2. **Restores** branch-specific deployment settings from files such as [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) so host-specific config is not overwritten by `main`-style defaults.
+3. Runs **`npm run export:playground`**, **`npm run typecheck`**, **`npm run lint`**, and **`npm run format:check`**.
+4. Force-pushes a branch like `sync/<deploy-branch>/<label>` and **opens or updates a pull request** titled along the lines of *Sync `feature/...` into &lt;Host&gt; deployment*.
+
+You then **merge** those PRs when you are ready for each host to pick up the feature. For **GitHub Pages**, merging into **`gh-deploy`** is what lets the Pages build/deploy workflow see the change (after the usual push to that branch).
+
+## Manual dispatch (without a new tag)
+
+In the GitHub UI: **Actions** → **Sync Feature Tag To Deployment Branches** → **Run workflow**. Set **`feature_ref`** to a branch name, tag, or commit SHA. The same matrix jobs and PR behavior apply as for a tag push.
+
+## Related docs
+
+- **[GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md)** — GitHub Pages source, `github-pages` environment, and branch alignment.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Local setup, PR expectations, and CI.
