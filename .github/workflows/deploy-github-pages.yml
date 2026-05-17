@@ -3,7 +3,7 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: ["gh-deploy"]
-  # Manual runs must use branch gh-deploy (UI or gh --ref) so environment rules evaluate gh-deploy, not main.
+  # For workflow_dispatch, use the same branch as on.push (gh-deploy) so environment rules match.
   workflow_dispatch:
 
 permissions:
@@ -16,8 +16,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  assert_deploy_branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce deploy branch for manual runs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${GITHUB_REF}" != "refs/heads/gh-deploy" ]; then
+            echo "::error::GitHub Pages deploy is only supported from gh-deploy. Run workflow with Use workflow from = gh-deploy, or push to that branch. (Ref: ${GITHUB_REF})"
+            exit 1
+          fi
+
   build:
     runs-on: ubuntu-latest
+    needs: assert_deploy_branch
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

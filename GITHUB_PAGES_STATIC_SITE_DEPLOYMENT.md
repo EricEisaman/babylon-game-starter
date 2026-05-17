@@ -101,7 +101,7 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: ["gh-deploy"]
-  # Manual runs must use branch gh-deploy (UI or gh --ref) so environment rules evaluate gh-deploy, not main.
+  # For workflow_dispatch, use the same branch as on.push (default deployBranch) so environment rules match.
   workflow_dispatch:
 
 permissions:
@@ -114,8 +114,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  assert_deploy_branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce gh-deploy for manual runs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${GITHUB_REF}" != "refs/heads/gh-deploy" ]; then
+            echo "::error::GitHub Pages deploy is only supported from gh-deploy. Use Run workflow with branch gh-deploy, or push to gh-deploy."
+            exit 1
+          fi
+
   build:
     runs-on: ubuntu-latest
+    needs: assert_deploy_branch
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -212,6 +223,7 @@ Deploy through GitHub Actions:
 - Commit the generated `.github/workflows/deploy-github-pages.yml` (typically on your default branch; then propagate — see below).
 - Push to **`static.githubPages.deployBranch`** (default **`gh-deploy`**) to trigger the workflow on **`push`**.
 - Or run **Deploy GitHub Pages** manually: **Actions** → **Run workflow**, and set **Use workflow from** to **`deployBranch`** (default **`gh-deploy`**, not **`main`**). Leaving the dropdown on **`main`** makes GitHub evaluate **`main`** against the environment (see Step 4).
+- **Assert job:** manual runs from the wrong branch fail immediately in **`assert_deploy_branch`** (before **`github-pages`**), with an error that names the configured **`deployBranch`** in generated workflows.
 - From the CLI (replace `gh-deploy` if you changed **`deployBranch`**): `gh workflow run "Deploy GitHub Pages" --ref gh-deploy`
 - After deployment, GitHub Pages serves the uploaded `dist/` artifact.
 
@@ -258,7 +270,8 @@ If the page loads without styles, JavaScript, favicon, or loading-screen logo, c
 ## Troubleshooting
 
 - If the site loads without assets, verify `static.basePath` matches the GitHub Pages URL path, including leading and trailing slashes.
-- If the deploy job reports **`Branch "<branch>" is not allowed to deploy to github-pages`**, open **Settings → Environments** for `static.githubPages.environmentName` and allow the branch that actually started the run (the **`push`** branch or the branch you chose for **`workflow_dispatch`**). If **`deployBranch`** is already allowed but the message names **`main`**, rerun from **`deployBranch`** instead of adding **`main`**.
+- If **`assert_deploy_branch`** fails, you used **Run workflow** from a branch other than **`deployBranch`** (default **`gh-deploy`**). Switch **Use workflow from** and rerun.
+- If the deploy job reports **`Branch "<branch>" is not allowed to deploy to github-pages`**, open **Settings → Environments** for `static.githubPages.environmentName` and allow the branch that actually started the run (the **`push`** branch or the branch you chose for **`workflow_dispatch`**). If **`deployBranch`** is already allowed but the message names **`main`**, you are likely on an older workflow without the assert job—rerun with current workflow from **`deployBranch`** instead of adding **`main`**.
 - If the workflow does not deploy, confirm Pages source is set to **GitHub Actions** and the workflow has `pages: write` and `id-token: write` permissions.
 - If the site loads but multiplayer fails, open the browser console and confirm the client is probing the expected host.
 - If using a custom host, confirm the server responds to `/api/multiplayer/health` and that CORS allows the GitHub Pages origin.
