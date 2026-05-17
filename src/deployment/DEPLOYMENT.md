@@ -178,9 +178,9 @@ Defaults target **Render** **web-service**: Docker + Nginx-style SPA serving, `P
 4. Run `npm run dev` and hit proxied API routes locally.
 5. Deploy to the chosen host.
 
-### Feature tag sync to deployment branches
+### Feature tag sync to main and deployment branches
 
-Feature work can be prepared for every deployment branch by pushing a `feature/**` tag at the
+Feature work can be prepared for **`main`** and every deployment branch by pushing a `feature/**` tag at the
 commit to promote:
 
 ```bash
@@ -188,26 +188,27 @@ git tag feature/my-feature
 git push origin feature/my-feature
 ```
 
-The `Sync Feature Tag To Deployment Branches` workflow opens reviewable PRs into:
+The **Sync feature ref to main and deployment branches** workflow (file: `sync-feature-tag-to-deploy-branches.yml`) opens reviewable PRs into:
 
+- `main` — normal merge of the feature commit (deployment settings from the feature are **not** stripped; no `merge=ours` preservation step).
 - `render-deploy`
 - `netlify-deployment`
 - `gh-deploy`
 
-Each PR is prepared from the target deployment branch, merges the tagged feature commit, then
+For each **deployment** branch, each PR is prepared from the target branch, merges the tagged feature commit, then
 restores the target branch's deployment identity files before validation:
 
 - `src/deployment/settings/settings.mjs`
 - `src/deployment/settings/settings.mjs.d.ts`
 - `src/deployment/settings/settings.d.mts`
 
-Those files are branch-owned. Feature branches should not rely on a tag sync to change a deployment
+Those files are branch-owned on deployment branches. Feature branches should not rely on a tag sync to change a deployment
 branch's host/type settings; update the deployment branch settings intentionally when that is the
-actual goal.
+actual goal. The PR into **`main`** does **not** use that preservation step.
 
 The workflow runs `npm ci`, `npm run export:playground`, `npm run typecheck`, `npm run lint`, and
 `npm run format:check` before creating or updating each sync PR. Merge conflicts outside the
-preserved settings files fail the affected matrix job and should be resolved manually.
+preserved settings files (on deployment targets) fail the affected matrix job and should be resolved manually.
 
 ### Static host quick notes
 
