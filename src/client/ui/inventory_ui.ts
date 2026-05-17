@@ -6,6 +6,21 @@ import { CONFIG } from '../config/game_config';
 import { InventoryManager } from '../managers/inventory_manager';
 import { Notification } from '../utils/notification';
 
+import {
+  applyOverlayButtonBaseStyles,
+  bindOutsideClose,
+  bindOverlayPressFeedback,
+  bindOverlayToggle,
+  bindPreventTextSelection,
+  isolatePanelPointerEvents,
+  muteOutsideClose,
+  repositionOverlayButton,
+  notifyOverlayPanelOpening,
+  onOtherOverlayPanelOpening,
+  setInventoryPanelOpen
+} from './overlay_button_utils';
+
+import type { OutsideCloseBinding, OverlayToggleBinding } from './overlay_button_utils';
 import type { SceneManager } from '../managers/scene_manager';
 
 export class InventoryUI {
@@ -13,6 +28,12 @@ export class InventoryUI {
   private static inventoryPanel: HTMLDivElement | null = null;
   public static isPanelOpen = false;
   private static sceneManager: SceneManager | null = null;
+  private static toggleBinding: OverlayToggleBinding | null = null;
+  private static pressBinding: OverlayToggleBinding | null = null;
+  private static selectionBinding: OverlayToggleBinding | null = null;
+  private static panelIsolationBinding: OverlayToggleBinding | null = null;
+  private static otherPanelBinding: OverlayToggleBinding | null = null;
+  private static outsideCloseBinding: OutsideCloseBinding | null = null;
 
   /**
    * Initializes the InventoryUI
@@ -27,7 +48,19 @@ export class InventoryUI {
     this.createInventoryButton(canvas);
     this.createInventoryPanel(canvas);
     this.setupEventListeners();
-    this.updateInventoryButton(); // Initialize button state
+    this.updateInventoryButton();
+    this.scheduleOverlayReposition();
+  }
+
+  private static scheduleOverlayReposition(): void {
+    const reposition = (): void => {
+      if (this.inventoryButton) {
+        repositionOverlayButton(this.inventoryButton, 'bottom-right');
+      }
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(reposition);
+    });
   }
 
   /**
@@ -43,29 +76,16 @@ export class InventoryUI {
 
     this.inventoryButton = document.createElement('div');
     this.inventoryButton.id = 'inventory-button';
-    this.inventoryButton.innerHTML = `
-            <div style="
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                width: 50px;
-                height: 50px;
-                background: rgba(0, 0, 0, 0.7);
-                border: 2px solid rgba(255, 255, 255, 0.3);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                z-index: 9999;
-                transition: background-color 0.3s ease, border-color 0.3s ease;
-                font-size: 20px;
-                color: white;
-                backdrop-filter: blur(10px);
-            " onmouseover="this.style.background='rgba(0, 0, 0, 0.9)'; this.style.borderColor='rgba(255, 255, 255, 0.6)'" onmouseout="this.style.background='rgba(0, 0, 0, 0.7)'; this.style.borderColor='rgba(255, 255, 255, 0.3)'">
-                🎒
-            </div>
-        `;
+    this.inventoryButton.textContent = '🎒';
+    applyOverlayButtonBaseStyles(this.inventoryButton, {
+      corner: 'bottom-right',
+      zIndex: CONFIG.INVENTORY.BUTTON_Z_INDEX
+    });
+    this.inventoryButton.style.background = 'rgba(0, 0, 0, 0.7)';
+    this.inventoryButton.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+    this.inventoryButton.style.fontSize = '20px';
+    this.inventoryButton.style.color = 'white';
+    this.inventoryButton.style.backdropFilter = 'blur(10px)';
 
     document.body.appendChild(this.inventoryButton);
 
@@ -95,11 +115,13 @@ export class InventoryUI {
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
             border-left: 2px solid rgba(255, 255, 255, 0.2);
-            z-index: 1000;
+            z-index: ${CONFIG.INVENTORY.Z_INDEX};
             transition: right 0.3s ease;
             color: white;
             font-family: Arial, sans-serif;
             overflow-y: auto;
+            pointer-events: auto;
+            touch-action: manipulation;
         `;
 
     this.updateInventoryContent();
@@ -139,7 +161,7 @@ export class InventoryUI {
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
             border-left: 2px solid rgba(255, 255, 255, 0.2);
-            z-index: 1000;
+            z-index: ${CONFIG.INVENTORY.Z_INDEX};
             transition: right 0.3s ease;
             color: white;
             font-family: Arial, sans-serif;
@@ -232,8 +254,9 @@ export class InventoryUI {
                 top: 0;
                 z-index: 1;
                 display: flex;
-                justify-content: center;
+                justify-content: space-between;
                 align-items: center;
+                gap: 12px;
                 padding: 20px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.2);
                 background: rgba(255, 255, 255, 0.05);
@@ -245,7 +268,22 @@ export class InventoryUI {
                     font-size: 24px;
                     font-weight: bold;
                     color: white;
+                    flex: 1;
+                    text-align: center;
                 ">${CONFIG.INVENTORY.HEADING_TEXT}</h2>
+                <button type="button" class="overlay-panel-close" aria-label="Close inventory" style="
+                    flex: 0 0 auto;
+                    width: 44px;
+                    height: 44px;
+                    border: 1px solid rgba(255, 255, 255, 0.35);
+                    border-radius: 8px;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    font-size: 22px;
+                    line-height: 1;
+                    cursor: pointer;
+                    touch-action: manipulation;
+                ">✕</button>
             </div>
             <div class="inventory-content" style="
                 padding: 20px;
@@ -326,32 +364,75 @@ export class InventoryUI {
    * Sets up event listeners
    */
   private static setupEventListeners(): void {
-    if (this.inventoryButton) {
-      this.inventoryButton.addEventListener('click', () => {
-        this.togglePanel();
-      });
+    this.removeOverlayBindings();
+
+    if (!this.inventoryButton || !this.inventoryPanel) return;
+
+    this.selectionBinding = bindPreventTextSelection(this.inventoryButton);
+    this.pressBinding = bindOverlayPressFeedback(this.inventoryButton);
+    this.toggleBinding = bindOverlayToggle(this.inventoryButton, () => {
+      this.togglePanel();
+    });
+    this.outsideCloseBinding = bindOutsideClose({
+      panel: this.inventoryPanel,
+      trigger: this.inventoryButton,
+      isOpen: () => this.isPanelOpen,
+      onClose: () => {
+        this.closePanel();
+      }
+    });
+    this.panelIsolationBinding = isolatePanelPointerEvents(this.inventoryPanel);
+    this.otherPanelBinding = onOtherOverlayPanelOpening('inventory', () => {
+      this.closePanel();
+    });
+
+    this.inventoryPanel.addEventListener('click', this.handlePanelClick);
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('resize', this.handleWindowResize);
+  }
+
+  private static handlePanelClick = (e: MouseEvent): void => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('.overlay-panel-close')) {
+      e.stopPropagation();
+      this.closePanel();
     }
+  };
 
-    // Close panel when clicking outside
-    document.addEventListener('click', (e) => {
-      if (this.isPanelOpen && this.inventoryPanel && this.inventoryButton) {
-        const target = e.target;
-        if (
-          target instanceof Node &&
-          !this.inventoryPanel.contains(target) &&
-          !this.inventoryButton.contains(target)
-        ) {
-          this.closePanel();
-        }
-      }
-    });
+  private static handleKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && this.isPanelOpen) {
+      this.closePanel();
+    }
+  };
 
-    // Handle window resize
-    window.addEventListener('resize', () => {
-      if (this.isPanelOpen) {
-        this.updatePanelWidth();
-      }
-    });
+  private static handleWindowResize = (): void => {
+    if (this.inventoryButton) {
+      repositionOverlayButton(this.inventoryButton, 'bottom-right');
+    }
+    if (this.isPanelOpen) {
+      this.updatePanelWidth();
+    }
+  };
+
+  private static removeOverlayBindings(): void {
+    this.toggleBinding?.remove();
+    this.pressBinding?.remove();
+    this.selectionBinding?.remove();
+    this.panelIsolationBinding?.remove();
+    this.otherPanelBinding?.remove();
+    this.outsideCloseBinding?.remove();
+    this.toggleBinding = null;
+    this.pressBinding = null;
+    this.selectionBinding = null;
+    this.panelIsolationBinding = null;
+    this.otherPanelBinding = null;
+    this.outsideCloseBinding = null;
+    if (this.inventoryPanel) {
+      this.inventoryPanel.removeEventListener('click', this.handlePanelClick);
+    }
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('resize', this.handleWindowResize);
   }
 
   /**
@@ -370,15 +451,15 @@ export class InventoryUI {
    */
   private static openPanel(): void {
     if (this.inventoryPanel) {
+      notifyOverlayPanelOpening('inventory');
+      muteOutsideClose();
+      this.updatePanelWidth();
       this.inventoryPanel.style.right = '0';
+      this.inventoryPanel.style.zIndex = String(CONFIG.INVENTORY.BUTTON_Z_INDEX + 50);
       this.isPanelOpen = true;
       this.updateInventoryContent();
       this.updateInventoryButton();
-      // Keep the button visible and on top - no transform animation
-      if (this.inventoryButton) {
-        this.inventoryButton.style.background = 'rgba(0, 0, 0, 0.9)';
-        this.inventoryButton.style.zIndex = '9999';
-      }
+      setInventoryPanelOpen(true);
     }
   }
 
@@ -388,10 +469,12 @@ export class InventoryUI {
   private static closePanel(): void {
     if (this.inventoryPanel) {
       this.inventoryPanel.style.right = '-100%';
+      this.inventoryPanel.style.zIndex = String(CONFIG.INVENTORY.Z_INDEX);
       this.isPanelOpen = false;
+      setInventoryPanelOpen(false);
       if (this.inventoryButton) {
+        this.inventoryButton.dataset.panelOpen = 'false';
         this.inventoryButton.style.background = 'rgba(0, 0, 0, 0.7)';
-        this.inventoryButton.style.zIndex = '9999';
       }
     }
   }
@@ -441,27 +524,17 @@ export class InventoryUI {
         0
       );
 
-      // DEBUG: Log inventory count
+      this.inventoryButton.style.display = 'flex';
+      this.inventoryButton.style.zIndex = CONFIG.INVENTORY.BUTTON_Z_INDEX.toString();
 
-      // Always show the button
-      this.inventoryButton.style.display = 'block';
-
-      // Get the inner div that contains the backpack icon
-      const innerDiv = this.inventoryButton.querySelector('div');
-      if (innerDiv) {
-        // Ensure the button stays on top
-        innerDiv.style.zIndex = '9999';
-
-        // Update styling based on whether there are items
-        if (totalItems > 0) {
-          innerDiv.style.opacity = '1';
-          innerDiv.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-          innerDiv.style.color = 'white';
-        } else {
-          innerDiv.style.opacity = '0.5';
-          innerDiv.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-          innerDiv.style.color = 'rgba(255, 255, 255, 0.5)';
-        }
+      if (totalItems > 0) {
+        this.inventoryButton.style.opacity = '1';
+        this.inventoryButton.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+        this.inventoryButton.style.color = 'white';
+      } else {
+        this.inventoryButton.style.opacity = '0.5';
+        this.inventoryButton.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        this.inventoryButton.style.color = 'rgba(255, 255, 255, 0.5)';
       }
     }
   }
@@ -494,6 +567,8 @@ export class InventoryUI {
    * Global cleanup method to remove all InventoryUI elements from DOM
    */
   public static cleanup(): void {
+    this.removeOverlayBindings();
+
     // Remove ALL inventory buttons and panels (more aggressive)
     const allButtons = document.querySelectorAll('#inventory-button');
     allButtons.forEach((button) => {
