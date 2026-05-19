@@ -612,26 +612,6 @@ export const ASSETS = {
       scale: 1,
       lightmappedMeshes: EMPTY_LIGHTMAPPED_MESHES,
       physicsObjects: EMPTY_PHYSICS_OBJECTS,
-      items: [
-        {
-          name: 'Rainbow Bright',
-          url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/items/RainbowBright.glb',
-          collectible: true,
-          creditValue: 500,
-          minImpulseForCollection: 0.3,
-          inventory: false,
-          instances: [
-            {
-              position: new BABYLON.Vector3(1.5, 2, -3),
-              scale: 2.0,
-              rotation: new BABYLON.Vector3(0, 0, 0),
-              mass: 10,
-              colliderType: 'CONVEX_HULL',
-              friction: 0.9
-            },
-          ]
-        }
-      ],
       sky: {
         TEXTURE_URL:
           'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/images/skies/happy_fluffy_sky.png',
@@ -641,8 +621,27 @@ export const ASSETS = {
       },
       spawnPoint: new BABYLON.Vector3(1.5, 2, 0),
       spawnRotation: new BABYLON.Vector3(0, Math.PI, 0),
-      cameraOffset: new BABYLON.Vector3(0, 1.1, -2.2)
-    },
+      cameraOffset: new BABYLON.Vector3(0, 1.1, -2.2),
+      items: [
+  {
+    name: 'Rainbow Bright',
+    url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/items/RainbowBright.glb',
+    collectible: true,
+    creditValue: 500,
+    minImpulseForCollection: 0.3,
+    inventory: false,
+    instances: [
+      {
+        position: new BABYLON.Vector3(5, 2, 3),
+        scale: 1.0,
+        rotation: new BABYLON.Vector3(0, 0, 0),
+        mass: 10,
+        colliderType: 'CONVEX_HULL',
+        friction: 0.9
+      }
+    ]
+  }
+],
     {
       name: 'Mansion',
       isDefault: true,
