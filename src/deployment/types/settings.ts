@@ -34,6 +34,10 @@ export type EndpointService =
 
 export interface StaticDeploymentConfig {
   basePath?: `/${string}`;
+  githubPages?: {
+    deployBranch?: string;
+    environmentName?: string;
+  };
 }
 
 export type HostTypeCompatibility<H extends DeploymentHost> = H extends 'github.io' | 'netlify'

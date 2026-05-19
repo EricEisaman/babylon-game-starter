@@ -40,7 +40,7 @@ export interface HUDConfig {
 }
 
 export type UIElementType = 'toggle' | 'dropdown';
-export type VisibilityType = 'all' | 'mobile' | 'iPadWithKeyboard';
+export type VisibilityType = 'all' | 'mobile' | 'iPadWithKeyboard' | 'playground';
 export type SettingsActionId =
   | 'screen-controls'
   | 'character'

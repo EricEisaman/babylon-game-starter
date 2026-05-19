@@ -1,4 +1,4 @@
-name: Sync Feature Tag To Deployment Branches
+name: Sync feature ref to main and deployment branches
 
 on:
   push:
@@ -27,18 +27,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target_branch: main
+            deployment_name: Main
+            preserve_settings: 'false'
           - target_branch: render-deploy
             deployment_name: Render
+            preserve_settings: 'true'
           - target_branch: netlify-deployment
             deployment_name: Netlify
+            preserve_settings: 'true'
           - target_branch: gh-deploy
             deployment_name: GitHub Pages
+            preserve_settings: 'true'
 
     env:
       SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.feature_ref || github.sha }}
       FEATURE_LABEL: ${{ github.event_name == 'workflow_dispatch' && inputs.feature_ref || github.ref_name }}
       TARGET_BRANCH: ${{ matrix.target_branch }}
       DEPLOYMENT_NAME: ${{ matrix.deployment_name }}
+      PRESERVE_SETTINGS: ${{ matrix.preserve_settings }}
 
     steps:
       - name: Checkout full repository history
@@ -73,38 +80,45 @@ jobs:
           echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
           echo "sync_branch=${sync_branch}" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare sync branch and preserve deployment settings
+      - name: Prepare sync branch
         id: prepare
         run: |
           set -euo pipefail
 
-          settings_dir="$(mktemp -d)"
-          settings_files=(
-            "src/deployment/settings/settings.mjs"
-            "src/deployment/settings/settings.mjs.d.ts"
-            "src/deployment/settings/settings.d.mts"
-          )
-
           git switch --force-create "${{ steps.source.outputs.sync_branch }}" "origin/${TARGET_BRANCH}"
 
-          for file in "${settings_files[@]}"; do
-            mkdir -p "${settings_dir}/$(dirname "${file}")"
-            cp "${file}" "${settings_dir}/${file}"
-          done
+          if [ "${PRESERVE_SETTINGS}" = "true" ]; then
+            settings_dir="$(mktemp -d)"
+            settings_files=(
+              "src/deployment/settings/settings.mjs"
+              "src/deployment/settings/settings.mjs.d.ts"
+              "src/deployment/settings/settings.d.mts"
+            )
 
-          {
-            echo "src/deployment/settings/settings.mjs merge=ours"
-            echo "src/deployment/settings/settings.mjs.d.ts merge=ours"
-            echo "src/deployment/settings/settings.d.mts merge=ours"
-          } >> .git/info/attributes
-          git config merge.ours.driver true
+            for file in "${settings_files[@]}"; do
+              mkdir -p "${settings_dir}/$(dirname "${file}")"
+              cp "${file}" "${settings_dir}/${file}"
+            done
 
-          git merge --no-ff --no-commit "${{ steps.source.outputs.source_sha }}"
+            {
+              echo "src/deployment/settings/settings.mjs merge=ours"
+              echo "src/deployment/settings/settings.mjs.d.ts merge=ours"
+              echo "src/deployment/settings/settings.d.mts merge=ours"
+            } >> .git/info/attributes
+            git config merge.ours.driver true
 
-          for file in "${settings_files[@]}"; do
-            cp "${settings_dir}/${file}" "${file}"
-            git add "${file}"
-          done
+            git merge --no-ff --no-commit "${{ steps.source.outputs.source_sha }}"
+
+            for file in "${settings_files[@]}"; do
+              cp "${settings_dir}/${file}" "${file}"
+              git add "${file}"
+            done
+          else
+            if ! git merge --no-ff --no-commit "${{ steps.source.outputs.source_sha }}"; then
+              echo "Merge failed (conflicts?). Resolve manually on a local branch." >&2
+              exit 1
+            fi
+          fi
 
           if git diff --cached --quiet && git diff --quiet; then
             git merge --abort || true
@@ -151,15 +165,26 @@ jobs:
           git commit -m "Sync ${FEATURE_LABEL} into ${TARGET_BRANCH}"
           git push --force-with-lease origin "${{ steps.source.outputs.sync_branch }}"
 
-      - name: Open or update deployment sync PR
+      - name: Open or update sync PR
         if: steps.prepare.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          title="Sync ${FEATURE_LABEL} into ${DEPLOYMENT_NAME} deployment"
-          body="$(cat <<EOF
+          if [ "${TARGET_BRANCH}" = "main" ]; then
+            title="Merge feature ${FEATURE_LABEL} into main"
+            body="$(cat <<EOF
+          ## Summary
+          - Merges feature ref \`${FEATURE_LABEL}\` into \`main\` (full tree, including deployment settings if present in the feature).
+          - Runs export, typecheck, lint, and format validation before opening this PR.
+
+          Source commit: \`${{ steps.source.outputs.source_sha }}\`
+          EOF
+          )"
+          else
+            title="Sync ${FEATURE_LABEL} into ${DEPLOYMENT_NAME} deployment"
+            body="$(cat <<EOF
           ## Summary
           - Syncs feature ref \`${FEATURE_LABEL}\` into \`${TARGET_BRANCH}\`.
           - Preserves branch-owned deployment settings files from \`${TARGET_BRANCH}\`.
@@ -173,6 +198,7 @@ jobs:
           Source commit: \`${{ steps.source.outputs.source_sha }}\`
           EOF
           )"
+          fi
 
           pr_url="$(gh pr list \
             --head "${{ steps.source.outputs.sync_branch }}" \
