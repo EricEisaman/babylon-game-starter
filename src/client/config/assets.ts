@@ -622,8 +622,8 @@ export const ASSETS = {
           inventory: false,
           instances: [
             {
-              position: new BABYLON.Vector3(5, 2, 3),
-              scale: 1.0,
+              position: new BABYLON.Vector3(1.5, 2, -3),
+              scale: 2.0,
               rotation: new BABYLON.Vector3(0, 0, 0),
               mass: 10,
               colliderType: 'CONVEX_HULL',
