@@ -1,54 +1,35 @@
-# GitHub Pages Static Site Deployment
+# GitHub Pages static site deployment
 
-This guide describes how to deploy `babylon-game-starter` as a static site to GitHub Pages, and how to configure the multiplayer behavior for the published client.
+Front-end-only static hosting on GitHub Pages. The Go multiplayer server is **not** hosted on Pages; the client uses a remote host or multiplayer disabled (see [Supported multiplayer modes](#supported-multiplayer-modes)).
 
-## Overview
+Project sites are served under a repo subpath (for example `/babylon-game-starter/`), so **`static.basePath`** in deployment settings must match that URL.
 
-GitHub Pages deployment is a front-end-only build. No backend multiplayer service is hosted on GitHub Pages itself.
+**Forked this repo?** Complete the one-time checklist in **[FORK_GITHUB_SETUP.md](FORK_GITHUB_SETUP.md)** before pushing to **`main`** or **`gh-deploy`**.
 
-For multiplayer, the client must connect to a remote multiplayer server or run with multiplayer disabled.
+## How publishing works
 
-The main difference from Netlify is pathing: GitHub Pages project sites are usually served from a repository subpath such as `/babylon-game-starter/`, so the Vite `base` path must match that published path.
+| Trigger | Branch | Workflow |
+| ------- | ------ | -------- |
+| **Push** to deploy branch | **`gh-deploy`** (default) | [Deploy GitHub Pages](.github/workflows/deploy-github-pages.yml) |
+| **Run workflow** (manual) | **Use workflow from** = **`gh-deploy`** | Same |
+| **Push** to **`main`** | — | Does **not** deploy Pages |
 
-## Supported multiplayer modes
+**Do not** use **Settings → Pages → Deploy from a branch**. That runs GitHub’s built-in **`pages build and deployment`** on **`main`**, which is unrelated to **Deploy GitHub Pages** and commonly fails if the environment only allows **`gh-deploy`**.
 
-1. **NONE**
-   - Disable multiplayer entirely.
-   - Use this when you want the game to run as a fully local single-player scene.
-   - Configure in `src/client/config/game_config.ts`:
-     ```ts
-     MULTIPLAYER: {
-       ENABLED: false,
-       PRODUCTION_SERVER: 'bgs-mp.onrender.com',
-       LOCAL_SERVER: 'localhost:5000',
-       CONNECTION_TIMEOUT_MS: 15000,
-       PRODUCTION_FIRST: true,
-       // ...
-     }
-     ```
-   - The client detects `ENABLED: false` and skips multiplayer server discovery.
+**Feature / sync PRs** into **`main`**, **`gh-deploy`**, **`netlify-deployment`**, and **`render-deploy`** use **[`sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml)** and a **`feature/**`** tag — see **[FEATURE_RELEASE.md](FEATURE_RELEASE.md)**. That is separate from redeploying Pages via **Deploy GitHub Pages**.
 
-2. **Shared Render multiplayer server**
-   - Use the default public server at `bgs-mp.onrender.com`.
-   - This is the same behavior used by the Babylon playground exports in this repo.
-   - No additional build-time configuration is required if `CONFIG.MULTIPLAYER.PRODUCTION_SERVER` remains set to `bgs-mp.onrender.com`.
+The generated workflow (from `npm run deploy:prepare`) includes:
 
-3. **Custom multiplayer server**
-   - Point the client at your own multiplayer host.
-   - Set the Vite build-time environment variable `VITE_MULTIPLAYER_HOST` in the GitHub Actions build environment.
-   - Example values:
-     - `my-mp.onrender.com`
-     - `myserver.example.com:5000`
-     - `https://myserver.example.com`
-   - The client strips the scheme automatically and uses only the host portion.
+- **`on.push`** to **`static.githubPages.deployBranch`** (default **`gh-deploy`**)
+- **`workflow_dispatch`** (manual runs must use the same branch in the UI)
+- **`assert_deploy_branch`** — fails if **`GITHUB_REF`** is not **`refs/heads/<deployBranch>`**
+- **`deploy.if`** — same ref check before the **`github-pages`** environment
 
-## GitHub Pages configuration
+## Setup
 
-### Step 1: Set deployment settings
+### 1. Deployment settings
 
-In `src/deployment/settings/settings.mjs`, configure the deployment for GitHub Pages static hosting.
-
-Example for this repository as a GitHub Pages project site:
+Edit [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs):
 
 ```js
 const deploymentSettings = {
@@ -59,7 +40,7 @@ const deploymentSettings = {
       name: 'multiplayer',
       type: 'go',
       routePrefix: '/api/multiplayer',
-      localPort: 5000
+      localPort: 5000 // dev proxy only; not used on Pages build
     }
   ],
   static: {
@@ -70,192 +51,66 @@ const deploymentSettings = {
     }
   }
 };
-
-export default deploymentSettings;
 ```
 
-- `host: 'github.io'` and `type: 'static'` are required.
-- `services` should include the multiplayer Go server entry with `localPort: 5000`. This tells the Vite dev server to proxy `/api/multiplayer/*` -> `localhost:5000` when running `npm run dev` locally, so that `npm run dev:multiplayer` is reachable from the browser. **`localPort` is only used by the Vite dev proxy; it has no effect on the GitHub Pages build or deployment.** Omitting the service entry (leaving `services: []`) causes every multiplayer API call to 404 in local dev.
-- `basePath` controls the deployed base URL. For a GitHub Pages project site, set it to the repository path with leading and trailing slashes, for example `/babylon-game-starter/`.
-- If you deploy to a user or organization Pages site at the domain root, use `basePath: '/'`.
-- If you use a custom domain that serves the app from the domain root, use `basePath: '/'`. If the custom domain serves the app from a subpath, use that subpath.
-- **`static.githubPages`** (optional) drives the generated GitHub Actions workflow:
-  - `deployBranch` — branch whose `push` events trigger a Pages deploy (default `gh-deploy`). Keep it aligned with **Settings → Environments → Deployment branches** for `environmentName`, and with the **`gh-deploy`** target used by [`sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml) when you ship via feature tags.
-  - `environmentName` — Actions `environment` name for the deploy job (default `github-pages`).
+- **`basePath`**: repo subpath with slashes, or `'/'` for user/org site or custom domain at root.
+- **`githubPages`**: optional; defaults above if omitted.
 
-### Step 2: Prepare deployment artifacts
-
-Run:
+### 2. Generate workflow
 
 ```bash
 npm run deploy:prepare
 ```
 
-This script validates the deployment settings and generates the GitHub Pages workflow at `.github/workflows/deploy-github-pages.yml`. The workflow’s `on.push.branches` and `deploy.environment.name` come from `static.githubPages` (defaults above if omitted).
+Writes [`.github/workflows/deploy-github-pages.yml`](.github/workflows/deploy-github-pages.yml). Commit it with your settings.
 
-The generated workflow pins the static build and Pages deployment path. Shown here with default `githubPages` settings:
+### 3. GitHub repository settings
 
-```yaml
-name: Deploy GitHub Pages
+1. **Settings → Pages → Build and deployment → Source:** **GitHub Actions**
+2. **Settings → Environments → `github-pages`:** deployment branches include **`gh-deploy`** only (not **`main`**, unless intentional)
+3. Actions enabled; workflow needs **`pages: write`** and **`id-token: write`** (already in the generated file)
 
-on:
-  push:
-    branches: ["gh-deploy"]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    environment:
-      name: "github-pages"
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-```
-
-`npm run build` already sets `NODE_OPTIONS=--max-old-space-size=4096` through the package script, so local and hosted builds use the same heap limit. The Babylon Inspector is loaded only in Vite development, so production builds should not bundle the Inspector's React/Fluent UI dependency graph.
-
-### Step 3: Build the static site locally
-
-Run:
+### 4. Local build (optional)
 
 ```bash
 npm run build
 ```
 
-This produces the static assets under `dist/`. With `host: 'github.io'`, Vite uses `static.basePath` as the production asset base path.
+Output: `dist/`. Vite uses **`static.basePath`** when `host` is **`github.io`**.
 
-### Step 4: Configure GitHub Pages
+### 5. Deploy
 
-In the GitHub repository:
+- Merge to **`gh-deploy`** (often via sync PR), then **push**, **or**
+- **Actions → Deploy GitHub Pages → Run workflow** with **Use workflow from** = **`gh-deploy`**
 
-- Open **Settings -> Pages**.
-- Set **Source** to **GitHub Actions**.
-- Confirm Actions are enabled for the repository.
-- Confirm repository Actions settings allow workflows to create Pages deployments. The generated workflow requests `pages: write` and `id-token: write`.
-- Open **Settings -> Environments** and select the environment named in `static.githubPages.environmentName` (default **`github-pages`**). Confirm the **deployment branch** policy allows every branch that can **trigger** a run that reaches the deploy job:
-  - For **`push`**, allow at least `static.githubPages.deployBranch` (default `gh-deploy`).
-  - For **`workflow_dispatch`**, GitHub uses the **branch you run the workflow from** as the deployment ref. If you dispatch from `main`, the allowed list must include **`main`**, even when `on.push.branches` only lists `gh-deploy`. Prefer dispatching from `deployBranch`, or widen the environment’s allowed branches.
-
-The generated workflow deploys to the environment named in settings:
-
-```yaml
-deploy:
-  environment:
-    name: "github-pages"
+```bash
+gh workflow run "Deploy GitHub Pages" --ref gh-deploy
 ```
 
-GitHub checks this environment's deployment protection rules after the workflow starts. If the triggering branch is not allowed there, the build can succeed but the deploy job will fail with:
+Published URL (project site): `https://<owner>.github.io/<repo>/`
 
-```text
-Branch "<branch>" is not allowed to deploy to github-pages due to environment protection rules.
-```
+## Multiplayer on Pages
 
-Common cases: `"gh-deploy"` when `push` is used but the environment only allows `main`; or `"main"` when **`workflow_dispatch`** was started from `main` while the environment only allows `gh-deploy`.
+| Mode | Configuration |
+| ---- | ------------- |
+| **Disabled** | `CONFIG.MULTIPLAYER.ENABLED = false` in [`game_config.ts`](src/client/config/game_config.ts) |
+| **Shared demo** | Default `PRODUCTION_SERVER` (`bgs-mp.onrender.com`); no build env var |
+| **Custom host** | Repository variable `VITE_MULTIPLAYER_HOST` and add to workflow build job: `env: { VITE_MULTIPLAYER_HOST: ${{ vars.VITE_MULTIPLAYER_HOST }} }` |
 
-### Step 5: Configure GitHub Actions environment variables
-
-For the shared default multiplayer server, no extra GitHub Actions environment variable is required.
-
-For a custom multiplayer server:
-
-1. Add a repository variable or secret named `VITE_MULTIPLAYER_HOST`.
-2. Add it to the generated workflow's build job environment before `npm run build`.
-
-Example using a repository variable:
-
-```yaml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    env:
-      VITE_MULTIPLAYER_HOST: ${{ vars.VITE_MULTIPLAYER_HOST }}
-    steps:
-      - uses: actions/checkout@v4
-      # ...
-      - run: npm run build
-```
-
-If you want to disable multiplayer entirely, do not set `VITE_MULTIPLAYER_HOST`; instead use `CONFIG.MULTIPLAYER.ENABLED = false`.
-
-### Step 6: Deploy
-
-Deploy through GitHub Actions:
-
-- Commit the generated `.github/workflows/deploy-github-pages.yml` (typically on your default branch; then propagate — see below).
-- Push to **`static.githubPages.deployBranch`** (default `gh-deploy`), or run the workflow manually from the GitHub Actions tab **from a branch allowed by the `github-pages` environment** (see Step 4).
-- After deployment, GitHub Pages serves the uploaded `dist/` artifact.
-
-**Shipping changes via a feature branch and feature tag:** Workflow and client changes are usually merged to `main` first. To open sync pull requests into **`gh-deploy`**, **`netlify-deployment`**, and **`render-deploy`** without overwriting each branch’s own `settings.mjs`, push a tag matching `feature/**` (or run [`sync-feature-tag-to-deploy-branches.yml`](.github/workflows/sync-feature-tag-to-deploy-branches.yml) manually with `feature_ref`). Merge the PR into **`gh-deploy`** when you want the updated Pages workflow and build on the branch that receives `push` deploys.
-
-For the default project-site URL, the published app is expected at:
-
-```text
-https://<owner>.github.io/babylon-game-starter/
-```
-
-If the page loads without styles, JavaScript, favicon, or loading-screen logo, check that `static.basePath` exactly matches the deployed path; branding assets under `src/client/public/branding/` use the same Vite base path as the rest of the build.
-
-## Multiplayer behavior details
-
-### Using the shared default server
-
-- The built client will probe `https://bgs-mp.onrender.com/api/multiplayer/health`.
-- If the health check succeeds, it will connect to `https://bgs-mp.onrender.com/api/multiplayer/stream`.
-- This server is shared and suitable for demos, but not for production-grade or large-class deployments.
-
-### Using a custom server
-
-- Set `VITE_MULTIPLAYER_HOST` in the GitHub Actions build environment.
-- The client will validate the host with a health check before using it.
-- If the health probe fails, the client throws a clear error instead of silently falling back.
-- The custom server must allow CORS from the deployed GitHub Pages origin if the server is on a different domain.
-- For a project site, the origin is still only the scheme and host, for example `https://<owner>.github.io`; the `/babylon-game-starter/` path is not part of the CORS origin.
-
-### Disabling multiplayer
-
-- Set `CONFIG.MULTIPLAYER.ENABLED = false` in `src/client/config/game_config.ts`.
-- The client gracefully carries on without any backend multiplayer server.
-- This is the recommended mode for a purely static GitHub Pages deployment that does not require remote multiplayer.
-
-## Notes for GitHub Pages static sites
-
-- GitHub Pages cannot host the Go multiplayer server for this repo as a backend service in a static site deployment.
-- If you require a live multiplayer server, use a remote host such as `bgs-mp.onrender.com` or your own server.
-- GitHub Pages project sites require the correct Vite base path. In this repo, that comes from `static.basePath` when `host: 'github.io'`.
-- Unlike Netlify, GitHub Pages does not use `netlify.toml` or Netlify redirects. The generated GitHub Actions workflow uploads the built `dist/` directory directly to Pages.
-- Use `?mp=<host>` or `#mp=<host>` URL overrides only for exported playground snippets and runtime steering; GitHub Pages builds still respect the environment-set `VITE_MULTIPLAYER_HOST` before defaulting to `bgs-mp.onrender.com`.
+Custom servers must allow CORS from `https://<owner>.github.io` (path is not part of the origin). Health: `/api/multiplayer/health`.
 
 ## Troubleshooting
 
-- If the site loads without assets, verify `static.basePath` matches the GitHub Pages URL path, including leading and trailing slashes.
-- If the deploy job reports **`Branch "<branch>" is not allowed to deploy to github-pages`** (for example `gh-deploy` or `main`), open **Settings → Environments** for `static.githubPages.environmentName` and allow the branch that **triggered** the run (`push` branch or the branch you chose for **`workflow_dispatch`**).
-- If the workflow does not deploy, confirm Pages source is set to **GitHub Actions** and the workflow has `pages: write` and `id-token: write` permissions.
-- If the site loads but multiplayer fails, open the browser console and confirm the client is probing the expected host.
-- If using a custom host, confirm the server responds to `/api/multiplayer/health` and that CORS allows the GitHub Pages origin.
-- If multiplayer should be disabled, verify `CONFIG.MULTIPLAYER.ENABLED` is `false` and not overwritten by another build-time setting.
+| Symptom | Action |
+| ------- | ------ |
+| Broken assets / favicon | Match **`basePath`** to the live URL; see [BRANDING.md](BRANDING.md) |
+| **`pages build and deployment`** fails on **`main`** | **Pages → Source** = **GitHub Actions** ([fork checklist](FORK_GITHUB_SETUP.md)) |
+| **`main` not allowed** on **Deploy GitHub Pages** | Run from **`gh-deploy`**, not **`main`** |
+| **`gh-deploy` not allowed** | Add **`gh-deploy`** under **Environments → github-pages** |
+| **`assert_deploy_branch`** failed | Wrong branch for manual run or fix **`on.push.branches`** / **`deployBranch`** |
+
+## See also
+
+- **[FORK_GITHUB_SETUP.md](FORK_GITHUB_SETUP.md)** — Fork one-time GitHub settings
+- **[FEATURE_RELEASE.md](FEATURE_RELEASE.md)** — **`feature/**`** tag → sync PRs
+- **[src/deployment/DEPLOYMENT.md](src/deployment/DEPLOYMENT.md)** — Settings model and other hosts

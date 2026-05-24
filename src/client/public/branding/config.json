@@ -3,5 +3,35 @@
   "imageWidth": 256,
   "imageHeight": 256,
   "bgColor": "#ffffff",
-  "loadscreenText": "Babylon Game Starter\nLoading your game ..."
+  "loadscreenText": "Babylon Game Starter\nLoading your game ...",
+  "pwa": {
+    "enabled": true,
+    "name": "Babylon Game Starter",
+    "shortName": "BGS",
+    "description": "A modular 3D browser game built with Babylon.js",
+    "themeColor": "#1a1a1a",
+    "backgroundColor": "#1a1a1a",
+    "display": "standalone",
+    "icons": {
+      "192": "/branding/icons/icon-192.png",
+      "512": "/branding/icons/icon-512.png",
+      "512Maskable": "/branding/icons/icon-512-maskable.png"
+    },
+    "screenshots": [
+      {
+        "src": "/branding/screenshots/desktop-wide.png",
+        "sizes": "1280x720",
+        "type": "image/png",
+        "formFactor": "wide",
+        "label": "Explore 3D worlds"
+      },
+      {
+        "src": "/branding/screenshots/mobile-narrow.png",
+        "sizes": "390x844",
+        "type": "image/png",
+        "formFactor": "narrow",
+        "label": "Play on mobile"
+      }
+    ]
+  }
 }
