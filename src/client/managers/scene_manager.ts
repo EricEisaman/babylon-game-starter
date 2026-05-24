@@ -15,6 +15,7 @@ import { ASSETS } from '../config/assets';
 import { CONFIG } from '../config/game_config';
 import { CharacterController } from '../controllers/character_controller';
 import { SmoothFollowCameraController } from '../controllers/smooth_follow_camera_controller';
+import { initializeSimulationIfEnabled } from '../simulation/simulation_bootstrap';
 import { OBJECT_ROLE } from '../types/environment';
 import { devLog, isViteDev } from '../utils/dev_log';
 import {
@@ -35,6 +36,7 @@ import { CollectiblesManager } from './collectibles_manager';
 import { HUDManager } from './hud_manager';
 import { InventoryManager } from './inventory_manager';
 import { NodeMaterialManager } from './node_material_manager';
+import { OverlayManager } from './overlay_manager';
 import { SkyManager } from './sky_manager';
 import { VisualEffectsManager } from './visual_effects_manager';
 
@@ -175,6 +177,8 @@ export class SceneManager {
       });
     }
 
+    initializeSimulationIfEnabled(this.scene);
+
     // Force activate smooth follow camera
     this.smoothFollowController.forceActivateSmoothFollow();
   }
@@ -192,6 +196,7 @@ export class SceneManager {
     }
 
     NodeMaterialManager.initialize(this.scene);
+    OverlayManager.initialize(this.scene);
   }
 
   public getScene(): BABYLON.Scene {
@@ -261,6 +266,7 @@ export class SceneManager {
 
   public async loadEnvironment(environmentName: string): Promise<void> {
     BehaviorManager.unregisterFallOutOfWorld();
+    OverlayManager.clearAllOverlays();
 
     // Find the environment by name
     const environment = ASSETS.ENVIRONMENTS.find((env) => env.name === environmentName);
@@ -321,6 +327,8 @@ export class SceneManager {
       }
 
       await this.setupEnvironmentAmbientSounds(environment);
+
+      OverlayManager.applyEnvironmentOverlays(environmentName, environment.overlays ?? []);
 
       // Environment items will be set up after character is fully loaded
       // This ensures CollectiblesManager is properly initialized
@@ -619,6 +627,11 @@ export class SceneManager {
 
   private setupPhysicsObjects(environment: Environment): void {
     environment.physicsObjects.forEach((physicsObject) => {
+      // PIVOT_BEAM + hinge anchor are wired in setupJoints (single aggregate per mesh).
+      if (physicsObject.role === OBJECT_ROLE.PIVOT_BEAM) {
+        return;
+      }
+
       const mesh = this.scene.getMeshByName(physicsObject.name);
       if (mesh) {
         // Apply scaling if specified
@@ -712,17 +725,23 @@ export class SceneManager {
       const fixedMesh = this.scene.getMeshByName(fixedMassObject.name);
       if (!fixedMesh) return;
 
-      // Create physics aggregates if they don't exist
-      // Add friction to static ground mesh - CRITICAL: both objects need friction for it to work
-      const fixedMass = new BABYLON.PhysicsAggregate(fixedMesh, BABYLON.PhysicsShapeType.BOX, {
+      const fixedBody = this.ensurePhysicsBody(fixedMesh, BABYLON.PhysicsShapeType.BOX, {
         mass: 0,
         friction: 0.9
       });
-      const beam = new BABYLON.PhysicsAggregate(beamMesh, BABYLON.PhysicsShapeType.BOX, {
+      const beamBody = this.ensurePhysicsBody(beamMesh, BABYLON.PhysicsShapeType.BOX, {
         mass: pivotBeam.mass
       });
+      if (!fixedBody || !beamBody) {
+        return;
+      }
 
-      // Create hinge constraint
+      try {
+        beamBody.setMotionType(BABYLON.PhysicsMotionType.DYNAMIC);
+      } catch {
+        /* body still initializing */
+      }
+
       const joint = new BABYLON.HingeConstraint(
         new BABYLON.Vector3(0.75, 0, 0),
         new BABYLON.Vector3(-0.25, 0, 0),
@@ -731,8 +750,26 @@ export class SceneManager {
         this.scene
       );
 
-      fixedMass.body.addConstraint(beam.body, joint);
+      fixedBody.addConstraint(beamBody, joint);
     });
+  }
+
+  /**
+   * Returns an existing physics body on the mesh or creates one aggregate (avoids duplicate bodies).
+   */
+  private ensurePhysicsBody(
+    mesh: BABYLON.AbstractMesh,
+    shapeType: BABYLON.PhysicsShapeType,
+    options: { mass: number; friction?: number }
+  ): BABYLON.PhysicsBody | null {
+    if (mesh.physicsBody && !mesh.physicsBody.isDisposed) {
+      return mesh.physicsBody;
+    }
+    try {
+      return new BABYLON.PhysicsAggregate(mesh, shapeType, options).body;
+    } catch {
+      return null;
+    }
   }
 
   private setupFallbackPhysics(environment: Environment): void {

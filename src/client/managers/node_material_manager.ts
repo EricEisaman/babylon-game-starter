@@ -39,52 +39,75 @@ export class NodeMaterialManager {
       return; // No valid snippet ID found
     }
 
+    const nodeMaterial = await this.loadNodeMaterialSnippet(snippetId);
+    if (nodeMaterial) {
+      try {
+        mesh.material = nodeMaterial;
+      } catch {
+        // Failed to apply material
+      }
+    }
+  }
+
+  /**
+   * Applies an NME snippet from [nme.babylonjs.com](https://nme.babylonjs.com/) to a mesh
+   * (Spike E — instance `materialSnippetId` without renaming the mesh).
+   */
+  public static async applySnippetToMesh(
+    mesh: BABYLON.AbstractMesh,
+    snippetId: string
+  ): Promise<void> {
+    if (!this.scene) {
+      return;
+    }
+    const normalized = snippetId.trim().toUpperCase();
+    if (normalized.length === 0) {
+      return;
+    }
+    const nodeMaterial = await this.loadNodeMaterialSnippet(normalized);
+    if (nodeMaterial) {
+      try {
+        mesh.material = nodeMaterial;
+      } catch {
+        // Failed to apply material
+      }
+    }
+  }
+
+  private static async loadNodeMaterialSnippet(
+    snippetId: string
+  ): Promise<BABYLON.NodeMaterial | null> {
+    if (!this.scene) {
+      return null;
+    }
+
+    let nodeMaterial = this.activeNodeMaterials.get(snippetId);
+    if (nodeMaterial) {
+      return nodeMaterial;
+    }
+
     try {
-      // Check if we already have this node material cached
-      let nodeMaterial = this.activeNodeMaterials.get(snippetId);
+      nodeMaterial = await BABYLON.NodeMaterial.ParseFromSnippetAsync(snippetId, this.scene);
+      if (!nodeMaterial || typeof nodeMaterial !== 'object') {
+        return null;
+      }
 
-      if (!nodeMaterial) {
+      if (!this.hasInitializedAnimatedInputs(nodeMaterial)) {
         try {
-          // Parse the node material from the snippet only if not cached
-          nodeMaterial = await BABYLON.NodeMaterial.ParseFromSnippetAsync(snippetId, this.scene);
-
-          if (!nodeMaterial || typeof nodeMaterial !== 'object') {
-            return; // Failed to parse
-          }
-
-          // Guard: ensure internal state is fully initialized before use.
-          // animatedInputs being null indicates an incomplete build which would
-          // crash the render loop — force a rebuild to resolve it.
-          if (!this.hasInitializedAnimatedInputs(nodeMaterial)) {
-            try {
-              nodeMaterial.build(false);
-            } catch {
-              return; // Material is not usable
-            }
-          }
-
-          // Final safety check before caching
-          if (!this.hasInitializedAnimatedInputs(nodeMaterial)) {
-            return; // Still not initialized — skip to avoid render-loop crash
-          }
-
-          // Store the node material for reuse (keyed by snippet ID)
-          this.activeNodeMaterials.set(snippetId, nodeMaterial);
+          nodeMaterial.build(false);
         } catch {
-          return; // Parsing failed
+          return null;
         }
       }
 
-      if (nodeMaterial) {
-        try {
-          // Apply the node material to the mesh
-          mesh.material = nodeMaterial;
-        } catch {
-          // Failed to apply material
-        }
+      if (!this.hasInitializedAnimatedInputs(nodeMaterial)) {
+        return null;
       }
+
+      this.activeNodeMaterials.set(snippetId, nodeMaterial);
+      return nodeMaterial;
     } catch {
-      // Silently handle errors to match playground manager style
+      return null;
     }
   }
 
