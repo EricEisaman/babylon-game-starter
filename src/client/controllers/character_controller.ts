@@ -8,6 +8,8 @@ import { CHARACTER_STATES } from '../config/character_states';
 import { CONFIG } from '../config/game_config';
 import { INPUT_KEYS } from '../config/input_keys';
 import { MobileInputManager } from '../input/mobile_input_manager';
+import { isSimulationActive } from '../simulation/simulation_bootstrap';
+import { StateSimulationManager } from '../simulation/state_simulation_manager';
 import { DeviceDetector } from '../utils/device_detector';
 
 import { AnimationController } from './animation_controller';
@@ -685,9 +687,13 @@ export class CharacterController {
     const characterMass = character.mass;
 
     // Character-specific speed calculations using active character's properties
-    const baseSpeed = this.boostActive
+    let baseSpeed = this.boostActive
       ? character.speed.onGround * character.speed.boostMultiplier
       : character.speed.onGround;
+    if (isSimulationActive()) {
+      const mods = StateSimulationManager.getMovementModifiers();
+      baseSpeed *= mods.speedMultiplier;
+    }
     const massAdjustedSpeed = baseSpeed / Math.sqrt(characterMass); // Additional mass adjustment for realistic physics
 
     const desiredVelocity = this.inputDirection

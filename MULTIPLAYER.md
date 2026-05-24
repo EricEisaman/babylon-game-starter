@@ -215,6 +215,8 @@ Two zero-code routes to override the default host, in priority order:
 Use this as a classroom-ready smoke test right after pasting:
 
 - [ ] Page loads and Havok is active (no `HavokPhysics is not defined` in console).
+- [ ] Console has no `No audio engine` (AudioV2 uses explicit engine imports in bundled code; see [`PLAYGROUND.md`](PLAYGROUND.md)).
+- [ ] Particle effects load without `Unable to load the snippet` 404s (catalog `snippetId` values in [`game_config.ts`](src/client/config/game_config.ts) must be real Babylon snippet ids).
 - [ ] Browser console shows `[Datastar] Checking server at <host>...` and, within a few seconds or up to ~30 s on a cold start, `[Datastar] ✓ Server available at <host>`.
 - [ ] If a cold start is in progress, console shows the warming-up notice.
 - [ ] `GET /api/multiplayer/stream` in the Network tab has `Content-Encoding: br` (or `gzip`) and no `Content-Length`.

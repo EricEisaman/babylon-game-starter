@@ -58,6 +58,19 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### Optional extensions (dev)
+
+The default game is unchanged. To try the optional **SynapticLab** simulation demo (ported from [circuit-hijack](https://github.com/EricEisaman/circuit-hijack)):
+
+| URL | Effect |
+|-----|--------|
+| [`http://localhost:3000/?sim=1`](http://localhost:3000/?sim=1) | Enables state simulation, loads **SynapticLab**, HUD meters, DOM hunger vignette — see [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md) |
+| `?overlay=Drug%20Hunger%20Vignette` | Dev: force an overlay catalog entry (use with `?sim=1`) |
+
+Or set `CONFIG.SIMULATION.ENABLED: true` in [`src/client/config/game_config.ts`](src/client/config/game_config.ts) and switch to **SynapticLab** in Settings.
+
+See [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md), [docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md), and [docs/evaluation/README.md](docs/evaluation/README.md).
+
 **Multiplayer (local):** run `npm run dev:fullstack` to start Vite and the Go API together (Go restarts automatically when you save `src/server/multiplayer/**` — see `nodemon.multiplayer.json`). Or use two terminals: `npm run dev:multiplayer` then `npm run dev`. With `VITE_MULTIPLAYER_HOST` unset, the client uses same-origin `/api/multiplayer/*`, proxied to Go (see `vite.config.ts`). Override the backend with `.env.local` — see `.env.example`.
 
 ---

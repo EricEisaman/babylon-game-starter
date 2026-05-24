@@ -13,15 +13,22 @@
 
 // /// <reference path="./types/babylon.d.ts" />
 
-import { ASSETS } from './config/assets';
+import { ASSETS, SIMULATION_LAB_ENVIRONMENT_NAME } from './config/assets';
+import { AudioManager } from './managers/audio_manager';
 import { CharacterLoader } from './managers/character_loader';
 import { HUDManager } from './managers/hud_manager';
 import { initMultiplayerAfterCharacterReady } from './managers/multiplayer_bootstrap';
 import { getMultiplayerManager } from './managers/multiplayer_manager';
+import { OverlayManager } from './managers/overlay_manager';
 import { SceneManager } from './managers/scene_manager';
+import {
+  disposeSimulation,
+  isSimulationActive,
+  setSimulationQueryOverride
+} from './simulation/simulation_bootstrap';
 import { InventoryUI } from './ui/inventory_ui';
 import { SettingsUI } from './ui/settings_ui';
-import { queryHook } from './utils/query_hook';
+import { getQueryParam, isQueryFlagEnabled, queryHook } from './utils/query_hook';
 import { switchToEnvironment } from './utils/switch_environment';
 
 /**
@@ -29,15 +36,39 @@ import { switchToEnvironment } from './utils/switch_environment';
  * This prevents orphaned elements when the playground is rerun
  */
 function cleanupUI(): void {
+  disposeSimulation();
   HUDManager.cleanup();
   SettingsUI.cleanup();
   InventoryUI.cleanup();
+  OverlayManager.dispose();
+}
+
+/** Draco + AudioV2 bootstrap for playground (main.ts does this for local Vite). */
+function configurePlaygroundRuntimeGlobals(): void {
+  if (globalThis.BABYLON?.Tools) {
+    globalThis.BABYLON.Tools.ScriptBaseUrl = 'https://cdn.babylonjs.com';
+  }
+
+  const decoder = globalThis.BABYLON?.DracoCompression?.Configuration?.decoder;
+  if (decoder) {
+    decoder.wasmUrl = 'https://cdn.babylonjs.com/draco_wasm_wrapper_gltf.js';
+    decoder.wasmBinaryUrl = 'https://cdn.babylonjs.com/draco_decoder_gltf.wasm';
+    decoder.fallbackUrl = 'https://cdn.babylonjs.com/draco_decoder_gltf.js';
+  }
 }
 
 class Playground {
   public static CreateScene(engine: BABYLON.Engine, canvas: HTMLCanvasElement): BABYLON.Scene {
+    configurePlaygroundRuntimeGlobals();
+    void AudioManager.ensurePlaygroundAudioReady();
+
     // Clean up any existing UI elements before creating new ones
     cleanupUI();
+    setSimulationQueryOverride(isQueryFlagEnabled('sim'));
+    const overlayFromQuery = getQueryParam('overlay');
+    if (overlayFromQuery) {
+      OverlayManager.setQueryCatalogName(overlayFromQuery);
+    }
     void getMultiplayerManager()
       .leave()
       .catch(() => undefined);
@@ -77,12 +108,14 @@ class Playground {
     if (!defaultEnv) {
       throw new Error('ASSETS.ENVIRONMENTS must contain at least one environment');
     }
-    const defaultEnvironment = defaultEnv.name;
-    void switchToEnvironment(defaultEnvironment).then(() => {
-      // Load character model after environment is loaded
-      const spawnPoint = defaultEnv.spawnPoint ?? new BABYLON.Vector3(0, 1, 0);
+    const useSimulationLab = isSimulationActive();
+    const labEnv = ASSETS.ENVIRONMENTS.find((env) => env.name === SIMULATION_LAB_ENVIRONMENT_NAME);
+    const initialEnv = useSimulationLab && labEnv ? labEnv : defaultEnv;
+    const initialEnvironmentName = initialEnv.name;
+    void switchToEnvironment(initialEnvironmentName).then(() => {
+      const spawnPoint = initialEnv.spawnPoint ?? new BABYLON.Vector3(0, 1, 0);
       CharacterLoader.loadCharacterModel(undefined, undefined, spawnPoint);
-      void initMultiplayerAfterCharacterReady(sceneManager, defaultEnvironment);
+      void initMultiplayerAfterCharacterReady(sceneManager, initialEnvironmentName);
     });
 
     return sceneManager.getScene();

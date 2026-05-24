@@ -3,10 +3,12 @@
 // ============================================================================
 
 import { CONFIG } from '../config/game_config';
+import { StateSimulationManager } from '../simulation/state_simulation_manager';
 
 import { CollectiblesManager } from './collectibles_manager';
 
 import type { CharacterController } from '../controllers/character_controller';
+import type { HudMeterDefinition } from '../types/ui';
 
 export class HUDManager {
   private static hudContainer: HTMLDivElement | null = null;
@@ -24,6 +26,9 @@ export class HUDManager {
   private static lastHudHeavyUpdate = 0;
   private static isMobile = false;
   private static isIPadWithKeyboard = false;
+  private static simulationMeterContainer: HTMLDivElement | null = null;
+  private static simulationMeterFills = new Map<string, HTMLDivElement>();
+  private static simulationMetersEnabled = false;
   private static activeHudConfig: {
     readonly SHOW_COORDINATES: boolean;
     readonly SHOW_TIME: boolean;
@@ -317,6 +322,90 @@ export class HUDManager {
     } else {
       this.setElementVisibility('credits', false);
     }
+
+    if (this.simulationMetersEnabled && doHeavyDom) {
+      this.updateSimulationMeters();
+    }
+  }
+
+  /**
+   * Shows optional state-simulation meter bars (Spike B).
+   */
+  public static enableSimulationMeters(meters: readonly HudMeterDefinition[]): void {
+    this.disableSimulationMeters();
+    if (!this.hudContainer || meters.length === 0) {
+      return;
+    }
+
+    const canvas = this.scene?.getEngine().getRenderingCanvas();
+    const parent = canvas?.parentElement ?? document.body;
+
+    this.simulationMeterContainer = document.createElement('div');
+    this.simulationMeterContainer.id = 'simulation-meters';
+    this.simulationMeterContainer.style.cssText = `
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 900;
+      pointer-events: none;
+      font-family: ${CONFIG.HUD.FONT_FAMILY};
+      font-size: 11px;
+      color: ${CONFIG.HUD.PRIMARY_COLOR};
+    `;
+
+    for (const meter of meters) {
+      const row = document.createElement('div');
+      row.style.cssText = 'min-width: 140px;';
+      const label = document.createElement('div');
+      label.textContent = meter.label;
+      label.style.cssText = 'margin-bottom: 2px; opacity: 0.9;';
+      const track = document.createElement('div');
+      track.style.cssText = `
+        height: 8px;
+        background: rgba(0,0,0,0.45);
+        border-radius: 4px;
+        overflow: hidden;
+      `;
+      const fill = document.createElement('div');
+      fill.style.cssText = `
+        height: 100%;
+        width: 0%;
+        background: ${meter.color};
+        transition: width 0.15s ease-out;
+      `;
+      track.appendChild(fill);
+      row.appendChild(label);
+      row.appendChild(track);
+      this.simulationMeterContainer.appendChild(row);
+      this.simulationMeterFills.set(meter.id, fill);
+    }
+
+    parent.appendChild(this.simulationMeterContainer);
+    this.simulationMetersEnabled = true;
+  }
+
+  public static disableSimulationMeters(): void {
+    this.simulationMetersEnabled = false;
+    this.simulationMeterFills.clear();
+    if (this.simulationMeterContainer) {
+      this.simulationMeterContainer.remove();
+      this.simulationMeterContainer = null;
+    }
+    const orphan = document.getElementById('simulation-meters');
+    orphan?.remove();
+  }
+
+  private static updateSimulationMeters(): void {
+    const values = StateSimulationManager.getMeterValues();
+    for (const [id, fill] of this.simulationMeterFills) {
+      const raw = values[id] ?? 0;
+      const pct = Math.max(0, Math.min(100, raw * 100));
+      fill.style.width = `${pct}%`;
+    }
   }
 
   /**
@@ -489,6 +578,8 @@ export class HUDManager {
    * Disposes of the HUD
    */
   public static dispose(): void {
+    this.disableSimulationMeters();
+
     if (this.hudContainer) {
       this.hudContainer.remove();
       this.hudContainer = null;
@@ -505,6 +596,8 @@ export class HUDManager {
    * Global cleanup method to remove all HUD elements from DOM
    */
   public static cleanup(): void {
+    this.disableSimulationMeters();
+
     // Remove any existing HUD containers
     const existingHUD = document.getElementById('game-hud');
     if (existingHUD) {

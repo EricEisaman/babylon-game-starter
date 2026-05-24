@@ -1,8 +1,10 @@
 /**
  * True when running under Vite in development; false in production and in the official playground.
+ * Cast avoids requiring Vite's `ImportMetaEnv` where the playground TS service has no `env`.
  */
 export function isViteDev(): boolean {
-  return import.meta.env?.DEV ?? false;
+  const meta = import.meta as { env?: { DEV?: boolean } };
+  return meta.env?.DEV === true;
 }
 
 /**

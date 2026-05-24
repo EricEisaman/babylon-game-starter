@@ -32,7 +32,17 @@ function toEngineVolumeRamp(
   return ramp as AbstractSoundVolumeRamp;
 }
 
-export function fromAbstractSound(sound: BABYLON.AbstractSound): ManagedAudioSound {
+/** Minimal AudioV2 surface (avoids dual-module StaticSound vs global AbstractSound mismatch). */
+interface AudioV2SoundLike {
+  play: () => void;
+  stop: () => void;
+  dispose: () => void;
+  setVolume: (volume: number, ramp?: AbstractSoundVolumeRamp) => void;
+  volume: number;
+  activeInstancesCount: number;
+}
+
+export function fromAbstractSound(sound: AudioV2SoundLike): ManagedAudioSound {
   return {
     play: () => {
       sound.play();

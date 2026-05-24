@@ -4,7 +4,7 @@
 
 import type { BehaviorConfig, FallRespawnConfig } from './behaviors';
 import type { ItemEffectKind } from './config';
-import type { EffectType } from './effects';
+import type { EffectType, EnvironmentOverlayBinding } from './effects';
 
 export const OBJECT_ROLE = {
   DYNAMIC_BOX: 'DYNAMIC_BOX',
@@ -74,6 +74,12 @@ export interface AmbientSoundConfig {
   readonly position: BABYLON.Vector3;
   readonly rollOff?: number; // Defaults to 2
   readonly maxDistance?: number; // Defaults to 40
+}
+
+/** @deprecated Use `overlays` + `CONFIG.EFFECTS.OVERLAY_SNIPPETS` via OverlayManager. */
+export interface EnvironmentSmartFilter {
+  readonly snippetId: string;
+  readonly enabled?: boolean;
 }
 
 // ============================================================================
@@ -157,6 +163,10 @@ export interface Environment {
    * env’s spawn (or cross-env when configured) is always active without this block.
    */
   readonly fallRespawn?: FallRespawnConfig;
+  /** Full-screen overlays (SFE / NME / dom) — cleared on every environment switch. */
+  readonly overlays?: readonly EnvironmentOverlayBinding[];
+  /** @deprecated Prefer `overlays`. */
+  readonly smartFilter?: EnvironmentSmartFilter;
 }
 
 // Forward declarations for circular dependencies
@@ -179,6 +189,8 @@ export interface ItemConfig {
   readonly inventory?: boolean;
   readonly thumbnail?: string;
   readonly itemEffectKind?: ItemEffectKind;
+  /** Optional simulation collect role when CONFIG.SIMULATION.ENABLED. */
+  readonly collectRole?: string;
 }
 
 export interface ItemInstance {
@@ -191,4 +203,6 @@ export interface ItemInstance {
   readonly instanceName?: string;
   readonly effect?: EffectType;
   readonly behavior?: BehaviorConfig;
+  /** NME snippet id applied to spawned mesh (no #nm prefix in GLB name). */
+  readonly materialSnippetId?: string;
 }
