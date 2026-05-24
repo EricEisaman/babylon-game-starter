@@ -14,7 +14,7 @@ Be respectful, assume good intent, and keep discussion focused on the work. Hara
 
 ## Versioning — Semantic Versioning 2.0.0
 
-This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The version in `package.json` is the single source of truth and **MUST** match the version in `package-lock.json`. The project is currently at **`1.5.0`** — the public API is stable and the standard `MAJOR.MINOR.PATCH` rules apply.
+This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The version in `package.json` is the single source of truth and **MUST** match the version in `package-lock.json`. The project is currently at **`1.6.0`** — the public API is stable and the standard `MAJOR.MINOR.PATCH` rules apply.
 
 Given a version number `MAJOR.MINOR.PATCH`:
 
@@ -52,7 +52,7 @@ When you cut a release:
 
 ### Prerequisites
 
-- **Node.js ≥ 18** (CI runs Node 20).
+- **Node.js ≥ 20.19** (CI runs Node 22; Vite 8 requires Node 20.19+ or 22.12+).
 - **npm** (the project ships an `npm` lockfile; do not commit `pnpm-lock.yaml` or `yarn.lock`).
 - **Go** (only required if you are working on the multiplayer server under `src/server/multiplayer/`).
 

@@ -33,6 +33,7 @@ export default tseslint.config(
       '**/*.mjs',
       'scripts/**',
       'eslint.config.js',
+      'vite.config.ts',
       '**/*.d.ts',
       '**/*.d.mts'
     ]
