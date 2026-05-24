@@ -9,7 +9,7 @@
 <p align="center">
 
 [![Release](https://img.shields.io/badge/release-v1.6.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
-[![Live demo](https://img.shields.io/badge/Live_demo-GitHub_Pages-2ea44f)](https://ericisaman.github.io/babylon-game-starter/)
+[![Live demo](https://img.shields.io/badge/Live_demo-GitHub_Pages-2ea44f)](https://ericeisaman.github.io/babylon-game-starter/)
 [![CI](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml/badge.svg)](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml)
 [![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-BB464B?logo=babylon.js&logoColor=white)](https://www.babylonjs.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -22,7 +22,7 @@ Babylon Game Starter provides a complete, ready-to-run foundation for building i
 
 **Current release: [v1.6.0](#v160)** — Installable PWA with unified branding, offline cache, and iPad Safari install coach.
 
-**Live demo:** [https://ericisaman.github.io/babylon-game-starter/](https://ericisaman.github.io/babylon-game-starter/) (GitHub Pages)
+**Live demo:** [https://ericeisaman.github.io/babylon-game-starter/](https://ericeisaman.github.io/babylon-game-starter/) (GitHub Pages — [EricEisaman/babylon-game-starter](https://github.com/EricEisaman/babylon-game-starter))
 
 ---
 
