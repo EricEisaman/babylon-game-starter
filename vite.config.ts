@@ -4,8 +4,10 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 import {
+  buildSocialMetaTags,
   buildWebManifest,
   loadBrandingConfigJson,
+  renderSocialMetaHtml,
   resolveBrandingConfig
 } from './src/deployment/branding/load_branding_config.mjs';
 import deploymentSettings from './src/deployment/settings/settings';
@@ -25,6 +27,9 @@ const base = isStaticGithub ? (deploymentSettings.static?.basePath ?? '/') : '/'
 
 const brandingResolved = resolveBrandingConfig(loadBrandingConfigJson());
 const webManifest = buildWebManifest(brandingResolved, base);
+const publicUrl = deploymentSettings.static?.publicUrl;
+const socialMetaTags = buildSocialMetaTags(brandingResolved, { base, publicUrl });
+const socialMetaHtml = renderSocialMetaHtml(socialMetaTags);
 
 // Longer prefixes must win: `/api` matches `/api/multiplayer/*` if registered first,
 // sending multiplayer traffic to the wrong backend (Node :8787 vs Go :5000).
@@ -121,6 +126,16 @@ export default defineConfig({
     emptyOutDir: true
   },
   plugins: [
+    {
+      name: 'branding-social-meta',
+      transformIndexHtml(html) {
+        const withTitle = html.replace(
+          /<title>[^<]*<\/title>/,
+          `<title>${socialMetaTags.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>`
+        );
+        return withTitle.replace('</head>', `    ${socialMetaHtml}\n</head>`);
+      }
+    },
     ...(brandingResolved.pwa.enabled
       ? [
           VitePWA({

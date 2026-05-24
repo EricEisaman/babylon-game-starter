@@ -1,6 +1,6 @@
 {
   "name": "babylon-game-starter-vite",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "engines": {
     "node": ">=20.19.0 || >=22.12.0"
   },
@@ -21,6 +21,7 @@
     "export:playground": "node scripts/generate-playground-json.mjs && node scripts/check-playground-export.mjs",
     "check:playground": "node scripts/check-playground-export.mjs",
     "generate:pwa-assets": "node scripts/generate-pwa-assets.mjs",
+    "social:test": "npm run build && PLAYWRIGHT_BROWSERS_PATH=0 node scripts/check-social-meta.mjs",
     "pwa:test": "npm run build && node scripts/check-pwa.mjs",
     "deploy:prepare": "node src/deployment/scripts/prepare-deployment.mjs"
   },
@@ -48,6 +49,7 @@
     "lighthouse": "^13.3.0",
     "nodemon": "^3.1.9",
     "prettier": "^3.8.3",
+    "playwright": "^1.52.0",
     "sharp": "^0.34.5",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.58.2",
