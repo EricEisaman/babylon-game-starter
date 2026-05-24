@@ -47,18 +47,37 @@ const DEFAULT_BRANDING: ResolvedBrandingConfig = {
 let cachedConfig: ResolvedBrandingConfig | null = null;
 let loadPromise: Promise<ResolvedBrandingConfig> | null = null;
 
-/** Vite injects `import.meta.env`; playground TS has no `ImportMetaEnv` type. */
-function readViteBaseUrl(): string {
+/** Infer GitHub Pages project-site base (e.g. `/babylon-game-starter/`) when Vite env is `/`. */
+function inferBaseUrlFromLocation(): string {
   try {
-    const meta = import.meta as { env?: { BASE_URL?: string } };
-    const base = meta.env?.BASE_URL;
-    if (typeof base === 'string' && base.length > 0) {
-      return base.endsWith('/') ? base : `${base}/`;
+    const { pathname } = window.location;
+    const match = pathname.match(/^(\/[^./][^/]*)\//);
+    if (match?.[1]) {
+      return `${match[1]}/`;
     }
   } catch {
-    // Playground runtime: no Vite env injection.
+    // Ignore non-browser runtimes.
   }
   return '/';
+}
+
+/** Vite inlines `import.meta.env.BASE_URL` only for direct property access (not optional chaining). */
+function readViteBaseUrl(): string {
+  let base = '/';
+  try {
+    base = import.meta.env.BASE_URL;
+  } catch {
+    return inferBaseUrlFromLocation();
+  }
+
+  if (!base || base === '/') {
+    const inferred = inferBaseUrlFromLocation();
+    if (inferred !== '/') {
+      return inferred;
+    }
+  }
+
+  return base.endsWith('/') ? base : `${base}/`;
 }
 
 function withAppBasePath(path: string): string {
@@ -203,6 +222,9 @@ export async function loadBrandingConfig(): Promise<ResolvedBrandingConfig> {
   }
 
   loadPromise = (async () => {
+    // Correct loadscreen asset URLs immediately (before config fetch) for subpath deploys.
+    applyLoadscreenBranding(DEFAULT_BRANDING);
+
     try {
       const response = await fetch(withAppBasePath('/branding/config.json'), { cache: 'no-store' });
       if (!response.ok) {
