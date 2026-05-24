@@ -11,7 +11,8 @@ const deploymentSettings = {
     }
   ],
   static: {
-    basePath: '/babylon-game-starter/'
+    basePath: '/babylon-game-starter/',
+    publicUrl: 'https://ericeisaman.github.io/babylon-game-starter/'
   }
 };
 

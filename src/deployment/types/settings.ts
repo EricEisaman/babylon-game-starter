@@ -42,6 +42,8 @@ export interface GithubPagesDeploymentConfig {
 
 export interface StaticDeploymentConfig {
   basePath?: `/${string}`;
+  /** Canonical public site URL for Open Graph (no trailing slash required). */
+  publicUrl?: string;
   githubPages?: GithubPagesDeploymentConfig;
 }
 

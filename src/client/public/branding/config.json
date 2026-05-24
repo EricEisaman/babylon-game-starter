@@ -33,5 +33,15 @@
         "label": "Play on mobile"
       }
     ]
+  },
+  "social": {
+    "title": "Babylon Game Starter",
+    "description": "A modular 3D browser game built with Babylon.js",
+    "siteName": "Babylon Game Starter",
+    "image": "/branding/screenshots/og-card.png",
+    "imageWidth": 1200,
+    "imageHeight": 630,
+    "imageType": "image/png",
+    "twitterCard": "summary_large_image"
   }
 }

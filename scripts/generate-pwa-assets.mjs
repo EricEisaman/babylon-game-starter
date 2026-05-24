@@ -88,12 +88,30 @@ async function generateScreenshots(resolved) {
   }
 }
 
+async function generateOgCard(resolved) {
+  const bannerPath = path.join(repoRoot, 'resources', 'Babylon_Game_Starter_Banner.jpg');
+  const screenshotsDir = path.join(publicRoot, 'branding', 'screenshots');
+  await ensureDir(screenshotsDir);
+
+  const outPath = publicPathFromConfig(resolved.social.image);
+  const width = resolved.social.imageWidth;
+  const height = resolved.social.imageHeight;
+
+  await sharp(bannerPath)
+    .resize(width, height, { fit: 'cover', position: 'centre' })
+    .png()
+    .toFile(outPath);
+
+  console.log('OG card written:', path.relative(repoRoot, outPath), `(${width}x${height})`);
+}
+
 async function main() {
   const raw = loadBrandingConfigJson(repoRoot);
   const resolved = resolveBrandingConfig(raw);
 
   await generateIcons(resolved);
   await generateScreenshots(resolved);
+  await generateOgCard(resolved);
   console.log('PWA assets generated successfully.');
 }
 

@@ -8,7 +8,7 @@
 
 <p align="center">
 
-[![Release](https://img.shields.io/badge/release-v1.6.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
+[![Release](https://img.shields.io/badge/release-v1.7.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
 [![Live demo](https://img.shields.io/badge/Live_demo-GitHub_Pages-2ea44f)](https://ericeisaman.github.io/babylon-game-starter/)
 [![CI](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml/badge.svg)](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml)
 [![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-BB464B?logo=babylon.js&logoColor=white)](https://www.babylonjs.com)
@@ -20,13 +20,30 @@
 
 Babylon Game Starter provides a complete, ready-to-run foundation for building interactive 3D browser games. It ships with physics-based character movement, an environment system, collectibles, inventory, a behavior trigger system (proximity and fall-out-of-map), particle effects, an AudioV2-powered sound engine, and full mobile control support — all driven by configuration files. The same client can be bundled for the **Babylon.js Playground** via `playground.json`.
 
-**Current release: [v1.6.0](#v160)** — Installable PWA with unified branding, offline cache, and iPad Safari install coach.
-
-**Live demo:** [https://ericeisaman.github.io/babylon-game-starter/](https://ericeisaman.github.io/babylon-game-starter/) (GitHub Pages — [EricEisaman/babylon-game-starter](https://github.com/EricEisaman/babylon-game-starter))
+**Current release: [v1.7.0](#v170)** — Open Graph / Twitter Card metadata in unified branding, injected at build time for social link previews.
 
 ---
 
-## v1.6.0 {#v160}
+## v1.7.0
+
+Released **May 2026**. Minor version: platform branding now drives social link previews (Discord, Slack, iMessage, and similar crawlers); default game behavior is unchanged unless you customize branding or deployment URLs.
+
+### Added
+
+- **Open Graph / Twitter Card metadata** — `social` block in [`public/branding/config.json`](src/client/public/branding/config.json); tags injected into `dist/index.html` at build time (crawler-safe, no JavaScript required).
+- **`static.publicUrl`** — Per-deployment canonical URL in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) for absolute `og:url` and `og:image`.
+- **OG card asset** — `og-card.png` (1200×630) generated via `npm run generate:pwa-assets`.
+- **`npm run social:test`** — Static HTML + Playwright validation of social meta tags ([`scripts/check-social-meta.mjs`](scripts/check-social-meta.mjs)).
+
+### Changed
+
+- [BRANDING.md](BRANDING.md) documents the social metadata schema and validation workflow.
+
+To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FEATURE_RELEASE.md) (`feature/**` tag or manual sync workflow).
+
+---
+
+## v1.6.0
 
 Released **May 2026**. Minor version: installable PWA, unified branding config, and Vite 8 upgrade; default game behavior is unchanged unless you use PWA or branding features.
 
@@ -49,7 +66,7 @@ To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FE
 
 ---
 
-## v1.5.0 {#v150}
+## v1.5.0
 
 Released **May 2026**. Minor version: new optional simulation content and playground fixes; default worlds and multiplayer wire format are unchanged unless you opt in.
 

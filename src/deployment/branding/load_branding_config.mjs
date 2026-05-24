@@ -26,6 +26,29 @@ export function loadBrandingConfigJson(repoRootOverride = repoRoot) {
   return JSON.parse(raw);
 }
 
+const DEFAULT_OG_IMAGE = '/branding/screenshots/og-card.png';
+
+/**
+ * @param {string} publicUrl
+ * @returns {string}
+ */
+function normalizePublicUrl(publicUrl) {
+  return publicUrl.replace(/\/+$/, '');
+}
+
+/**
+ * @param {string} publicUrl
+ * @param {string} assetPath
+ * @param {string} base
+ * @returns {string}
+ */
+export function toAbsolutePublicUrl(publicUrl, assetPath, base) {
+  const origin = normalizePublicUrl(publicUrl);
+  const pathWithBase = toManifestPath(assetPath, base);
+  const normalizedPath = pathWithBase.startsWith('/') ? pathWithBase : `/${pathWithBase}`;
+  return `${origin}${normalizedPath}`;
+}
+
 /**
  * @param {import('../../client/types/branding').BrandingConfig} config
  * @returns {import('../../client/types/branding').ResolvedBrandingConfig}
@@ -55,6 +78,24 @@ export function resolveBrandingConfig(config) {
     screenshots: pwaRaw.screenshots ?? []
   };
 
+  const socialRaw = merged.social ?? {};
+  const wideScreenshot = pwa.screenshots.find((shot) => shot.formFactor === 'wide');
+  const imageFallback = wideScreenshot?.src ?? DEFAULT_OG_IMAGE;
+  const imageTypeFallback = wideScreenshot?.type ?? 'image/png';
+  const [fallbackWidth = '1200', fallbackHeight = '630'] = (wideScreenshot?.sizes ?? '1200x630').split('x');
+
+  const social = {
+    title: socialRaw.title ?? pwa.name,
+    description: socialRaw.description ?? pwa.description,
+    siteName: socialRaw.siteName ?? pwa.name,
+    siteUrl: socialRaw.siteUrl,
+    image: socialRaw.image ?? imageFallback,
+    imageWidth: socialRaw.imageWidth ?? Number(fallbackWidth),
+    imageHeight: socialRaw.imageHeight ?? Number(fallbackHeight),
+    imageType: socialRaw.imageType ?? imageTypeFallback,
+    twitterCard: socialRaw.twitterCard ?? 'summary_large_image'
+  };
+
   return {
     image: merged.image,
     imageWidth: merged.imageWidth,
@@ -63,7 +104,8 @@ export function resolveBrandingConfig(config) {
     loadscreenText: merged.loadscreenText,
     title,
     subtitle,
-    pwa
+    pwa,
+    social
   };
 }
 
@@ -125,4 +167,82 @@ export function buildWebManifest(resolved, base) {
     icons,
     screenshots
   };
+}
+
+/**
+ * @param {import('../../client/types/branding').ResolvedBrandingConfig} resolved
+ * @param {{ base: string, publicUrl?: string }} options
+ * @returns {import('../../client/types/branding').SocialMetaTags}
+ */
+export function buildSocialMetaTags(resolved, { base, publicUrl }) {
+  const { social } = resolved;
+  const canonicalUrl = publicUrl ?? social.siteUrl;
+  const ogUrl = canonicalUrl ? normalizePublicUrl(canonicalUrl) : undefined;
+  const ogImage = canonicalUrl
+    ? toAbsolutePublicUrl(canonicalUrl, social.image, base)
+    : undefined;
+
+  return {
+    title: social.title,
+    description: social.description,
+    siteName: social.siteName,
+    ogType: 'website',
+    ogUrl,
+    ogImage,
+    ogImageWidth: social.imageWidth,
+    ogImageHeight: social.imageHeight,
+    ogImageType: social.imageType,
+    twitterCard: social.twitterCard,
+    twitterTitle: social.title,
+    twitterDescription: social.description,
+    twitterImage: ogImage
+  };
+}
+
+/**
+ * @param {import('../../client/types/branding').SocialMetaTags} tags
+ * @returns {string}
+ */
+export function renderSocialMetaHtml(tags) {
+  const escapeHtml = (value) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  const metaLines = [
+    `<meta name="description" content="${escapeHtml(tags.description)}">`,
+    `<meta property="og:type" content="${escapeHtml(tags.ogType)}">`,
+    `<meta property="og:title" content="${escapeHtml(tags.title)}">`,
+    `<meta property="og:description" content="${escapeHtml(tags.description)}">`,
+    `<meta property="og:site_name" content="${escapeHtml(tags.siteName)}">`
+  ];
+
+  if (tags.ogUrl) {
+    metaLines.push(`<meta property="og:url" content="${escapeHtml(tags.ogUrl)}">`);
+  }
+  if (tags.ogImage) {
+    metaLines.push(`<meta property="og:image" content="${escapeHtml(tags.ogImage)}">`);
+    metaLines.push(
+      `<meta property="og:image:width" content="${escapeHtml(String(tags.ogImageWidth))}">`
+    );
+    metaLines.push(
+      `<meta property="og:image:height" content="${escapeHtml(String(tags.ogImageHeight))}">`
+    );
+    metaLines.push(
+      `<meta property="og:image:type" content="${escapeHtml(tags.ogImageType)}">`
+    );
+  }
+
+  metaLines.push(`<meta name="twitter:card" content="${escapeHtml(tags.twitterCard)}">`);
+  metaLines.push(`<meta name="twitter:title" content="${escapeHtml(tags.twitterTitle)}">`);
+  metaLines.push(
+    `<meta name="twitter:description" content="${escapeHtml(tags.twitterDescription)}">`
+  );
+  if (tags.twitterImage) {
+    metaLines.push(`<meta name="twitter:image" content="${escapeHtml(tags.twitterImage)}">`);
+  }
+
+  return metaLines.join('\n    ');
 }

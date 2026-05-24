@@ -17,12 +17,12 @@ src/client/public/branding/
     Babylon_logo.png    ← loading screen logo
     logo.png            ← favicon
   icons/                ← PWA install icons (192, 512, maskable)
-  screenshots/          ← install dialog previews (wide + narrow)
+  screenshots/          ← install dialog previews (wide + narrow) + og-card.png
 ```
 
 Runtime loader: [`src/client/utils/branding_config.ts`](src/client/utils/branding_config.ts) (fetch once, apply loadscreen + `theme-color` meta).
 
-Build-time manifest: [`vite.config.ts`](vite.config.ts) reads the same JSON via [`src/deployment/branding/load_branding_config.mjs`](src/deployment/branding/load_branding_config.mjs).
+Build-time manifest and social meta: [`vite.config.ts`](vite.config.ts) reads the same JSON via [`src/deployment/branding/load_branding_config.mjs`](src/deployment/branding/load_branding_config.mjs) and injects Open Graph / Twitter tags into `index.html` at build time (required for Discord, Slack, iMessage, and other crawlers that do not run JavaScript).
 
 ---
 
@@ -64,6 +64,24 @@ Each item:
 | `formFactor` | `wide` or `narrow` | Both required for rich install UI |
 | `label` | `Explore 3D worlds` | Shown in Chromium install dialog |
 
+### Nested `social` block (Open Graph / Twitter Card)
+
+Injected into `dist/index.html` at build time for link previews.
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `title` | string | Preview title (defaults to `pwa.name`) |
+| `description` | string | Preview description (defaults to `pwa.description`) |
+| `siteName` | string | `og:site_name` (defaults to `pwa.name`) |
+| `siteUrl` | string | Optional canonical URL when `static.publicUrl` is not set in deployment settings |
+| `image` | string | OG image path (defaults to wide screenshot or `/branding/screenshots/og-card.png`) |
+| `imageWidth` | number | OG image width (default `1200`) |
+| `imageHeight` | number | OG image height (default `630`) |
+| `imageType` | string | MIME type (default `image/png`) |
+| `twitterCard` | string | Usually `summary_large_image` |
+
+**Absolute URLs:** `og:image` and `og:url` require full HTTPS URLs. Set `static.publicUrl` in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) per deployment host (preserved on deploy branches). Optional `social.siteUrl` in branding is the fallback when settings omit `publicUrl`.
+
 ---
 
 ## Rebranding walkthrough
@@ -99,8 +117,9 @@ Each item:
 | `icon-512-maskable.png` | 512×512 (safe zone) | Android adaptive icon |
 | `desktop-wide.png` | 1280×720 | Install dialog screenshot (desktop) |
 | `mobile-narrow.png` | 390×844 | Install dialog screenshot (mobile) |
+| `og-card.png` | 1200×630 | Open Graph / Twitter Card preview image |
 
-`npm run generate:pwa-assets` derives icons from `logo.png` and screenshots from [`resources/Babylon_Game_Starter_Banner.jpg`](resources/Babylon_Game_Starter_Banner.jpg).
+`npm run generate:pwa-assets` derives icons from `logo.png`, screenshots and `og-card.png` from [`resources/Babylon_Game_Starter_Banner.jpg`](resources/Babylon_Game_Starter_Banner.jpg).
 
 ---
 
@@ -130,6 +149,12 @@ The Babylon Playground export uses [`src/client/utils/pwa_runtime.ts`](src/clien
 ## Validation
 
 ```sh
+npm run social:test
+```
+
+Runs `npm run build`, validates Open Graph / Twitter meta tags in static `dist/index.html`, starts `vite preview`, and checks tags with Playwright plus OG image HTTP availability.
+
+```sh
 npm run pwa:test
 ```
 
@@ -139,7 +164,7 @@ Runs `npm run build`, validates `config.json` and `dist/` artifacts, starts `vit
 
 ## Deployment
 
-Branding paths are relative to the Vite `base` URL (same as the rest of the static site). If favicon or loading-screen assets 404 after deploy, verify `static.basePath` in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) matches the live URL.
+Branding paths are relative to the Vite `base` URL (same as the rest of the static site). If favicon or loading-screen assets 404 after deploy, verify `static.basePath` in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) matches the live URL. For social previews, also set `static.publicUrl` to the canonical HTTPS origin + path (no trailing slash required).
 
 - [GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md)
 - [NETLIFY_STATIC_SITE_DEPLOYMENT.md](NETLIFY_STATIC_SITE_DEPLOYMENT.md)

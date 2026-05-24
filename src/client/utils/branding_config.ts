@@ -41,6 +41,16 @@ const DEFAULT_BRANDING: ResolvedBrandingConfig = {
         label: 'Play on mobile'
       }
     ]
+  },
+  social: {
+    title: 'Babylon Game Starter',
+    description: 'A modular 3D browser game built with Babylon.js',
+    siteName: 'Babylon Game Starter',
+    image: '/branding/screenshots/og-card.png',
+    imageWidth: 1200,
+    imageHeight: 630,
+    imageType: 'image/png',
+    twitterCard: 'summary_large_image'
   }
 };
 
@@ -51,9 +61,9 @@ let loadPromise: Promise<ResolvedBrandingConfig> | null = null;
 function inferBaseUrlFromLocation(): string {
   try {
     const { pathname } = window.location;
-    const match = pathname.match(/^(\/[^./][^/]*)\//);
-    if (match?.[1]) {
-      return `${match[1]}/`;
+    const baseMatch = /^(\/[^./][^/]*)\//.exec(pathname);
+    if (baseMatch?.[1]) {
+      return `${baseMatch[1]}/`;
     }
   } catch {
     // Ignore non-browser runtimes.
@@ -124,6 +134,18 @@ function resolveBrandingConfig(raw: BrandingConfig): ResolvedBrandingConfig {
       display: pwaRaw.display ?? 'standalone',
       icons: pwaRaw.icons ?? DEFAULT_BRANDING.pwa.icons,
       screenshots: pwaRaw.screenshots ?? DEFAULT_BRANDING.pwa.screenshots
+    },
+    social: {
+      title: raw.social?.title ?? pwaRaw.name ?? title,
+      description:
+        raw.social?.description ?? pwaRaw.description ?? DEFAULT_BRANDING.social.description,
+      siteName: raw.social?.siteName ?? pwaRaw.name ?? title,
+      siteUrl: raw.social?.siteUrl,
+      image: raw.social?.image ?? DEFAULT_BRANDING.social.image,
+      imageWidth: raw.social?.imageWidth ?? DEFAULT_BRANDING.social.imageWidth,
+      imageHeight: raw.social?.imageHeight ?? DEFAULT_BRANDING.social.imageHeight,
+      imageType: raw.social?.imageType ?? DEFAULT_BRANDING.social.imageType,
+      twitterCard: raw.social?.twitterCard ?? DEFAULT_BRANDING.social.twitterCard
     }
   };
 }
