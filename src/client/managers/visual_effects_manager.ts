@@ -5,6 +5,7 @@
 // /// <reference path="../types/babylon.d.ts" />
 
 import { CONFIG } from '../config/game_config';
+import { fixParticleSystemTexture, fixParticleSystemsInSet } from '../utils/particle_texture_url';
 
 /**
  * Result type for glow effect operations
@@ -62,12 +63,14 @@ export class VisualEffectsManager {
           snippet.snippetId,
           this.scene
         );
+        fixParticleSystemTexture(particleSystem, this.scene);
       } else if (snippet.type === 'nodes') {
         // Parse node particle system set from snippet
         const nodeParticleSystemSet = await BABYLON.NodeParticleSystemSet.ParseFromSnippetAsync(
           snippet.snippetId
         );
         const particleSystemSet = await nodeParticleSystemSet.buildAsync(this.scene);
+        fixParticleSystemsInSet(particleSystemSet, this.scene);
         particleSystemSet.start();
 
         // Get the first particle system from the set to return

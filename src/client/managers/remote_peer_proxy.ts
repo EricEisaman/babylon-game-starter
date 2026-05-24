@@ -6,6 +6,7 @@ import { ASSETS } from '../config/assets';
 import { CONFIG } from '../config/game_config';
 import { clampCoordComponent } from '../sync/multiplayer_wire_guards';
 import { deserializeQuaternion } from '../utils/multiplayer_serialization';
+import { fixParticleSystemTexture } from '../utils/particle_texture_url';
 
 import { NodeMaterialManager } from './node_material_manager';
 
@@ -130,6 +131,7 @@ async function createThrusterParticles(
   }
   try {
     const ps = await BABYLON.ParticleHelper.ParseFromSnippetAsync(snippet.snippetId, scene);
+    fixParticleSystemTexture(ps, scene);
     /** Name MUST contain `boost`/`thruster` so {@link SceneManager.clearParticles} preserves it across env switches. */
     ps.name = `mp-remote-boost-thruster-${clientId}`;
     ps.emitter = emitter;
