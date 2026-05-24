@@ -33,6 +33,11 @@ export interface CreditHandlers {
   readonly adjustCredits: (amount: number) => void;
 }
 
+export interface SimulationBehaviorHandlers {
+  readonly handleBehaviorAction: (action: BehaviorAction) => void;
+  readonly setVolumeZone: (zoneId: string, active: boolean) => void;
+}
+
 /**
  * Internal tracking structure for behavior instances
  */
@@ -61,6 +66,7 @@ export class BehaviorManager {
   private static updateObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
   private static fallHandlers: FallRespawnHandlers | null = null;
   private static creditHandlers: CreditHandlers | null = null;
+  private static simulationHandlers: SimulationBehaviorHandlers | null = null;
 
   /**
    * Scene callbacks for fall respawn (avoids importing SceneManager).
@@ -71,6 +77,10 @@ export class BehaviorManager {
 
   public static setCreditHandlers(handlers: CreditHandlers | null): void {
     this.creditHandlers = handlers;
+  }
+
+  public static setSimulationHandlers(handlers: SimulationBehaviorHandlers | null): void {
+    this.simulationHandlers = handlers;
   }
 
   /**
@@ -236,6 +246,7 @@ export class BehaviorManager {
       if (triggerResult && !instance.behaviorActive) {
         // Entering proximity - apply effects and execute action immediately
         this.applyEffects(instance);
+        this.notifyVolumeZoneEnter(instance);
         this.executeActionIfNeeded(instance, currentTime, true);
         instance.behaviorActive = true;
         instance.lastCheckTime = currentTime;
@@ -247,6 +258,7 @@ export class BehaviorManager {
       } else if (!triggerResult && instance.behaviorActive) {
         // Leaving proximity - remove effects
         this.removeEffects(instance);
+        this.notifyVolumeZoneExit(instance);
         instance.behaviorActive = false;
       }
     });
@@ -479,6 +491,28 @@ export class BehaviorManager {
       this.creditHandlers?.adjustCredits(action.amount);
     } else if (action.actionType === 'portal') {
       void this.fallHandlers?.switchEnvironment(action.target);
+    } else if (
+      action.actionType === 'simulationPulse' ||
+      action.actionType === 'adjustSimulation' ||
+      action.actionType === 'setCoupling'
+    ) {
+      this.simulationHandlers?.handleBehaviorAction(action);
     }
+  }
+
+  private static notifyVolumeZoneEnter(instance: BehaviorInstance): void {
+    const config = instance.config as ProximityTriggerConfig;
+    if (config.triggerKind !== 'proximity' || !config.volumeZone) {
+      return;
+    }
+    this.simulationHandlers?.setVolumeZone(config.volumeZone, true);
+  }
+
+  private static notifyVolumeZoneExit(instance: BehaviorInstance): void {
+    const config = instance.config as ProximityTriggerConfig;
+    if (config.triggerKind !== 'proximity' || !config.volumeZone) {
+      return;
+    }
+    this.simulationHandlers?.setVolumeZone(config.volumeZone, false);
   }
 }

@@ -72,6 +72,17 @@ import { CreateAudioEngineAsync } from '@babylonjs/core/AudioV2/webAudio/webAudi
 
 Those bind only the named symbol (a local value or a local type, not the full namespace) and are the canonical way to reach parts of `@babylonjs/core` that *aren't* mirrored onto the UMD global, or to pull in type-only enums. Use them freely. [`src/client/managers/scene_manager.ts`](src/client/managers/scene_manager.ts) line 12 is a real example.
 
+### AudioV2 and Draco in the playground entry
+
+Local Vite runs [`main.ts`](src/client/main.ts) `initializeRuntimeGlobals()` before the scene starts. The exported multifile entry [`index.ts`](src/client/index.ts) mirrors the essentials at the top of `CreateScene`:
+
+- **`AudioManager.ensurePlaygroundAudioReady()`** — creates `__babylonAudioEngine` before effects/items run.
+- **`BABYLON.Tools.ScriptBaseUrl` + Draco decoder URLs** — required for some glTF item loads (SynapticLab crystals/crate).
+
+Sound creation in bundled managers must pass that engine explicitly — e.g. `CreateSoundAsync(name, url, options, audioEngine)` from `@babylonjs/core/AudioV2/abstractAudio/audioEngineV2`. Do **not** rely on bare `BABYLON.CreateSoundAsync` without the fourth argument; the playground UMD and the bundle can load separate AudioV2 module instances and `LastCreatedAudioEngine()` will be empty on the global path.
+
+Particle catalog names in [`game_config.ts`](src/client/config/game_config.ts) must use real `snippet.babylonjs.com` ids (placeholder legacy ids 404 at runtime).
+
 ## Constraint 2 — Static imports only, no dynamic relative `import()`
 
 > [!IMPORTANT]

@@ -73,6 +73,10 @@ npm run dev:fullstack     # Vite client + Go multiplayer server (auto-restarts)
 
 See [README.md](README.md#quick-start) for the full script reference and [MULTIPLAYER.md](MULTIPLAYER.md) for multiplayer-specific configuration.
 
+### GitHub Actions and Pages (forks)
+
+If you fork the repository and use GitHub Pages or the **`feature/**`** sync workflow, complete the one-time checklist in **[FORK_GITHUB_SETUP.md](FORK_GITHUB_SETUP.md)**. That aligns **Pages → Source** (GitHub Actions), the **`github-pages`** environment (**`gh-deploy`** only), and **`settings.mjs`** (`basePath`, optional `githubPages`) with upstream so you do not get failed **`pages build and deployment`** runs on **`main`**.
+
 ---
 
 ## Coding standards

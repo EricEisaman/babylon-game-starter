@@ -60,10 +60,33 @@ export interface PortalAction {
   readonly target: string;
 }
 
+/** Simulation pulse (optional edu-sim module; see StateSimulationManager). */
+export interface SimulationPulseAction {
+  readonly actionType: 'simulationPulse';
+  readonly pulseKind: 'rpe' | 'craving' | 'drug';
+  readonly magnitude: number;
+}
+
+export interface AdjustSimulationAction {
+  readonly actionType: 'adjustSimulation';
+  readonly target: 'd1' | 'd2' | 'drugHunger' | 'habitEncoding' | 'accAwareness';
+  readonly amount: number;
+}
+
+export interface SetCouplingAction {
+  readonly actionType: 'setCoupling';
+  readonly amount: number;
+}
+
 /**
  * Discriminated union for behavior actions
  */
-export type BehaviorAction = AdjustCreditsAction | PortalAction;
+export type BehaviorAction =
+  | AdjustCreditsAction
+  | PortalAction
+  | SimulationPulseAction
+  | AdjustSimulationAction
+  | SetCouplingAction;
 
 /**
  * Configuration for proximity-based trigger
@@ -76,6 +99,8 @@ export interface ProximityTriggerConfig {
   readonly edgeColor?: BABYLON.Color4;
   readonly edgeWidth?: number;
   readonly action?: BehaviorAction; // Optional action to execute when triggered
+  /** Named volume for enter/exit callbacks (e.g. safe zone, anchor). */
+  readonly volumeZone?: string;
 }
 
 /**
