@@ -3,7 +3,7 @@
 // ============================================================================
 
 import type { EffectsConfig } from './effects';
-import type { HUDConfig, InventoryConfig, SettingsConfig } from './ui';
+import type { HUDConfig, HudMeterDefinition, InventoryConfig, SettingsConfig } from './ui';
 
 export interface CharacterSpeed {
   readonly WALK: number;
@@ -81,6 +81,11 @@ export interface MultiplayerConfig {
   readonly CLAIM_IDLE_TIMEOUT_MS: number;
 }
 
+export interface SimulationConfig {
+  readonly ENABLED: boolean;
+  readonly METERS: readonly HudMeterDefinition[];
+}
+
 export interface GameConfig {
   readonly CHARACTER: CharacterConfig;
   readonly CAMERA: CameraConfig;
@@ -93,6 +98,7 @@ export interface GameConfig {
   readonly SETTINGS: SettingsConfig;
   readonly INVENTORY: InventoryConfig;
   readonly MULTIPLAYER: MultiplayerConfig;
+  readonly SIMULATION: SimulationConfig;
 }
 
 export type ItemEffectKind = 'superJump' | 'invisibility' | 'gamma';

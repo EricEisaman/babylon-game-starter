@@ -4,6 +4,12 @@
 
 export type HUDPosition = 'top' | 'bottom' | 'left' | 'right';
 
+export interface HudMeterDefinition {
+  readonly id: string;
+  readonly label: string;
+  readonly color: string;
+}
+
 export interface HUDConfig {
   readonly POSITION: HUDPosition;
   readonly FONT_FAMILY: string;
