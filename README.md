@@ -205,7 +205,7 @@ eslint.config.js
 
 ## Documentation
 
-- **[BRANDING.md](BRANDING.md)** — Loading screen, favicon, and PWA manifest/icons/screenshots via `public/branding/config.json`
+- **[BRANDING.md](BRANDING.md)** — Loading screen, favicon, PWA manifest, and [social link previews](BRANDING.md#social-link-previews) via `public/branding/config.json` and `static.publicUrl`
 - **[docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md)** — `?sim=1`, SynapticLab gameplay, overlays, and playground testing
 - **[docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md)** — Particle, NME, and overlay catalog authoring
 - **[USERS_GUIDE.md](USERS_GUIDE.md)** — Architecture, configuration, behaviors, fall respawn, condensed narrative notes

@@ -71,7 +71,8 @@ const deploymentSettings = {
     }
   ],
   static: {
-    basePath: '/'
+    basePath: '/',
+    publicUrl: 'https://your-service.onrender.com'
   }
 };
 ```
@@ -81,6 +82,8 @@ const deploymentSettings = {
 - Docker build script detects `NEED_GO=1` and installs Go compiler
 - `vite.config.ts` proxy automatically routes `/api/multiplayer/*` to `localhost:5000` in dev
 - Nginx proxies production requests to Go service port 5000
+
+**Social link previews:** Set `static.publicUrl` on the **`render-deploy`** branch to your live Render URL (for example `https://your-service.onrender.com`). Build-time Open Graph tags use that value — see [BRANDING.md — Social link previews](BRANDING.md#social-link-previews).
 
 ### 2. **Nginx Proxy Configuration** (`nginx.conf`)
 
@@ -428,6 +431,7 @@ Then run `npm run deploy:prepare` to sync changes.
 
 ## References
 
+- [BRANDING.md](BRANDING.md) — PWA, loading screen, and [social link previews](BRANDING.md#social-link-previews) (`static.publicUrl` on `render-deploy`)
 - [Render Documentation](https://render.com/docs)
 - [Dockerfile Best Practices](https://docs.docker.com/develop/dev-best-practices/dockerfile_best-practices/)
 - [Nginx Proxy Docs](https://nginx.org/en/docs/http/ngx_http_proxy_module.html)
