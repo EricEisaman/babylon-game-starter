@@ -17,6 +17,7 @@ const exportRoots = [
   'datastar',
   'input',
   'managers',
+  'simulation',
   'sync',
   'types',
   'ui',

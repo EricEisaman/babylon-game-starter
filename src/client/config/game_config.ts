@@ -85,56 +85,56 @@ export const CONFIG: GameConfig = {
         name: 'Dust Storm',
         description: 'Atmospheric dust particles with wind effect',
         category: 'nature',
-        snippetId: 'X8Y9Z1'
+        snippetId: 'HYB2FR'
       },
       {
         type: 'legacy',
         name: 'Energy Field',
         description: 'Sci-fi energy field with electric arcs',
         category: 'tech',
-        snippetId: 'A2B3C4'
+        snippetId: 'T54JV7'
       },
       {
         type: 'legacy',
         name: 'Stardust',
         description: 'Cosmic stardust with twinkling effect',
         category: 'cosmic',
-        snippetId: 'D5E6F7'
+        snippetId: 'T54JV7'
       },
       {
         type: 'legacy',
         name: 'Smoke Trail',
         description: 'Realistic smoke with fade effect',
         category: 'nature',
-        snippetId: 'G8H9I0'
+        snippetId: 'HYB2FR'
       },
       {
         type: 'legacy',
         name: 'Portal Effect',
         description: 'Mystical portal with swirling particles',
         category: 'magic',
-        snippetId: 'J1K2L3'
+        snippetId: 'T54JV7'
       },
       {
         type: 'legacy',
         name: 'Laser Beam',
         description: 'Sci-fi laser beam with energy core',
         category: 'tech',
-        snippetId: 'M4N5O6'
+        snippetId: 'HYB2FR'
       },
       {
         type: 'legacy',
         name: 'Nebula Cloud',
         description: 'Cosmic nebula with colorful gas clouds',
         category: 'cosmic',
-        snippetId: 'P7Q8R9'
+        snippetId: 'T54JV7'
       },
       {
         type: 'legacy',
         name: 'Explosion',
         description: 'Dramatic explosion with debris',
         category: 'fire',
-        snippetId: 'S0T1U2'
+        snippetId: 'HYB2FR'
       },
       {
         type: 'nodes',
@@ -149,6 +149,15 @@ export const CONFIG: GameConfig = {
         description: 'Hyper',
         category: 'magic',
         snippetId: '#UED7L7#1'
+      }
+    ] as const,
+    OVERLAY_SNIPPETS: [
+      {
+        name: 'Drug Hunger Vignette',
+        description: 'Red vignette when drug hunger is high and ACC awareness is low',
+        editor: 'dom',
+        kind: 'dom',
+        snippetId: ''
       }
     ] as const,
     DEFAULT_PARTICLE: 'Magic Sparkles',
@@ -275,6 +284,18 @@ export const CONFIG: GameConfig = {
   // by setting VITE_MULTIPLAYER_HOST in .env / .env.local (see repo .env.example).
   // Students running the exported playground snippet can override at runtime via
   // `?mp=host` or `#mp=host` on the playground URL (see MULTIPLAYER.md).
+  SIMULATION: {
+    ENABLED: false,
+    METERS: [
+      { id: 'd1', label: 'D1 Accelerator', color: '#ff6b35' },
+      { id: 'd2', label: 'D2 Brake', color: '#4ecdc4' },
+      { id: 'rpe', label: 'Dopamine Pulse', color: '#ffe66d' },
+      { id: 'hunger', label: 'Drug Hunger', color: '#e63946' },
+      { id: 'coupling', label: 'Insula–ACC', color: '#a78bfa' },
+      { id: 'habit', label: 'Habit Encoding', color: '#f72585' }
+    ]
+  },
+
   MULTIPLAYER: {
     ENABLED: true,
     PRODUCTION_SERVER: 'bgs-mp.onrender.com',

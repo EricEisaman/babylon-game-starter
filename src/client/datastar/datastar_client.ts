@@ -376,9 +376,16 @@ function normalizeMultiplayerHostInput(raw: string): string {
   return s.trim();
 }
 
-function readViteEnv(): ImportMetaEnv | undefined {
+/** Subset of Vite `import.meta.env`; playground TS has no `ImportMetaEnv` type. */
+interface ViteEnvLike {
+  readonly DEV?: boolean;
+  readonly VITE_MULTIPLAYER_HOST?: string;
+}
+
+function readViteEnv(): ViteEnvLike | undefined {
   try {
-    return import.meta.env;
+    const meta = import.meta as { env?: ViteEnvLike };
+    return meta.env;
   } catch {
     return undefined;
   }

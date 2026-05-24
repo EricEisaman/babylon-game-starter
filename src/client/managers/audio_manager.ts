@@ -4,6 +4,10 @@
 
 // /// <reference path="../types/babylon.d.ts" />
 
+import {
+  CreateSoundAsync,
+  CreateStreamingSoundAsync
+} from '@babylonjs/core/AudioV2/abstractAudio/audioEngineV2';
 import { AudioParameterRampShape } from '@babylonjs/core/AudioV2/audioParameter';
 import { CreateAudioEngineAsync } from '@babylonjs/core/AudioV2/webAudio/webAudioEngine';
 
@@ -11,12 +15,6 @@ import { fromAbstractSound } from '../types/audio';
 
 import type { ManagedAudioSound } from '../types/audio';
 import type { AmbientSoundConfig } from '../types/environment';
-
-type CreateAbstractSoundAsync = (
-  name: string,
-  source: string,
-  options?: object
-) => Promise<BABYLON.AbstractSound>;
 
 type ManagedSound = ManagedAudioSound;
 type ManagedStreamingSound = ManagedAudioSound;
@@ -33,17 +31,6 @@ export class AudioManager {
       }, timeoutMs);
     });
     return (await Promise.race([promise, timeout])) as T | null;
-  }
-
-  private static getBabylonSoundFactory(
-    name: 'CreateSoundAsync' | 'CreateStreamingSoundAsync'
-  ): CreateAbstractSoundAsync | undefined {
-    const candidate = Reflect.get(BABYLON as object, name);
-    if (typeof candidate === 'function') {
-      return candidate as CreateAbstractSoundAsync;
-    }
-
-    return undefined;
   }
 
   private static getAudioEngine(): NonNullable<typeof globalThis.__babylonAudioEngine> | null {
@@ -78,6 +65,20 @@ export class AudioManager {
   }
 
   /**
+   * Ensures AudioV2 is ready before scene setup (playground entry has no main.ts bootstrap).
+   */
+  public static async ensurePlaygroundAudioReady(): Promise<void> {
+    await this.ensureAudioEngine();
+  }
+
+  /** Shared AudioV2 engine for explicit CreateSoundAsync calls outside this manager. */
+  public static async getSharedAudioEngine(): Promise<NonNullable<
+    typeof globalThis.__babylonAudioEngine
+  > | null> {
+    return this.ensureAudioEngine();
+  }
+
+  /**
    * Creates a sound and stores it for later retrieval
    * @param name The name of the sound
    * @param url The URL of the sound file (optional, can be set later)
@@ -91,14 +92,8 @@ export class AudioManager {
       return;
     }
 
-    const createSoundAsync = this.getBabylonSoundFactory('CreateSoundAsync');
-    if (!createSoundAsync) {
-      console.warn(`Cannot create sound "${name}": CreateSoundAsync not available`);
-      return;
-    }
-
     try {
-      const sound = await createSoundAsync(name, url ?? '', options);
+      const sound = await CreateSoundAsync(name, url ?? '', options ?? {}, audioEngine);
       const managedSound = fromAbstractSound(sound);
       this.activeSounds.set(name, managedSound);
     } catch (error) {
@@ -133,16 +128,8 @@ export class AudioManager {
       return;
     }
 
-    const createStreamingSoundAsync = this.getBabylonSoundFactory('CreateStreamingSoundAsync');
-    if (!createStreamingSoundAsync) {
-      console.warn(
-        `Cannot create streaming sound "${name}": CreateStreamingSoundAsync not available`
-      );
-      return;
-    }
-
     try {
-      const sound = await createStreamingSoundAsync(name, url, options);
+      const sound = await CreateStreamingSoundAsync(name, url, options ?? {}, audioEngine);
       const managedSound = fromAbstractSound(sound);
       this.activeSounds.set(name, managedSound);
     } catch (error) {

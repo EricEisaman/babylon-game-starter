@@ -21,8 +21,10 @@ The codebase uses **strict TypeScript** and ESLint; Babylon and DOM edges are ha
 | Behaviors | Proximity and **fall-out-of-world** triggers; glow; `adjustCredits`; `portal` |
 | Fall respawn | Always on per environment; optional `fallRespawn` tuning and hook ids |
 | Effects | `VisualEffectsManager` (particles, glow); `AudioManager` (AudioV2) |
+| Overlays | `OverlayManager` — full-screen DOM overlays (cleared on every env switch) |
 | Materials | `NodeMaterialManager` for imported / scene meshes |
 | HUD / mobile | `HUDManager`, `MobileInputManager`, device classes from `game_config.ts` |
+| Optional simulation | SynapticLab + `?sim=1` — see [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md) (off by default) |
 
 ---
 
@@ -58,6 +60,7 @@ The codebase uses **strict TypeScript** and ESLint; Babylon and DOM edges are ha
 | **InventoryManager** | Stored items, use/effect timing |
 | **BehaviorManager** | Proximity + fall-out-of-world evaluation, glow, actions |
 | **VisualEffectsManager** | Particle snippets, mesh glow, environment vs item particles |
+| **OverlayManager** | Environment-bound DOM overlays; simulation-driven strength; `clearAllOverlays` on env switch |
 | **AudioManager** | `CreateSoundAsync` / streaming, BGM crossfade, ambient, one-shots |
 | **HUDManager** | Credits, boost, FPS, layout by device class |
 | **CameraManager** | Offsets and smooth-follow integration |
@@ -248,6 +251,8 @@ Further reading: [resources/RESOURCES.md](resources/RESOURCES.md), _A Pattern La
 - [Babylon.js forum](https://forum.babylonjs.com/)
 - [Babylon.js Playground](https://playground.babylonjs.com/)
 - [Node Material Editor](https://nme.babylonjs.com/)
+- [Smart Filter Editor](https://sfe.babylonjs.com/)
+- [Authoring snippets (NME / particles / SFE)](docs/AUTHORING_SNIPPETS.md)
 - [AudioV2 — playing sounds and music](https://doc.babylonjs.com/features/featuresDeepDive/audio/playingSoundsMusic)
 
 ---

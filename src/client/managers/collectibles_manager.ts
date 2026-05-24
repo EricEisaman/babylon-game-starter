@@ -2,10 +2,17 @@
 // COLLECTIBLES MANAGER
 // ============================================================================
 
+import { CreateSoundAsync } from '@babylonjs/core/AudioV2/abstractAudio/audioEngineV2';
+
+import { isSimulationActive } from '../simulation/simulation_bootstrap';
+import { StateSimulationManager } from '../simulation/state_simulation_manager';
+import { fromAbstractSound } from '../types/audio';
 import { InventoryUI } from '../ui/inventory_ui';
 
+import { AudioManager } from './audio_manager';
 import { BehaviorManager } from './behavior_manager';
 import { InventoryManager } from './inventory_manager';
+import { NodeMaterialManager } from './node_material_manager';
 import { VisualEffectsManager } from './visual_effects_manager';
 
 import type { CharacterController } from '../controllers/character_controller';
@@ -17,11 +24,11 @@ export class CollectiblesManager {
   private static characterController: CharacterController | null = null;
   private static collectibles = new Map<string, BABYLON.AbstractMesh>();
   private static collectibleBodies = new Map<string, BABYLON.PhysicsAggregate>();
-  private static collectionSound: BABYLON.StaticSound | null = null;
+  private static collectionSound: ReturnType<typeof fromAbstractSound> | null = null;
   private static totalCredits = 0;
   private static collectionObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
   private static collectedItems = new Set<string>();
-  private static instanceBasis: BABYLON.Mesh | null = null;
+  private static readonly instanceBasisByItem = new Map<string, BABYLON.Mesh>();
   private static itemConfigs = new Map<string, ItemConfig>();
 
   // Tracking for non-collectible physics items
@@ -127,13 +134,7 @@ export class CollectiblesManager {
     // Wait for physics to be properly initialized
     await this.waitForPhysicsInitialization();
 
-    this.collectionSound = await BABYLON.CreateSoundAsync(
-      'collectionSound',
-      'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/sounds/effects/collect.m4a',
-      { volume: 0.7 }
-    );
-
-    // Iterate through all items in environment
+    // Iterate through all items in environment (never gate GLB spawn on audio)
     for (const itemConfig of environment.items) {
       await this.loadItemModel(itemConfig);
 
@@ -155,8 +156,37 @@ export class CollectiblesManager {
       }
     }
 
+    await this.ensureCollectionSound();
+
     // Set up collision detection only for collectible items
     this.setupCollisionDetection();
+  }
+
+  private static async ensureCollectionSound(): Promise<void> {
+    if (this.collectionSound) {
+      return;
+    }
+
+    const audioEngine = await AudioManager.getSharedAudioEngine();
+    if (!audioEngine) {
+      return;
+    }
+
+    try {
+      const sound = await CreateSoundAsync(
+        'collectionSound',
+        'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/sounds/effects/collect.m4a',
+        { volume: 0.7 },
+        audioEngine
+      );
+      this.collectionSound = fromAbstractSound(sound);
+    } catch (error) {
+      console.warn('[CollectiblesManager] Collection sound unavailable:', error);
+    }
+  }
+
+  private static getInstanceBasis(itemName: string): BABYLON.Mesh | null {
+    return this.instanceBasisByItem.get(itemName) ?? null;
   }
 
   /**
@@ -232,26 +262,23 @@ export class CollectiblesManager {
         return false;
       });
 
+      let basisMesh: BABYLON.Mesh | null = null;
       if (meshWithGeometry instanceof BABYLON.Mesh) {
-        // Use the first mesh with geometry as the instance basis
-        this.instanceBasis = meshWithGeometry;
-
-        // Make the instance basis invisible and disable it in the scene
-        this.instanceBasis.isVisible = false;
-        this.instanceBasis.setEnabled(false);
-      } else {
-        // If no mesh with geometry found, use the first mesh as fallback
-        if (result.meshes.length > 0) {
-          const fallbackMesh = result.meshes.find((mesh) => mesh instanceof BABYLON.Mesh);
-          if (fallbackMesh instanceof BABYLON.Mesh) {
-            this.instanceBasis = fallbackMesh;
-            this.instanceBasis.isVisible = false;
-            this.instanceBasis.setEnabled(false);
-          }
+        basisMesh = meshWithGeometry;
+      } else if (result.meshes.length > 0) {
+        const fallbackMesh = result.meshes.find((mesh) => mesh instanceof BABYLON.Mesh);
+        if (fallbackMesh instanceof BABYLON.Mesh) {
+          basisMesh = fallbackMesh;
         }
       }
-    } catch {
-      // Ignore item loading errors for playground compatibility
+
+      if (basisMesh) {
+        basisMesh.isVisible = false;
+        basisMesh.setEnabled(false);
+        this.instanceBasisByItem.set(itemConfig.name, basisMesh);
+      }
+    } catch (error) {
+      console.warn('[CollectiblesManager] Failed to load item model:', itemConfig.name, error);
     }
   }
 
@@ -264,13 +291,14 @@ export class CollectiblesManager {
     itemConfig: ItemConfig,
     environmentName: string
   ): void {
-    if (!this.scene || !this.instanceBasis) {
+    const instanceBasis = this.getInstanceBasis(itemConfig.name);
+    if (!this.scene || !instanceBasis) {
       return;
     }
 
     try {
       // Create an instance from the loaded model
-      const meshInstance = this.instanceBasis.createInstance(id);
+      const meshInstance = instanceBasis.createInstance(id);
 
       // Set the mesh name to instanceName if provided, otherwise use the generated ID
       meshInstance.name = instance.instanceName ?? id;
@@ -297,6 +325,10 @@ export class CollectiblesManager {
       // Make it visible and enabled
       meshInstance.isVisible = true;
       meshInstance.setEnabled(true);
+
+      if (instance.materialSnippetId) {
+        void NodeMaterialManager.applySnippetToMesh(meshInstance, instance.materialSnippetId);
+      }
 
       // Get the scaled bounding box dimensions after applying instance scaling
       // const boundingBox = meshInstance.getBoundingInfo();
@@ -368,13 +400,14 @@ export class CollectiblesManager {
     itemConfig: ItemConfig,
     environmentName: string
   ): void {
-    if (!this.scene || !this.instanceBasis) {
+    const instanceBasis = this.getInstanceBasis(itemConfig.name);
+    if (!this.scene || !instanceBasis) {
       return;
     }
 
     try {
       // Create an instance from the loaded model
-      const meshInstance = this.instanceBasis.createInstance(id);
+      const meshInstance = instanceBasis.createInstance(id);
 
       // Set the mesh name to instanceName if provided, otherwise use the generated ID
       meshInstance.name = instance.instanceName ?? id;
@@ -593,6 +626,10 @@ export class CollectiblesManager {
       InventoryManager.addItem(itemConfig.name, 1, itemConfig.thumbnail);
       // Refresh inventory UI to show the new item
       InventoryUI.refreshInventory();
+    }
+
+    if (isSimulationActive() && itemConfig.collectRole) {
+      StateSimulationManager.handleItemCollectRole(itemConfig.collectRole);
     }
 
     // ALWAYS update inventory button opacity after ANY collection
@@ -876,7 +913,8 @@ export class CollectiblesManager {
         finalVolume = Math.max(0.05, Math.min(baseVolume, baseVolume * attenuation));
       }
     }
-    this.collectionSound.play({ volume: finalVolume });
+    this.collectionSound.setVolume(finalVolume);
+    this.collectionSound.play();
   }
 
   /**
@@ -1066,11 +1104,11 @@ export class CollectiblesManager {
     });
     this.particleSystemPool.length = 0;
 
-    // Dispose instance basis (like playground.ts)
-    if (this.instanceBasis) {
-      this.instanceBasis.dispose();
-      this.instanceBasis = null;
+    // Dispose per-item instance basis meshes
+    for (const basis of this.instanceBasisByItem.values()) {
+      basis.dispose();
     }
+    this.instanceBasisByItem.clear();
 
     // Remove collision detection observer
     if (this.collectionObserver) {
@@ -1166,11 +1204,10 @@ export class CollectiblesManager {
     });
     this.particleSystemPool.length = 0;
 
-    // Dispose the instance basis mesh
-    if (this.instanceBasis) {
-      this.instanceBasis.dispose();
-      this.instanceBasis = null;
+    for (const basis of this.instanceBasisByItem.values()) {
+      basis.dispose();
     }
+    this.instanceBasisByItem.clear();
 
     this.scene = null;
     this.characterController = null;
