@@ -41,24 +41,53 @@ const DEFAULT_BRANDING: ResolvedBrandingConfig = {
         label: 'Play on mobile'
       }
     ]
+  },
+  social: {
+    title: 'Babylon Game Starter',
+    description: 'A modular 3D browser game built with Babylon.js',
+    siteName: 'Babylon Game Starter',
+    image: '/branding/screenshots/og-card.png',
+    imageWidth: 1200,
+    imageHeight: 630,
+    imageType: 'image/png',
+    twitterCard: 'summary_large_image'
   }
 };
 
 let cachedConfig: ResolvedBrandingConfig | null = null;
 let loadPromise: Promise<ResolvedBrandingConfig> | null = null;
 
-/** Vite injects `import.meta.env`; playground TS has no `ImportMetaEnv` type. */
-function readViteBaseUrl(): string {
+/** Infer GitHub Pages project-site base (e.g. `/babylon-game-starter/`) when Vite env is `/`. */
+function inferBaseUrlFromLocation(): string {
   try {
-    const meta = import.meta as { env?: { BASE_URL?: string } };
-    const base = meta.env?.BASE_URL;
-    if (typeof base === 'string' && base.length > 0) {
-      return base.endsWith('/') ? base : `${base}/`;
+    const { pathname } = window.location;
+    const baseMatch = /^(\/[^./][^/]*)\//.exec(pathname);
+    if (baseMatch?.[1]) {
+      return `${baseMatch[1]}/`;
     }
   } catch {
-    // Playground runtime: no Vite env injection.
+    // Ignore non-browser runtimes.
   }
   return '/';
+}
+
+/** Vite inlines `import.meta.env.BASE_URL` only for direct property access (not optional chaining). */
+function readViteBaseUrl(): string {
+  let base = '/';
+  try {
+    base = import.meta.env.BASE_URL;
+  } catch {
+    return inferBaseUrlFromLocation();
+  }
+
+  if (!base || base === '/') {
+    const inferred = inferBaseUrlFromLocation();
+    if (inferred !== '/') {
+      return inferred;
+    }
+  }
+
+  return base.endsWith('/') ? base : `${base}/`;
 }
 
 function withAppBasePath(path: string): string {
@@ -105,6 +134,18 @@ function resolveBrandingConfig(raw: BrandingConfig): ResolvedBrandingConfig {
       display: pwaRaw.display ?? 'standalone',
       icons: pwaRaw.icons ?? DEFAULT_BRANDING.pwa.icons,
       screenshots: pwaRaw.screenshots ?? DEFAULT_BRANDING.pwa.screenshots
+    },
+    social: {
+      title: raw.social?.title ?? pwaRaw.name ?? title,
+      description:
+        raw.social?.description ?? pwaRaw.description ?? DEFAULT_BRANDING.social.description,
+      siteName: raw.social?.siteName ?? pwaRaw.name ?? title,
+      siteUrl: raw.social?.siteUrl,
+      image: raw.social?.image ?? DEFAULT_BRANDING.social.image,
+      imageWidth: raw.social?.imageWidth ?? DEFAULT_BRANDING.social.imageWidth,
+      imageHeight: raw.social?.imageHeight ?? DEFAULT_BRANDING.social.imageHeight,
+      imageType: raw.social?.imageType ?? DEFAULT_BRANDING.social.imageType,
+      twitterCard: raw.social?.twitterCard ?? DEFAULT_BRANDING.social.twitterCard
     }
   };
 }
@@ -203,6 +244,9 @@ export async function loadBrandingConfig(): Promise<ResolvedBrandingConfig> {
   }
 
   loadPromise = (async () => {
+    // Correct loadscreen asset URLs immediately (before config fetch) for subpath deploys.
+    applyLoadscreenBranding(DEFAULT_BRANDING);
+
     try {
       const response = await fetch(withAppBasePath('/branding/config.json'), { cache: 'no-store' });
       if (!response.ok) {
