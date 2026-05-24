@@ -8,18 +8,44 @@
 
 <p align="center">
 
-[![Release](https://img.shields.io/badge/release-v1.5.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
+[![Release](https://img.shields.io/badge/release-v1.6.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
+[![Live demo](https://img.shields.io/badge/Live_demo-GitHub_Pages-2ea44f)](https://ericisaman.github.io/babylon-game-starter/)
 [![CI](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml/badge.svg)](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml)
 [![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-BB464B?logo=babylon.js&logoColor=white)](https://www.babylonjs.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Node](https://img.shields.io/badge/Node-%E2%89%A518-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A520.19-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </p>
 
 Babylon Game Starter provides a complete, ready-to-run foundation for building interactive 3D browser games. It ships with physics-based character movement, an environment system, collectibles, inventory, a behavior trigger system (proximity and fall-out-of-map), particle effects, an AudioV2-powered sound engine, and full mobile control support — all driven by configuration files. The same client can be bundled for the **Babylon.js Playground** via `playground.json`.
 
-**Current release: [v1.5.0](#v150)** — SynapticLab simulation demo, DOM overlays, and hardened playground export.
+**Current release: [v1.6.0](#v160)** — Installable PWA with unified branding, offline cache, and iPad Safari install coach.
+
+**Live demo:** [https://ericisaman.github.io/babylon-game-starter/](https://ericisaman.github.io/babylon-game-starter/) (GitHub Pages)
+
+---
+
+## v1.6.0 {#v160}
+
+Released **May 2026**. Minor version: installable PWA, unified branding config, and Vite 8 upgrade; default game behavior is unchanged unless you use PWA or branding features.
+
+### Added
+
+- **Installable PWA** — `vite-plugin-pwa` with CacheFirst service worker, versioned updates, and offline asset caching via [`public/branding/config.json`](src/client/public/branding/config.json).
+- **Settings PWA controls** — **Update App**, **Install App** (context-aware: native prompt on Chromium, Share → Add to Home Screen coach on iPad Safari), and **Purge Cache**.
+- **Branding docs and scripts** — [BRANDING.md](BRANDING.md), `npm run generate:pwa-assets`, and `npm run pwa:test` (manifest + preview installability validation).
+- **Playground-safe PWA bridge** — [`src/client/utils/pwa_runtime.ts`](src/client/utils/pwa_runtime.ts) keeps `playground.json` free of service-worker imports.
+
+### Fixed
+
+- **Install UX** — Modal copy and behavior adapt to device context (iPad Safari coach vs Chromium native install prompt).
+
+### Changed
+
+- **Vite 8** — Build toolchain upgraded to Vite ^8.0.14; Node engines `>=20.19.0 || >=22.12.0`; CI uses Node 22.
+
+To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FEATURE_RELEASE.md) (`feature/**` tag or manual sync workflow).
 
 ---
 
@@ -61,6 +87,7 @@ To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FE
 - **HUD** — Device-adaptive layout (desktop / mobile / iPad + keyboard) from `game_config.ts`
 - **Mobile controls** — Virtual joystick, jump, and boost
 - **Playground export** — `npm run export:playground` produces `playground.json` for the Babylon.js web editor, **including multiplayer**. The export is smoke-checked by `scripts/check-playground-export.mjs` before it is written. See [*Running in the Babylon playground*](MULTIPLAYER.md#running-in-the-babylon-playground) for the classroom walkthrough, including the `?mp=host` runtime override.
+- **Installable PWA** — Offline-first asset caching, unified branding config, and install screenshots; see [BRANDING.md](BRANDING.md). Validate with `npm run pwa:test`.
 
 ---
 
@@ -73,7 +100,7 @@ To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FE
 | `@babylonjs/havok`  | ^1.3.12 |
 | `@babylonjs/loaders`| ^9.1.0  |
 | `@babylonjs/materials` | ^9.1.0 |
-| `vite`              | ^5.0.8  |
+| `vite`              | ^8.0.14 |
 | `typescript`        | ^5.3.3  |
 
 ---
@@ -121,6 +148,8 @@ See [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md), [docs/AUTHORING_SNIPPETS.md](d
 | `npm run typecheck`         | `tsc --noEmit` for app and Node configs (runs in CI)                        |
 | `npm run export:playground` | Generate `playground.json` for the Babylon.js editor and smoke-check it     |
 | `npm run check:playground`  | Re-run the export smoke check standalone (walks every import from the entry)|
+| `npm run generate:pwa-assets` | Regenerate PWA icons and install screenshots from branding source art |
+| `npm run pwa:test`          | Build and validate full PWA installability (manifest + Lighthouse audits) |
 | `npm run deploy:prepare`    | Validate deployment settings and scaffold host artifacts / `src/server/*`   |
 
 CI (`.github/workflows/typecheck.yml`) runs **`format:check` → `lint` → `typecheck`**.
@@ -159,6 +188,7 @@ eslint.config.js
 
 ## Documentation
 
+- **[BRANDING.md](BRANDING.md)** — Loading screen, favicon, and PWA manifest/icons/screenshots via `public/branding/config.json`
 - **[docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md)** — `?sim=1`, SynapticLab gameplay, overlays, and playground testing
 - **[docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md)** — Particle, NME, and overlay catalog authoring
 - **[USERS_GUIDE.md](USERS_GUIDE.md)** — Architecture, configuration, behaviors, fall respawn, condensed narrative notes
