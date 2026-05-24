@@ -14,7 +14,7 @@ Be respectful, assume good intent, and keep discussion focused on the work. Hara
 
 ## Versioning — Semantic Versioning 2.0.0
 
-This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The version in `package.json` is the single source of truth and **MUST** match the version in `package-lock.json`. The project is currently at **`1.0.0`** — the public API is stable and the standard `MAJOR.MINOR.PATCH` rules apply.
+This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The version in `package.json` is the single source of truth and **MUST** match the version in `package-lock.json`. The project is currently at **`1.5.0`** — the public API is stable and the standard `MAJOR.MINOR.PATCH` rules apply.
 
 Given a version number `MAJOR.MINOR.PATCH`:
 

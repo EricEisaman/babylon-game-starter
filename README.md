@@ -8,6 +8,7 @@
 
 <p align="center">
 
+[![Release](https://img.shields.io/badge/release-v1.5.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
 [![CI](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml/badge.svg)](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml)
 [![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-BB464B?logo=babylon.js&logoColor=white)](https://www.babylonjs.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -18,15 +19,43 @@
 
 Babylon Game Starter provides a complete, ready-to-run foundation for building interactive 3D browser games. It ships with physics-based character movement, an environment system, collectibles, inventory, a behavior trigger system (proximity and fall-out-of-map), particle effects, an AudioV2-powered sound engine, and full mobile control support — all driven by configuration files. The same client can be bundled for the **Babylon.js Playground** via `playground.json`.
 
+**Current release: [v1.5.0](#v150)** — SynapticLab simulation demo, DOM overlays, and hardened playground export.
+
+---
+
+## v1.5.0 {#v150}
+
+Released **May 2026**. Minor version: new optional simulation content and playground fixes; default worlds and multiplayer wire format are unchanged unless you opt in.
+
+### Added
+
+- **SynapticLab** — Optional simulation environment ported from [circuit-hijack](https://github.com/EricEisaman/circuit-hijack): HUD meters (D1, D2, RPE, hunger, coupling, habit), volume zones, and collectibles (Dopamine Proxy crystals, PFC Exercise crate). Enable with [`?sim=1`](http://localhost:3000/?sim=1) or `CONFIG.SIMULATION.ENABLED`. See [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md).
+- **`OverlayManager`** — Catalog-driven **DOM/CSS overlays** (e.g. Drug Hunger Vignette on SynapticLab). Dev override: `?overlay=<catalog name>`.
+- **`simulation/` modules** — `simulation_bootstrap`, `StateSimulationManager`, and typed simulation config wired from behaviors and HUD.
+- **Docs** — [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md), [docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md), and [docs/evaluation/](docs/evaluation/) (circuit-hijack evaluation notes).
+
+### Fixed
+
+- **Playground export** — AudioV2 uses explicit `audioEngine` imports (no `No audio engine` from dual-module `BABYLON.CreateSoundAsync`). Draco decoder URLs and audio pre-init in `index.ts` `CreateScene`. Particle catalog `snippetId` values point at real Babylon snippets (no 404s for Smoke Trail / Nebula Cloud). Collectibles spawn even when collection audio is unavailable.
+- **Settings UI** — Environment dropdown stays in sync after programmatic env switches (`?sim=1`, portals, multiplayer).
+- **Playground TypeScript** — `import.meta.env` reads are playground-safe in `dev_log` and `datastar_client` (no `ImportMetaEnv` compile errors in the web editor).
+
+### Changed
+
+- **CI** — Typecheck workflow also runs on pushes to `feature/**` branches (in addition to `main` and pull requests).
+
+To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FEATURE_RELEASE.md) (`feature/**` tag or manual sync workflow).
+
 ---
 
 ## Features
 
 - **Modular manager architecture** — Scene, camera, audio, HUD, collectibles, inventory, behaviors, visual effects, sky, cutscenes, character loading, and more
 - **Configuration-driven design** — Characters, environments, items, sounds, and rules through typed config under `src/client/config/`
-- **Babylon.js v9 AudioV2** — Background music with crossfading, ambient positional sounds, and SFX via `CreateSoundAsync` when available
+- **Babylon.js v9 AudioV2** — Background music with crossfading, ambient positional sounds, and SFX; playground export passes an explicit audio engine (see [PLAYGROUND.md](PLAYGROUND.md))
+- **Optional state simulation** — SynapticLab demo with `?sim=1`, behavior-driven meter updates, and DOM overlays
 - **Physics-based movement** — Havok integration for character movement, jumping, and boost
-- **Environment system** — Switchable 3D worlds with music, particles, items, sky, optional fall-respawn hooks
+- **Environment system** — Switchable 3D worlds with music, particles, items, sky, overlays, optional fall-respawn hooks
 - **Collectibles and inventory** — Pickup, credits, inventory, and temporary item effects
 - **Behavior system** — Proximity triggers, fall-out-of-world respawn, glow, `adjustCredits`, and environment `portal` actions
 - **HUD** — Device-adaptive layout (desktop / mobile / iPad + keyboard) from `game_config.ts`
@@ -106,10 +135,10 @@ src/client/
                        # character_states.ts, local_dev.ts
   controllers/         # Character, camera, animation
   input/               # Mobile touch input
-  managers/            # scene_manager, audio_manager, visual_effects_manager,
-                       # behavior_manager, fall_respawn_hooks, collectibles_manager,
-                       # inventory_manager, hud_manager, camera_manager, sky_manager,
-                       # node_material_manager, character_loader, cut_scene_manager, …
+  managers/            # scene_manager, audio_manager, overlay_manager,
+                       # visual_effects_manager, behavior_manager, fall_respawn_hooks,
+                       # collectibles_manager, inventory_manager, hud_manager, …
+  simulation/          # simulation_bootstrap, state_simulation_manager (optional ?sim=1 demo)
   types/               # Shared TypeScript types
   ui/                  # Settings, inventory, HUD-related UI
   utils/               # switch_environment.ts, dev helpers, notifications, …
@@ -130,6 +159,8 @@ eslint.config.js
 
 ## Documentation
 
+- **[docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md)** — `?sim=1`, SynapticLab gameplay, overlays, and playground testing
+- **[docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md)** — Particle, NME, and overlay catalog authoring
 - **[USERS_GUIDE.md](USERS_GUIDE.md)** — Architecture, configuration, behaviors, fall respawn, condensed narrative notes
 - **[MULTIPLAYER.md](MULTIPLAYER.md)** — Multiplayer onboarding, configuration, testing, and troubleshooting
 - **[MULTIPLAYER_SYNCH.md](MULTIPLAYER_SYNCH.md)** — Normative wire contract, authority rules, and item-sync spec
