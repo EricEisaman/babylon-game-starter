@@ -43,6 +43,10 @@ const DYNAMIC_RELATIVE_IMPORT_RE = /\bimport\s*\(\s*['"`](\.\.?\/[^'"`]+)['"`]\s
 const NAMESPACE_BABYLON_IMPORT_RE =
   /^\s*import\s+\*\s+as\s+BABYLON\s+from\s+['"]@babylonjs\/core['"]/m;
 
+// PWA modules (service worker, workbox) are Vite-only. Playground uses
+// utils/pwa_runtime.ts stubs; nothing in the export graph may import pwa/.
+const PWA_IMPORT_PATH_RE = /(?:^|\/)pwa\//;
+
 /**
  * Parse the doubly-wrapped playground JSON into the inner file manifest.
  */
@@ -122,6 +126,13 @@ function check(manifest) {
         // Package import or URL import; not our problem.
         continue;
       }
+      if (PWA_IMPORT_PATH_RE.test(resolved)) {
+        errors.push(
+          `${current}: import "${rel}" resolves to "${resolved}" which is PWA-only (Vite build). ` +
+            `Playground export must use utils/pwa_runtime.ts instead — see BRANDING.md / PLAYGROUND.md.`
+        );
+        continue;
+      }
       const key = pickManifestKey(files, resolved);
       if (!key) {
         errors.push(
@@ -138,6 +149,13 @@ function check(manifest) {
     DYNAMIC_RELATIVE_IMPORT_RE.lastIndex = 0;
     let dyn;
     while ((dyn = DYNAMIC_RELATIVE_IMPORT_RE.exec(source)) !== null) {
+      if (PWA_IMPORT_PATH_RE.test(dyn[1])) {
+        errors.push(
+          `${current}: dynamic import "${dyn[1]}" is PWA-only (Vite build). ` +
+            `Use utils/pwa_runtime.ts in playground-bundled code instead.`
+        );
+        continue;
+      }
       errors.push(
         `${current}: dynamic relative import "${dyn[1]}" is forbidden in playground-bundled code. ` +
           `The Babylon playground rewrites the specifier to a bare token without quotes, producing ` +

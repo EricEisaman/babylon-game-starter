@@ -12,6 +12,16 @@ import { getMultiplayerManager } from '../managers/multiplayer_manager';
 import { hideAllRemotePeers } from '../managers/remote_peer_proxy';
 import { CharacterLock } from '../utils/character_lock';
 import { EnvironmentLock } from '../utils/environment_lock';
+import {
+  applyPwaUpdate,
+  isPwaInstallOfferAvailable,
+  isPwaSupported,
+  isPwaUpdateAvailable,
+  onPwaInstallOfferChanged,
+  onPwaUpdateAvailable,
+  purgePwaCache,
+  showPwaInstallInstructions
+} from '../utils/pwa_runtime';
 
 import {
   applyOverlayButtonBaseStyles,
@@ -54,8 +64,21 @@ export class SettingsUI {
   private static panelIsolationBinding: OverlayToggleBinding | null = null;
   private static otherPanelBinding: OverlayToggleBinding | null = null;
   private static outsideCloseBinding: OutsideCloseBinding | null = null;
+  private static pwaUpdateUnsubscribe: (() => void) | null = null;
+  private static pwaInstallUnsubscribe: (() => void) | null = null;
 
-  // Device detection methods
+  private static shouldShowPwaSection(section: SettingsSection): boolean {
+    if (section.hiddenWhen === 'no-pwa-update') {
+      return isPwaUpdateAvailable();
+    }
+    if (section.hiddenWhen === 'no-pwa-support') {
+      return isPwaSupported();
+    }
+    if (section.hiddenWhen === 'no-pwa-install') {
+      return isPwaInstallOfferAvailable();
+    }
+    return true;
+  }
   private static isMobileDevice(): boolean {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
@@ -169,6 +192,15 @@ export class SettingsUI {
           this.toggleInspector(value);
         }
         break;
+      case 'pwa-update':
+        await applyPwaUpdate();
+        break;
+      case 'pwa-install':
+        showPwaInstallInstructions();
+        break;
+      case 'pwa-purge-cache':
+        await purgePwaCache();
+        break;
     }
   }
 
@@ -199,6 +231,18 @@ export class SettingsUI {
     this.createSettingsButton(canvas);
     this.createSettingsPanel(canvas);
     this.setupEventListeners();
+    this.pwaUpdateUnsubscribe?.();
+    this.pwaUpdateUnsubscribe = onPwaUpdateAvailable(() => {
+      if (this.isPanelOpen) {
+        this.regenerateSections();
+      }
+    });
+    this.pwaInstallUnsubscribe?.();
+    this.pwaInstallUnsubscribe = onPwaInstallOfferChanged(() => {
+      if (this.isPanelOpen) {
+        this.regenerateSections();
+      }
+    });
     this.scheduleOverlayReposition();
     this.isInitializing = false; // Allow onChange after initialization
   }
@@ -510,6 +554,25 @@ export class SettingsUI {
             `;
       }
     });
+
+    const actionButtons = this.settingsPanel.querySelectorAll('.settings-action-button');
+    actionButtons.forEach((button) => {
+      if (button instanceof HTMLElement) {
+        button.style.cssText = `
+                width: 100%;
+                margin-top: 8px;
+                padding: 10px 14px;
+                background: rgba(0, 255, 136, 0.15);
+                border: 1px solid rgba(0, 255, 136, 0.5);
+                border-radius: 6px;
+                color: white;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                touch-action: manipulation;
+            `;
+      }
+    });
   }
 
   public static regenerateSections(): void {
@@ -538,8 +601,24 @@ export class SettingsUI {
       if (!this.shouldShowSection(section.visibility)) {
         return;
       }
+      if (!this.shouldShowPwaSection(section)) {
+        return;
+      }
 
       const sectionId = `section-${index}`;
+
+      if (section.uiElement === 'button') {
+        const label = section.buttonLabel ?? section.title;
+        sectionsHTML += `
+                    <div class="settings-section" id="${sectionId}">
+                        <div class="section-header">
+                            <h3>${section.title}</h3>
+                        </div>
+                        <button type="button" class="settings-action-button" data-section-index="${index}">${label}</button>
+                    </div>
+                `;
+        return;
+      }
 
       if (section.uiElement === 'toggle') {
         // Get current state for mobile controls
@@ -563,7 +642,7 @@ export class SettingsUI {
                         </div>
                     </div>
                 `;
-      } else {
+      } else if (section.uiElement === 'dropdown') {
         let defaultValue = section.options?.[0] ?? '';
         if (typeof section.defaultValue === 'string') {
           defaultValue = section.defaultValue;
@@ -647,6 +726,23 @@ export class SettingsUI {
           if (!this.isInitializing) {
             await this.runSectionAction(section.actionId, target.checked);
           }
+        })();
+      });
+    });
+
+    const actionButtons = this.settingsPanel.querySelectorAll('.settings-action-button');
+    actionButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        void (async () => {
+          if (!(button instanceof HTMLButtonElement)) return;
+          const sectionIndexStr = button.dataset.sectionIndex;
+          if (sectionIndexStr == null) return;
+          const sectionIndex = parseInt(sectionIndexStr);
+          const section = CONFIG.SETTINGS.SECTIONS[sectionIndex];
+          if (!section?.actionId) {
+            return;
+          }
+          await this.runSectionAction(section.actionId, true);
         })();
       });
     });
@@ -1947,6 +2043,10 @@ export class SettingsUI {
    */
   public static cleanup(): void {
     this.removeOverlayBindings();
+    this.pwaUpdateUnsubscribe?.();
+    this.pwaUpdateUnsubscribe = null;
+    this.pwaInstallUnsubscribe?.();
+    this.pwaInstallUnsubscribe = null;
 
     // Remove ALL settings buttons and panels (more aggressive)
     const allButtons = document.querySelectorAll('#settings-button');

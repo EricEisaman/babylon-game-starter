@@ -14,7 +14,25 @@ import { CreateAudioEngineAsync } from '@babylonjs/core/AudioV2/webAudio/webAudi
 import * as PhysicsV2 from '@babylonjs/core/Physics/v2/index';
 
 import { CONFIG } from './config/game_config';
+import {
+  applyPwaUpdate as applyPwaUpdateImpl,
+  initPwa,
+  isPwaSupported as isPwaSupportedImpl,
+  isPwaUpdateAvailable as isPwaUpdateAvailableImpl,
+  onPwaUpdateAvailable as onPwaUpdateAvailableImpl,
+  purgePwaCache as purgePwaCacheImpl
+} from './pwa/pwa_client';
+import { initChromiumInstallPrompt } from './pwa/pwa_install';
+import { loadBrandingConfig } from './utils/branding_config';
 import { devLog } from './utils/dev_log';
+import {
+  isInstallOfferAvailable,
+  maybeShowInstallCoach,
+  onInstallOfferChanged,
+  recordPwaVisit,
+  showInstallInstructions
+} from './utils/pwa_install_coach';
+import { registerPwaRuntime } from './utils/pwa_runtime';
 import { readScenePerfConsoleContext } from './utils/scene_perf_console_stamp';
 import {
   collectScenePerformanceStats,
@@ -110,6 +128,23 @@ async function initializeRuntimeGlobals(): Promise<void> {
 async function initialize(): Promise<void> {
   try {
     devLog('[Main] Initializing Babylon Game Starter...');
+    await loadBrandingConfig();
+    registerPwaRuntime({
+      isSupported: isPwaSupportedImpl,
+      isUpdateAvailable: isPwaUpdateAvailableImpl,
+      onUpdateAvailable: onPwaUpdateAvailableImpl,
+      applyUpdate: applyPwaUpdateImpl,
+      purgeCache: purgePwaCacheImpl,
+      isInstallOfferAvailable,
+      onInstallOfferChanged,
+      showInstallInstructions,
+      maybeShowInstallCoach,
+      recordPwaVisit
+    });
+    initChromiumInstallPrompt();
+    recordPwaVisit();
+    maybeShowInstallCoach();
+    void initPwa();
     await loadInspectorIfDev();
 
     // Get canvas element

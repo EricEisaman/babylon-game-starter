@@ -11,6 +11,8 @@ const srcRoot = path.join(repoRoot, 'src', 'client');
 // `../sync/item_sync`, then `sync` must be listed here or the pasted snippet
 // will fail to resolve the import inside https://playground.babylonjs.com.
 // `scripts/check-playground-export.mjs` catches missing folders after export.
+// `pwa/` is intentionally excluded — service worker code is Vite-only; playground
+// uses utils/pwa_runtime.ts stubs wired from main.ts.
 const exportRoots = [
   'config',
   'controllers',
