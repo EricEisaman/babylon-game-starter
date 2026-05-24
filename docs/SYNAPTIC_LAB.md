@@ -13,6 +13,8 @@ npm run dev
 
 Open **[http://localhost:3000/?sim=1](http://localhost:3000/?sim=1)**.
 
+**Live demo (SynapticLab):** [https://ericisaman.github.io/babylon-game-starter/?sim=1](https://ericisaman.github.io/babylon-game-starter/?sim=1)
+
 You start in **SynapticLab** with HUD meters (D1, D2, RPE, hunger, coupling, habit) and the optional drug-hunger vignette overlay.
 
 ---

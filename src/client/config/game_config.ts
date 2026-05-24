@@ -267,6 +267,30 @@ export const CONFIG: GameConfig = {
         visibility: 'all',
         defaultValue: false, // Default state, will be synced with actual element state
         actionId: 'inspector'
+      },
+      {
+        title: 'Update App',
+        uiElement: 'button',
+        visibility: 'all',
+        buttonLabel: 'Update to latest version',
+        actionId: 'pwa-update',
+        hiddenWhen: 'no-pwa-update'
+      },
+      {
+        title: 'Install App',
+        uiElement: 'button',
+        visibility: 'all',
+        buttonLabel: 'Add to Home Screen',
+        actionId: 'pwa-install',
+        hiddenWhen: 'no-pwa-install'
+      },
+      {
+        title: 'Purge Cache',
+        uiElement: 'button',
+        visibility: 'all',
+        buttonLabel: 'Clear cached assets',
+        actionId: 'pwa-purge-cache',
+        hiddenWhen: 'no-pwa-support'
       }
     ]
   },

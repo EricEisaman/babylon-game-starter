@@ -103,7 +103,7 @@ Custom servers must allow CORS from `https://<owner>.github.io` (path is not par
 
 | Symptom | Action |
 | ------- | ------ |
-| Broken assets / favicon | Match **`basePath`** to the live URL |
+| Broken assets / favicon | Match **`basePath`** to the live URL; see [BRANDING.md](BRANDING.md) |
 | **`pages build and deployment`** fails on **`main`** | **Pages → Source** = **GitHub Actions** ([fork checklist](FORK_GITHUB_SETUP.md)) |
 | **`main` not allowed** on **Deploy GitHub Pages** | Run from **`gh-deploy`**, not **`main`** |
 | **`gh-deploy` not allowed** | Add **`gh-deploy`** under **Environments → github-pages** |
