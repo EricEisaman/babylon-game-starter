@@ -582,6 +582,16 @@ export class SettingsUI {
             return `<option value="${character.name}" ${selectedAttr} ${disabledAttr} ${styleAttr}>${lockIcon}${character.name}</option>`;
           }).join('');
         } else if (section.title === 'Environment') {
+          const loadedEnvironmentName =
+            this.sceneManager?.isEnvironmentLoaded() === true
+              ? this.sceneManager.getCurrentEnvironment()
+              : null;
+          if (
+            loadedEnvironmentName &&
+            ASSETS.ENVIRONMENTS.some((env) => env.name === loadedEnvironmentName)
+          ) {
+            defaultValue = loadedEnvironmentName;
+          }
           optionsHTML = ASSETS.ENVIRONMENTS.map((environment) => {
             const isLocked = EnvironmentLock.isEnvironmentLocked(environment.name);
             const isSelected = environment.name === defaultValue;
@@ -874,6 +884,10 @@ export class SettingsUI {
     // Use requestAnimationFrame to ensure DOM is ready
     requestAnimationFrame(() => {
       this.regenerateSections();
+      const currentEnvironment = this.sceneManager?.getCurrentEnvironment();
+      if (currentEnvironment) {
+        this.syncEnvironmentDropdown(currentEnvironment);
+      }
       this.syncSplitRenderingToggleState();
       this.syncGameHUDToggleState();
       this.syncInspectorToggleState();
@@ -978,6 +992,41 @@ export class SettingsUI {
     return null;
   }
 
+  private static findEnvironmentSelect(): HTMLSelectElement | null {
+    if (!this.settingsPanel) {
+      return null;
+    }
+    const sectionIndex = CONFIG.SETTINGS.SECTIONS.findIndex(
+      (section) => section.title === 'Environment' && section.uiElement === 'dropdown'
+    );
+    if (sectionIndex < 0) {
+      return null;
+    }
+    const select = this.settingsPanel.querySelector(`select[data-section-index="${sectionIndex}"]`);
+    return select instanceof HTMLSelectElement ? select : null;
+  }
+
+  /**
+   * Keeps the Environment settings dropdown aligned with the loaded scene environment.
+   */
+  private static syncEnvironmentDropdown(environmentName: string): void {
+    if (EnvironmentLock.isEnvironmentLocked(environmentName)) {
+      return;
+    }
+    const select = this.findEnvironmentSelect();
+    if (!select) {
+      return;
+    }
+    const optionExists = Array.from(select.options).some(
+      (option) => option.value === environmentName
+    );
+    if (!optionExists) {
+      return;
+    }
+    select.value = environmentName;
+    select.setAttribute('data-previous-value', environmentName);
+  }
+
   /**
    * Gets the scene from the scene manager if available
    * @returns The scene or null if scene manager is not initialized
@@ -1031,6 +1080,8 @@ export class SettingsUI {
     if (this.sceneManager.getCurrentCharacterName() !== null) {
       this.sceneManager.showPlayerMeshResumePhysicsAndRevealEnvironment();
     }
+
+    this.syncEnvironmentDropdown(environmentName);
   }
 
   public static async changeEnvironment(
@@ -1044,6 +1095,7 @@ export class SettingsUI {
     const currentEnvironment = this.sceneManager.getCurrentEnvironment();
     const environmentLoaded = this.sceneManager.isEnvironmentLoaded();
     if (currentEnvironment === environmentName && environmentLoaded) {
+      this.syncEnvironmentDropdown(environmentName);
       return;
     }
 

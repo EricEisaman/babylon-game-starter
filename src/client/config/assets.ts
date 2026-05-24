@@ -18,6 +18,36 @@ import type {
 const EMPTY_LIGHTMAPPED_MESHES: readonly LightmappedMesh[] = [];
 const EMPTY_PHYSICS_OBJECTS: readonly PhysicsObject[] = [];
 
+/**
+ * Circuit-hijack SynapticLab layout (monochrome.glb + cue zones + collectibles).
+ * Loaded when `?sim=1` or `CONFIG.SIMULATION.ENABLED`.
+ */
+export const SIMULATION_LAB_ENVIRONMENT_NAME = 'SynapticLab';
+
+const LEVEL_TEST_LIGHTMAPPED_MESHES = [
+  { name: 'level_primitive0', level: 1.6 },
+  { name: 'level_primitive1', level: 1.6 },
+  { name: 'level_primitive2', level: 1.6 }
+] as const satisfies readonly LightmappedMesh[];
+
+/** Level Test interactive props (includes seesaw Cube.006 PIVOT_BEAM + Cube.007 anchor). */
+const LEVEL_TEST_PHYSICS_OBJECTS = [
+  {
+    name: 'Cube',
+    mass: 0.1,
+    scale: 1,
+    role: OBJECT_ROLE.DYNAMIC_BOX,
+    effect: 'GLOW' satisfies EffectType
+  },
+  { name: 'Cube.001', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
+  { name: 'Cube.002', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
+  { name: 'Cube.003', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
+  { name: 'Cube.004', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
+  { name: 'Cube.005', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
+  { name: 'Cube.006', mass: 0.01, scale: 1, role: OBJECT_ROLE.PIVOT_BEAM },
+  { name: 'Cube.007', mass: 0, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX }
+] as const satisfies readonly PhysicsObject[];
+
 export const ASSETS = {
   CHARACTERS: [
     {
@@ -154,27 +184,8 @@ export const ASSETS = {
       lightmap:
         'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/environments/levelTest/lightmap.jpg',
       scale: 1,
-      lightmappedMeshes: [
-        { name: 'level_primitive0', level: 1.6 },
-        { name: 'level_primitive1', level: 1.6 },
-        { name: 'level_primitive2', level: 1.6 }
-      ],
-      physicsObjects: [
-        {
-          name: 'Cube',
-          mass: 0.1,
-          scale: 1,
-          role: OBJECT_ROLE.DYNAMIC_BOX,
-          effect: 'GLOW' satisfies EffectType
-        },
-        { name: 'Cube.001', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
-        { name: 'Cube.002', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
-        { name: 'Cube.003', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
-        { name: 'Cube.004', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
-        { name: 'Cube.005', mass: 0.1, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX },
-        { name: 'Cube.006', mass: 0.01, scale: 1, role: OBJECT_ROLE.PIVOT_BEAM },
-        { name: 'Cube.007', mass: 0, scale: 1, role: OBJECT_ROLE.DYNAMIC_BOX }
-      ],
+      lightmappedMeshes: LEVEL_TEST_LIGHTMAPPED_MESHES,
+      physicsObjects: LEVEL_TEST_PHYSICS_OBJECTS,
       sky: {
         TEXTURE_URL:
           'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/images/skies/cartoon-river-with-orange-sky.jpg',
@@ -293,6 +304,229 @@ export const ASSETS = {
               scale: 0.01,
               rotation: new BABYLON.Vector3(0, 0, 0),
               mass: 0.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      // Ported from circuit-hijack SynapticLab @ bfd7160 (neutral BGS action type names).
+      name: SIMULATION_LAB_ENVIRONMENT_NAME,
+      model: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/monochrome.glb',
+      lightmap: '',
+      scale: 1,
+      lightmappedMeshes: EMPTY_LIGHTMAPPED_MESHES,
+      physicsObjects: EMPTY_PHYSICS_OBJECTS,
+      sky: {
+        TEXTURE_URL:
+          'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/images/skies/cartoon-river-with-orange-sky.jpg',
+        ROTATION_Y: 0,
+        BLUR: 0.4,
+        TYPE: 'SPHERE' satisfies SkyType
+      },
+      spawnPoint: new BABYLON.Vector3(0, 2.5, 0),
+      spawnRotation: new BABYLON.Vector3(0, Math.PI, 0),
+      cameraOffset: new BABYLON.Vector3(0, 1.2, -2.5),
+      cutScene: {
+        type: 'image',
+        visualUrl:
+          'https://raw.githubusercontent.com/EricEisaman/circuit-hijack/main/resources/Circuit-Hijack-Banner.png',
+        fadeInEnabled: true,
+        fadeOutEnabled: true,
+        fadeDurationMs: 800,
+        concurrent: true
+      },
+      backgroundMusic: {
+        url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/audio/ambience/space-ambience.mp3',
+        volume: 0.15
+      },
+      ambientSounds: [
+        {
+          url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/audio/ambience/space-ambience.mp3',
+          volume: 0.08,
+          position: new BABYLON.Vector3(0, 1, 0),
+          rollOff: 2,
+          maxDistance: 50
+        }
+      ],
+      lights: [
+        {
+          lightType: 'HEMISPHERIC' satisfies LightType,
+          name: 'SynapticLabAmbient',
+          direction: new BABYLON.Vector3(0, 1, 0),
+          diffuseColor: new BABYLON.Color3(0.55, 0.45, 0.75),
+          intensity: 0.85
+        },
+        {
+          lightType: 'POINT' satisfies LightType,
+          name: 'AccAnchorLight',
+          position: new BABYLON.Vector3(-6, 3, 4),
+          diffuseColor: new BABYLON.Color3(0.4, 0.7, 1),
+          intensity: 1.2,
+          range: 12
+        }
+      ],
+      particles: [
+        {
+          name: 'Magic Sparkles',
+          position: new BABYLON.Vector3(5, 1.5, 3),
+          updateSpeed: 0.01,
+          instanceName: 'cue-sparkles-1',
+          behavior: {
+            triggerKind: 'proximity',
+            radius: 4,
+            checkPeriod: { type: 'interval', milliseconds: 2500 },
+            edgeColor: new BABYLON.Color4(1, 0.35, 0.2, 1),
+            edgeWidth: 8,
+            action: {
+              actionType: 'simulationPulse',
+              pulseKind: 'craving',
+              magnitude: 0.55
+            }
+          } satisfies BehaviorConfig
+        },
+        {
+          name: 'Hyper',
+          position: new BABYLON.Vector3(-4, 1.5, -5),
+          updateSpeed: 0.012,
+          instanceName: 'cue-hyper-2',
+          behavior: {
+            triggerKind: 'proximity',
+            radius: 3.5,
+            checkPeriod: { type: 'interval', milliseconds: 3000 },
+            edgeColor: new BABYLON.Color4(1, 0.5, 0.1, 1),
+            edgeWidth: 7,
+            action: {
+              actionType: 'simulationPulse',
+              pulseKind: 'craving',
+              magnitude: 0.5
+            }
+          } satisfies BehaviorConfig
+        },
+        {
+          name: 'Sparkles',
+          position: new BABYLON.Vector3(0, 1, 7),
+          updateSpeed: 0.008,
+          instanceName: 'cue-sparkles-3',
+          behavior: {
+            triggerKind: 'proximity',
+            radius: 3,
+            checkPeriod: { type: 'interval', milliseconds: 3500 },
+            action: {
+              actionType: 'simulationPulse',
+              pulseKind: 'craving',
+              magnitude: 0.45
+            }
+          } satisfies BehaviorConfig
+        },
+        {
+          name: 'Magic Sparkles',
+          position: new BABYLON.Vector3(-6, 1, 4),
+          updateSpeed: 0.006,
+          instanceName: 'acc-anchor-zone',
+          behavior: {
+            triggerKind: 'proximity',
+            radius: 3.5,
+            volumeZone: 'accAnchor',
+            edgeColor: new BABYLON.Color4(0.3, 0.6, 1, 1),
+            edgeWidth: 6,
+            checkPeriod: { type: 'interval', milliseconds: 500 },
+            action: {
+              actionType: 'setCoupling',
+              amount: 0.65
+            }
+          } satisfies BehaviorConfig
+        },
+        {
+          name: 'Nebula Cloud',
+          position: new BABYLON.Vector3(6, 1, -3),
+          updateSpeed: 0.005,
+          instanceName: 'safe-zone-nebula',
+          behavior: {
+            triggerKind: 'proximity',
+            radius: 4,
+            volumeZone: 'safe',
+            edgeColor: new BABYLON.Color4(0.2, 0.9, 0.5, 1),
+            edgeWidth: 5,
+            checkPeriod: { type: 'interval', milliseconds: 1000 },
+            action: {
+              actionType: 'adjustSimulation',
+              target: 'd2',
+              amount: 0.02
+            }
+          } satisfies BehaviorConfig
+        },
+        {
+          name: 'Smoke Trail',
+          position: new BABYLON.Vector3(0, 1, -4),
+          updateSpeed: 0.01,
+          instanceName: 'withdrawal-zone',
+          behavior: {
+            triggerKind: 'proximity',
+            radius: 3.5,
+            edgeColor: new BABYLON.Color4(0.9, 0.15, 0.1, 1),
+            edgeWidth: 7,
+            checkPeriod: { type: 'interval', milliseconds: 4000 },
+            action: {
+              actionType: 'adjustSimulation',
+              target: 'drugHunger',
+              amount: 0.12
+            }
+          } satisfies BehaviorConfig
+        }
+      ],
+      overlays: [
+        {
+          catalogName: 'Drug Hunger Vignette',
+          driver: {
+            type: 'simulation',
+            input: 'drugHunger',
+            threshold: 0.7,
+            alsoRequiresLowAcc: true
+          }
+        }
+      ],
+      items: [
+        {
+          name: 'Dopamine Proxy',
+          url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/items/gamma_crystal.glb',
+          collectible: true,
+          creditValue: 0,
+          minImpulseForCollection: 0.2,
+          collectRole: 'drug',
+          instances: [
+            {
+              position: new BABYLON.Vector3(3, 1.2, -2),
+              scale: 0.45,
+              rotation: new BABYLON.Vector3(0, 0, 0),
+              mass: 0.3,
+              instanceName: 'drug-proxy-1',
+              effect: 'GLOW' satisfies EffectType
+            },
+            {
+              position: new BABYLON.Vector3(-2, 1.2, 6),
+              scale: 0.4,
+              rotation: new BABYLON.Vector3(0, 0.5, 0),
+              mass: 0.3,
+              instanceName: 'drug-proxy-2',
+              effect: 'GLOW' satisfies EffectType
+            }
+          ]
+        },
+        {
+          name: 'PFC Exercise',
+          url: 'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/items/stylized_crate_asset.glb',
+          collectible: true,
+          creditValue: 0,
+          minImpulseForCollection: 0.3,
+          collectRole: 'pfcExercise',
+          instances: [
+            {
+              position: new BABYLON.Vector3(7, 1, 0),
+              scale: 0.35,
+              rotation: new BABYLON.Vector3(0, 0, 0),
+              mass: 0.4,
+              instanceName: 'pfc-crate'
             }
           ]
         }
