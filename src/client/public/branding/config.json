@@ -3,7 +3,7 @@
   "imageWidth": 2560,
   "imageHeight": 2560,
   "bgColor": "#000000",
-  "loadscreenText": "Babylon Game Starter\ SIGMA GAMES",
+  "loadscreenText": "Babylon Game Starter\SIGMA GAMES",
   "pwa": {
     "enabled": true,
     "name": "Babylon Game Starter",
