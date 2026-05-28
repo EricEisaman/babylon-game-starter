@@ -1,7 +1,7 @@
 {
   "image": "/branding/images/IMG_1185.jpeg",
-  "imageWidth": 256,
-  "imageHeight": 256,
+  "imageWidth": 2560,
+  "imageHeight": 2560,
   "bgColor": "#ffffff",
   "loadscreenText": "Babylon Game Starter\nLoading your game ...",
   "pwa": {
