@@ -2,6 +2,6 @@
   "image": "/branding/images/Babylon_logo.png",
   "imageWidth": 256,
   "imageHeight": 256,
-  "bgColor": "#ffffff",
-  "loadscreenText": "Babylon Game Starter\nLoading your game ..."
+  "bgColor": "#000000",
+  "loadscreenText": "Babylon Game Starter\nSigma Game ..."
 }
