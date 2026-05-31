@@ -558,7 +558,6 @@ export class ChatManager {
     try {
       const response = await fetch(`${config.serviceUrl}/health`, {
         method: 'GET',
-        headers: { [CLIENT_HEADER]: config.clientId },
         signal: controller.signal
       });
       return response.ok;

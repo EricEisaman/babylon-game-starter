@@ -66,23 +66,16 @@ On Chat Slayer, set `BACKEND_INITIAL_USERS=alice:secret1;bob:secret2` (or create
 
 ## Allow the game origin on Chat Slayer
 
-Browser requests require CORS. Add your **deployed game origin(s)** to Chat Slayer `ALLOWED_CLIENTS` for the same `clientId`, for example:
+Browser login and chat API calls require your game origin in Chat Slayer `ALLOWED_CLIENTS` for the same `clientId` (for example `https://bgs-mp.onrender.com` alongside local dev URLs). See [chat-slayer/CLIENT_GUIDE.md](../chat-slayer/CLIENT_GUIDE.md) and [chat-slayer/RENDER_DEPLOYMENT.md](../chat-slayer/RENDER_DEPLOYMENT.md).
 
-- `http://localhost:5173` (Vite dev)
-- `https://<user>.github.io` or your custom domain
+## Production troubleshooting
 
-See [chat-slayer/CLIENT_GUIDE.md](../chat-slayer/CLIENT_GUIDE.md) and [chat-slayer/RENDER_DEPLOYMENT.md](../chat-slayer/RENDER_DEPLOYMENT.md).
+| Symptom | Likely cause | Fix |
+|---------|----------------|-----|
+| CORS error on `GET /health` during warmup | Chat Slayer build without health CORS | Deploy latest **chat-slayer** (`/health` echoes `Origin`; game warmup uses a simple GET without client header). |
+| `403` on `/demo/actions/*` or `/demo/stream` | Origin or `clientId` mismatch | Confirm `ALLOWED_CLIENTS` includes your deployed game origin and `babylon-game` (or your `clientId`). |
 
-Example Dashboard entry:
-
-```json
-{
-  "id": "babylon-game",
-  "label": "Babylon Game Starter",
-  "origins": ["http://localhost:5173", "https://your-game.example.com"],
-  "allowWithoutOrigin": false
-}
-```
+Deploy **chat-slayer** before relying on cross-origin warmup from a hosted game.
 
 ## Render free tier (cold start)
 
