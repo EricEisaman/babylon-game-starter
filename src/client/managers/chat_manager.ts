@@ -29,6 +29,8 @@ const SESSION_STORAGE_KEYS = {
 } as const;
 
 const NORMAL_REQUEST_TIMEOUT_MS = 15_000;
+const ROOM_INBOX_HISTORY_LIMIT = 20;
+const RECONNECTING_STATUS_SUFFIX = ' — reconnecting…';
 const CLIENT_HEADER = 'X-Chat-Slayer-Client-Id';
 const PREVIEW_SESSION_TOKEN = 'ui-preview';
 const PREVIEW_ERROR = 'UI preview — configure chat/config.json for live chat.';
@@ -585,7 +587,7 @@ export class ChatManager {
     }
 
     if (Array.isArray(patch.inbox) && patch.inbox.length > 0) {
-      this.inbox = [...patch.inbox];
+      this.mergeInboxSnapshot(patch.inbox, source);
     } else if (patch.cs?.name === 'room-message' && patch.cs.payload) {
       const line = patch.cs.payload as ChatMessageLine;
       if (line.room_id === this.activeRoomId || !this.activeRoomId) {
@@ -611,9 +613,68 @@ export class ChatManager {
 
     if (source === 'stream' && patch.streamReady === true) {
       this.resolveStreamReadyWaiters();
+      this.clearReconnectingStatus();
     }
 
     this.notifyInbox();
+  }
+
+  private mergeInboxSnapshot(
+    incoming: readonly ChatMessageLine[],
+    source: 'action' | 'stream'
+  ): void {
+    const roomId = this.activeRoomId;
+    const otherRooms = roomId ? this.inbox.filter((line) => line.room_id !== roomId) : [];
+    const existingRoom = roomId ? this.inbox.filter((line) => line.room_id === roomId) : this.inbox;
+
+    if (source === 'action' && incoming.length > 0) {
+      this.inbox = roomId ? [...otherRooms, ...incoming] : [...incoming];
+      return;
+    }
+
+    const byEventId = new Map<string, ChatMessageLine>();
+    for (const line of existingRoom) {
+      byEventId.set(line.event_id, line);
+    }
+    for (const line of incoming) {
+      if (!roomId || line.room_id === roomId) {
+        byEventId.set(line.event_id, line);
+      }
+    }
+
+    const merged: ChatMessageLine[] = [];
+    const seen = new Set<string>();
+    for (const line of existingRoom) {
+      if (!seen.has(line.event_id)) {
+        merged.push(byEventId.get(line.event_id) ?? line);
+        seen.add(line.event_id);
+      }
+    }
+    for (const line of incoming) {
+      if (roomId && line.room_id !== roomId) {
+        continue;
+      }
+      if (!seen.has(line.event_id)) {
+        merged.push(line);
+        seen.add(line.event_id);
+      }
+    }
+
+    const capped =
+      merged.length > ROOM_INBOX_HISTORY_LIMIT
+        ? merged.slice(-ROOM_INBOX_HISTORY_LIMIT)
+        : merged;
+    this.inbox = roomId ? [...otherRooms, ...capped] : capped;
+  }
+
+  private clearReconnectingStatus(): void {
+    if (!this.statusText.endsWith(RECONNECTING_STATUS_SUFFIX)) {
+      return;
+    }
+    this.statusText = this.statusText.slice(0, -RECONNECTING_STATUS_SUFFIX.length);
+    for (const listener of this.stateListeners) {
+      listener(this.connectionState, this.statusText);
+    }
   }
 
   private waitForDemoStreamReady(timeoutMs: number): Promise<void> {
@@ -874,8 +935,10 @@ export class ChatManager {
     if (this.streamReconnectTimer || !this.session?.accessToken) {
       return;
     }
-    const baseStatus = this.statusText.replace(/ — reconnecting…$/, '');
-    this.setState('ready', `${baseStatus || 'Connected'} — reconnecting…`);
+    const baseStatus = this.statusText.endsWith(RECONNECTING_STATUS_SUFFIX)
+      ? this.statusText.slice(0, -RECONNECTING_STATUS_SUFFIX.length)
+      : this.statusText;
+    this.setState('ready', `${baseStatus || 'Connected'}${RECONNECTING_STATUS_SUFFIX}`);
     this.streamReconnectTimer = setTimeout(() => {
       this.streamReconnectTimer = null;
       if (this.session?.accessToken) {
