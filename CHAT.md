@@ -48,17 +48,20 @@ Edit [`src/client/public/chat/config.json`](src/client/public/chat/config.json):
 
 Chat Slayer validates the `X-Chat-Slayer-Client-Id` request header against the **`id`** values in its `ALLOWED_CLIENTS` env JSON. The game’s `clientId` in `chat/config.json` must match one of those ids exactly.
 
-For the shared `chat-slayer.onrender.com` deployment, use `"clientId": "web-demo"`. That entry already allows these game origins (among others):
+For the shared `chat-slayer.onrender.com` deployment, use `"clientId": "web-demo"`. That entry allows these **CORS origins** (scheme + host only — **never** a path) for `web-demo`:
 
 - `https://bgs-mp.onrender.com`
 - `https://babylon-game-starter.onrender.com`
 - `https://babylon-game-starter.netlify.app`
-- `https://EricEisaman.github.io/babylon-game-starter`
+- `https://ericeisaman.github.io` (GitHub Pages project site for this repo)
 
-| Game deploy URL | `serviceUrl` | `clientId` |
-|---|---|---|
-| `https://bgs-mp.onrender.com` | `/chat-api` | `web-demo` |
-| GitHub Pages / Netlify / other listed origins | `/chat-api` or direct Chat Slayer URL | `web-demo` |
+**Game URL vs CORS origin:** a project site at `https://ericeisaman.github.io/babylon-game-starter/` still sends `Origin: https://ericeisaman.github.io`. Do **not** put the path in `ALLOWED_CLIENTS`.
+
+| Game deploy URL | `serviceUrl` | `clientId` | CORS origin for `ALLOWED_CLIENTS` |
+|---|---|---|---|
+| `https://bgs-mp.onrender.com` | `/chat-api` | `web-demo` | `https://bgs-mp.onrender.com` |
+| `https://babylon-game-starter.netlify.app` | `/chat-api` | `web-demo` | `https://babylon-game-starter.netlify.app` |
+| `https://ericeisaman.github.io/babylon-game-starter/` | `/chat-api` (client uses direct Chat Slayer on Pages) | `web-demo` | `https://ericeisaman.github.io` |
 
 The `/chat-api` proxy removes browser CORS errors; it does **not** bypass Chat Slayer’s client-id or origin checks.
 
@@ -84,7 +87,7 @@ On Chat Slayer, set `BACKEND_INITIAL_USERS=alice:secret1;bob:secret2` (or create
 
 ## Allow the game origin on Chat Slayer
 
-When using a **cross-origin** `serviceUrl` (for example `https://chat-slayer.onrender.com` from `https://bgs-mp.onrender.com`), your game origin must appear in the **`origins`** array for the same `clientId` in Chat Slayer `ALLOWED_CLIENTS`. See [chat-slayer/CLIENT_GUIDE.md](../chat-slayer/CLIENT_GUIDE.md) and [chat-slayer/RENDER_DEPLOYMENT.md](../chat-slayer/RENDER_DEPLOYMENT.md).
+When using a **cross-origin** `serviceUrl` (for example `https://chat-slayer.onrender.com` from GitHub Pages or Render), your browser’s **`Origin`** header (not the full page URL) must appear in the **`origins`** array for the same `clientId` in Chat Slayer `ALLOWED_CLIENTS`. See [chat-slayer/CLIENT_GUIDE.md](../chat-slayer/CLIENT_GUIDE.md) and [chat-slayer/RENDER_DEPLOYMENT.md](../chat-slayer/RENDER_DEPLOYMENT.md).
 
 **Render Docker deploy (recommended):** [`chat/config.json`](src/client/public/chat/config.json) uses `"serviceUrl": "/chat-api"`. Nginx proxies `/chat-api/` to Chat Slayer same-origin, so browsers never hit cross-origin CORS. Vite dev proxies `/chat-api` the same way (`vite.config.ts`).
 
@@ -97,6 +100,9 @@ When using a **cross-origin** `serviceUrl` (for example `https://chat-slayer.onr
 | CORS error on `GET /health` during warmup | Chat Slayer build without health CORS | Deploy latest **chat-slayer** (`/health` echoes `Origin`; game warmup uses a simple GET without client header). |
 | `403` on `/demo/actions/*` or `/demo/stream` (other messages) | Origin not listed for your `clientId` | Confirm `ALLOWED_CLIENTS` includes your deployed game origin under the same `id` as `clientId`. |
 | `400` + `Invalid datastar signals` on `GET /demo/stream` | Stream opened with Bearer auth instead of Datastar query param | Deploy a client that passes `{ "accessToken": "..." }` in the `datastar` query param on `GET /demo/stream`. POST actions use JSON body; only the stream uses the query param. |
+| `404` on `/chat-api/*` from Netlify (HTML error in chat status) | Static host has no `/chat-api` proxy | Redeploy **`netlify-deployment`** with updated `netlify.toml` (`/chat-api/*` → Chat Slayer). See [NETLIFY_STATIC_SITE_DEPLOYMENT.md](NETLIFY_STATIC_SITE_DEPLOYMENT.md). |
+| Chat blocked from **`*.github.io`** (CORS / “server blocked or unreachable”) | `ALLOWED_CLIENTS` lists the game URL with a path instead of the origin | Add `https://<user>.github.io` (**no path**) to `web-demo.origins` on Chat Slayer. Example: game at `/babylon-game-starter/` → origin is `https://ericeisaman.github.io`. |
+| Chat 404 / fails on **GitHub Pages** | Pages cannot proxy `/chat-api` | The client auto-uses `https://chat-slayer.onrender.com` on `*.github.io` when config has `/chat-api`. Add the host-only origin above to `ALLOWED_CLIENTS`. See [GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md). |
 
 Deploy **chat-slayer** before relying on cross-origin warmup from a hosted game.
 
