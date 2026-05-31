@@ -44,7 +44,7 @@ const DEFAULT_BRANDING: ResolvedBrandingConfig = {
   },
   social: {
     title: 'Babylon Game Starter',
-    description: 'A modular 3D browser game built with Babylon.js',
+    description: 'A modular 3D browser game platform built with Babylon.js',
     siteName: 'Babylon Game Starter',
     image: '/branding/screenshots/og-card.png',
     imageWidth: 1200,
