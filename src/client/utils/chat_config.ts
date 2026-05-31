@@ -29,19 +29,17 @@ const DEFAULT_CHAT: ResolvedChatConfig = {
   allowedUsers: []
 };
 
-/** Direct Chat Slayer URL when static hosts have no `/chat-api` reverse proxy. */
-const CHAT_SLAYER_DIRECT_URL = 'https://chat-slayer.onrender.com';
-
+/** Direct Chat Slayer URL on static hosts without a reverse proxy (injected at build from deployment settings). */
 function resolveServiceUrlForHost(configured: string): string {
-  if (configured !== '/chat-api') {
+  if (configured !== __CHAT_PROXY_PREFIX__) {
     return configured;
   }
   if (typeof window === 'undefined') {
     return configured;
   }
-  // GitHub Pages is static-only — no nginx/Netlify proxy for /chat-api.
+  // GitHub Pages is static-only — no nginx/Netlify proxy for the configured prefix.
   if (window.location.hostname.endsWith('.github.io')) {
-    return CHAT_SLAYER_DIRECT_URL;
+    return __CHAT_DIRECT_UPSTREAM_URL__;
   }
   return configured;
 }
