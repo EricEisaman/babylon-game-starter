@@ -1,14 +1,8 @@
-/** @type {import('../types/settings').DeploymentSettings<'render.com'>} */
+/** @type {import('../types/settings').DeploymentSettings<'netlify'>} */
 const deploymentSettings = {
-  host: 'render.com',
-  type: 'web-service',
+  host: 'netlify',
+  type: 'static',
   services: [
-    {
-      name: 'api',
-      type: 'node',
-      routePrefix: '/api',
-      localPort: 8787
-    },
     {
       name: 'multiplayer',
       type: 'go',

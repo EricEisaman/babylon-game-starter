@@ -56,23 +56,25 @@ function validateSettings(settings) {
     }
   }
 
-  if (
-    settings.host === 'github.io' &&
-    settings.type === 'static' &&
-    settings.static?.githubPages
-  ) {
-    const gp = settings.static.githubPages;
-    if (gp.deployBranch !== undefined) {
-      assert(
-        typeof gp.deployBranch === 'string' && gp.deployBranch.length > 0,
-        'static.githubPages.deployBranch must be a non-empty string when set.'
-      );
-    }
-    if (gp.environmentName !== undefined) {
-      assert(
-        typeof gp.environmentName === 'string' && gp.environmentName.length > 0,
-        'static.githubPages.environmentName must be a non-empty string when set.'
-      );
+  if (settings.host === 'github.io' && settings.type === 'static') {
+    const gp = settings.static?.githubPages;
+    if (gp && typeof gp === 'object') {
+      if (gp.deployBranch !== undefined) {
+        assert(typeof gp.deployBranch === 'string', 'static.githubPages.deployBranch must be a string.');
+        assert(gp.deployBranch.length > 0, 'static.githubPages.deployBranch must be non-empty.');
+        assert(
+          /^[A-Za-z0-9._/-]+$/.test(gp.deployBranch),
+          'static.githubPages.deployBranch contains unsupported characters (use letters, digits, ._-/).'
+        );
+      }
+      if (gp.environmentName !== undefined) {
+        assert(typeof gp.environmentName === 'string', 'static.githubPages.environmentName must be a string.');
+        assert(gp.environmentName.length > 0, 'static.githubPages.environmentName must be non-empty.');
+        assert(
+          /^[A-Za-z0-9._-]+$/.test(gp.environmentName),
+          'static.githubPages.environmentName contains unsupported characters (use letters, digits, ._-).'
+        );
+      }
     }
   }
 }
@@ -231,7 +233,7 @@ function createGithubPagesWorkflow(settings) {
   const environmentName = settings.static?.githubPages?.environmentName ?? 'github-pages';
   const branchesYaml = JSON.stringify(deployBranch);
   const environmentYaml = JSON.stringify(environmentName);
-  return `name: Deploy GitHub Pages\n\non:\n  push:\n    branches: [${branchesYaml}]\n  # Push to ${deployBranch}, or workflow_dispatch with Use workflow from = ${deployBranch}.\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  pages: write\n  id-token: write\n\nconcurrency:\n  group: "pages"\n  cancel-in-progress: true\n\njobs:\n  assert_deploy_branch:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Only deploy branch may reach the github-pages environment\n        run: |\n          if [ "\${GITHUB_REF}" != "refs/heads/${deployBranch}" ]; then\n            echo "::error::Pages deploy must use ref refs/heads/${deployBranch} (push to that branch, or Run workflow with Use workflow from = ${deployBranch}). Current: \${GITHUB_REF}"\n            exit 1\n          fi\n\n  build:\n    runs-on: ubuntu-latest\n    needs: assert_deploy_branch\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci\n      - run: npm run build\n      - uses: actions/upload-pages-artifact@v3\n        with:\n          path: dist\n\n  deploy:\n    if: \${{ github.ref == 'refs/heads/${deployBranch}' }}\n    environment:\n      name: ${environmentYaml}\n      url: \${{ steps.deployment.outputs.page_url }}\n    runs-on: ubuntu-latest\n    needs: build\n    steps:\n      - id: deployment\n        uses: actions/deploy-pages@v4\n`;
+  return `name: Deploy GitHub Pages\n\non:\n  push:\n    branches: [${branchesYaml}]\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  pages: write\n  id-token: write\n\nconcurrency:\n  group: "pages"\n  cancel-in-progress: true\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci\n      - run: npm run build\n      - uses: actions/upload-pages-artifact@v3\n        with:\n          path: dist\n\n  deploy:\n    environment:\n      name: ${environmentYaml}\n      url: \${{ steps.deployment.outputs.page_url }}\n    runs-on: ubuntu-latest\n    needs: build\n    steps:\n      - id: deployment\n        uses: actions/deploy-pages@v4\n`;
 }
 
 async function writeHostArtifacts(settings, resolved) {

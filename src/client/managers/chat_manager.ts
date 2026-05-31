@@ -176,6 +176,13 @@ export class ChatManager {
   private warmupAbort: AbortController | null = null;
   private streamAbort: AbortController | null = null;
   private streamParser = new ChatSseStreamParser();
+  private streamOpenInFlight: Promise<void> | null = null;
+  private streamReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private streamReadyWaiters: Array<{
+    resolve: () => void;
+    reject: (err: Error) => void;
+    timeoutId: ReturnType<typeof setTimeout>;
+  }> = [];
   private readonly stateListeners = new Set<StateListener>();
   private readonly inboxListeners = new Set<InboxListener>();
   private environmentChangedHandler: ((e: Event) => void) | null = null;
@@ -367,7 +374,7 @@ export class ChatManager {
       return;
     }
     if (this.connectionState !== 'ready') {
-      return;
+      throw new Error('Chat still connecting — try again in a moment.');
     }
     if (isChatUiPreviewMode()) {
       const line: ChatMessageLine = {
@@ -515,6 +522,10 @@ export class ChatManager {
     );
     this.applySignalPatch(registerPatch);
 
+    this.closeStream();
+    this.setState('ready', this.statusText || 'Connected');
+    await this.ensureDemoStreamReady(config);
+
     const initialEnv =
       ASSETS.ENVIRONMENTS.find((e) => e.isDefault)?.name ?? ASSETS.ENVIRONMENTS[0]?.name;
     if (config.roomMode === 'per-environment' && initialEnv) {
@@ -525,10 +536,6 @@ export class ChatManager {
         await this.joinRoom(roomId);
       }
     }
-
-    this.closeStream();
-    this.setState('ready', this.statusText || 'Connected');
-    this.startDemoStream();
   }
 
   private async joinRoom(roomId: string): Promise<void> {
@@ -560,7 +567,10 @@ export class ChatManager {
     this.applySignalPatch(patch);
   }
 
-  private applySignalPatch(patch: ChatSignalPatch | null): void {
+  private applySignalPatch(
+    patch: ChatSignalPatch | null,
+    source: 'action' | 'stream' = 'action'
+  ): void {
     if (!patch) {
       return;
     }
@@ -574,14 +584,8 @@ export class ChatManager {
       this.activeRoomId = patch.roomId;
     }
 
-    if (Array.isArray(patch.inbox)) {
-      if (patch.inbox.length > 0) {
-        this.inbox = [...patch.inbox];
-      } else if (typeof patch.roomId === 'string' && patch.roomId.length > 0) {
-        // Empty inbox on room join = no history for this room; drop stale lines for it only.
-        this.inbox = this.inbox.filter((line) => line.room_id !== patch.roomId);
-      }
-      // Send acks include inbox:[] — ignore; stream room-message events carry new lines.
+    if (Array.isArray(patch.inbox) && patch.inbox.length > 0) {
+      this.inbox = [...patch.inbox];
     } else if (patch.cs?.name === 'room-message' && patch.cs.payload) {
       const line = patch.cs.payload as ChatMessageLine;
       if (line.room_id === this.activeRoomId || !this.activeRoomId) {
@@ -605,7 +609,61 @@ export class ChatManager {
       this.setState('error', message);
     }
 
+    if (source === 'stream' && patch.streamReady === true) {
+      this.resolveStreamReadyWaiters();
+    }
+
     this.notifyInbox();
+  }
+
+  private waitForDemoStreamReady(timeoutMs: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.removeStreamReadyWaiter(entry);
+        reject(new Error('Chat stream did not become ready in time'));
+      }, timeoutMs);
+      const entry = {
+        resolve: () => {
+          clearTimeout(timeoutId);
+          resolve();
+        },
+        reject: (err: Error) => {
+          clearTimeout(timeoutId);
+          reject(err);
+        },
+        timeoutId
+      };
+      this.streamReadyWaiters.push(entry);
+    });
+  }
+
+  private removeStreamReadyWaiter(entry: (typeof this.streamReadyWaiters)[number]): void {
+    const index = this.streamReadyWaiters.indexOf(entry);
+    if (index >= 0) {
+      this.streamReadyWaiters.splice(index, 1);
+    }
+  }
+
+  private resolveStreamReadyWaiters(): void {
+    for (const waiter of this.streamReadyWaiters) {
+      clearTimeout(waiter.timeoutId);
+      waiter.resolve();
+    }
+    this.streamReadyWaiters = [];
+  }
+
+  private rejectStreamReadyWaiters(err: Error): void {
+    for (const waiter of this.streamReadyWaiters) {
+      clearTimeout(waiter.timeoutId);
+      waiter.reject(err);
+    }
+    this.streamReadyWaiters = [];
+  }
+
+  private async ensureDemoStreamReady(config: ResolvedChatConfig): Promise<void> {
+    const ready = this.waitForDemoStreamReady(config.warmupTimeoutMs);
+    this.startDemoStream();
+    await ready;
   }
 
   public async ensureServiceReady(): Promise<void> {
@@ -774,23 +832,56 @@ export class ChatManager {
     }
   }
 
-  private closeStream(): void {
+  private abortStreamConnection(): void {
+    if (this.streamReconnectTimer) {
+      clearTimeout(this.streamReconnectTimer);
+      this.streamReconnectTimer = null;
+    }
     this.streamAbort?.abort();
     this.streamAbort = null;
     this.streamParser = new ChatSseStreamParser();
   }
 
+  private closeStream(): void {
+    this.abortStreamConnection();
+    this.rejectStreamReadyWaiters(new Error('Chat stream closed'));
+  }
+
   private startDemoStream(): void {
-    void this.openDemoStream().catch((err: unknown) => {
-      if (this.streamAbort?.signal.aborted) {
-        return;
+    if (this.streamOpenInFlight) {
+      return;
+    }
+    this.streamOpenInFlight = this.openDemoStream()
+      .catch((err: unknown) => {
+        if (this.streamAbort?.signal.aborted) {
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        this.rejectStreamReadyWaiters(
+          err instanceof Error ? err : new Error(message)
+        );
+        this.setState(
+          'ready',
+          `${this.statusText || 'Connected'} — live updates unavailable (${message}). You can still send messages.`
+        );
+      })
+      .finally(() => {
+        this.streamOpenInFlight = null;
+      });
+  }
+
+  private scheduleStreamReconnect(): void {
+    if (this.streamReconnectTimer || !this.session?.accessToken) {
+      return;
+    }
+    const baseStatus = this.statusText.replace(/ — reconnecting…$/, '');
+    this.setState('ready', `${baseStatus || 'Connected'} — reconnecting…`);
+    this.streamReconnectTimer = setTimeout(() => {
+      this.streamReconnectTimer = null;
+      if (this.session?.accessToken) {
+        this.startDemoStream();
       }
-      const message = err instanceof Error ? err.message : String(err);
-      this.setState(
-        'ready',
-        `${this.statusText || 'Connected'} — live updates unavailable (${message}). You can still send messages.`
-      );
-    });
+    }, 2_000);
   }
 
   private async openDemoStream(): Promise<void> {
@@ -799,7 +890,7 @@ export class ChatManager {
       return;
     }
 
-    this.closeStream();
+    this.abortStreamConnection();
     this.streamAbort = new AbortController();
     const signal = this.streamAbort.signal;
 
@@ -831,14 +922,15 @@ export class ChatManager {
           const chunk = decoder.decode(value, { stream: true });
           const patches = this.streamParser.push(chunk);
           for (const patch of patches) {
-            this.applySignalPatch(patch);
+            this.applySignalPatch(patch, 'stream');
           }
+        }
+        if (!signal.aborted) {
+          this.scheduleStreamReconnect();
         }
       } catch {
         if (!signal.aborted) {
-          this.serviceWarmed = false;
-          this.setState('ready', `${this.statusText || 'Connected'} — reconnecting…`);
-          this.startDemoStream();
+          this.scheduleStreamReconnect();
         }
       }
     })();
