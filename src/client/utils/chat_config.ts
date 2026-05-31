@@ -29,7 +29,12 @@ const DEFAULT_CHAT: ResolvedChatConfig = {
   allowedUsers: []
 };
 
-/** Direct Chat Slayer URL on static hosts without a reverse proxy (injected at build from deployment settings). */
+/** Static hosts where Netlify/Pages redirects cannot proxy chunked SSE (see CHAT.md). */
+function usesDirectChatSlayerUpstream(hostname: string): boolean {
+  return hostname.endsWith('.github.io') || hostname.endsWith('.netlify.app');
+}
+
+/** Direct Chat Slayer URL on static hosts without a working SSE proxy (injected at build). */
 function resolveServiceUrlForHost(configured: string): string {
   if (configured !== __CHAT_PROXY_PREFIX__) {
     return configured;
@@ -37,8 +42,7 @@ function resolveServiceUrlForHost(configured: string): string {
   if (typeof window === 'undefined') {
     return configured;
   }
-  // GitHub Pages is static-only — no nginx/Netlify proxy for the configured prefix.
-  if (window.location.hostname.endsWith('.github.io')) {
+  if (usesDirectChatSlayerUpstream(window.location.hostname)) {
     return __CHAT_DIRECT_UPSTREAM_URL__;
   }
   return configured;
