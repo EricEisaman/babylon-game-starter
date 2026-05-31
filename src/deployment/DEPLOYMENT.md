@@ -150,8 +150,52 @@ flowchart TD
 | ----------- | --------------------- |
 | Render web-service | Updates `render.yaml`, Docker-oriented defaults |
 | Render static | Static-site style in `render.yaml` |
-| Netlify static | `netlify.toml` with SPA fallback |
+| Netlify static | `netlify.toml` with SPA fallback and optional chat redirect |
 | GitHub Pages static | `.github/workflows/deploy-github-pages.yml` (`static.githubPages.deployBranch`, default `gh-deploy`) |
+
+---
+
+## Chat proxy (Chat Slayer)
+
+When chat is enabled with `"serviceUrl": "/chat-api"` in [`chat/config.json`](../../src/client/public/chat/config.json), the browser calls a **same-origin path**; each host materializes a reverse proxy to Chat Slayer. Player-facing config and CORS are documented in [CHAT.md](../../CHAT.md).
+
+### Three layers
+
+| Layer | Source | Purpose |
+| ----- | ------ | ------- |
+| 1 — Shared default | [`chat-proxy.defaults.mjs`](chat-proxy.defaults.mjs) | `DEFAULT_CHAT_PROXY_PREFIX` (`/chat-api`) and `DEFAULT_CHAT_UPSTREAM_URL` (default Chat Slayer origin) |
+| 2 — Host adapter | Optional `chat` in `settings.mjs` | `mode` (`same-origin-proxy` \| `direct`), `materializer` — inferred from `host` when omitted |
+| 3 — Env override | `CHAT_UPSTREAM_URL` | Override upstream at Render container start or Netlify/build CI (https origin only) |
+
+**Inferred defaults when `chat` is omitted:**
+
+| Host | `mode` | `materializer` |
+| ---- | ------ | -------------- |
+| `github.io` | `direct` | `none` (client uses build-time direct URL on `*.github.io`) |
+| `netlify` | `same-origin-proxy` | `netlify-redirect` |
+| `render.com` web-service | `same-origin-proxy` | `nginx` |
+
+Optional explicit shape in `settings.mjs`:
+
+```js
+chat: {
+  mode: 'same-origin-proxy',
+  materializer: 'netlify-redirect',
+  proxyPrefix: '/chat-api',
+  upstreamUrl: 'https://chat-slayer.onrender.com' // optional; defaults from chat-proxy.defaults.mjs
+}
+```
+
+When `mode` is `same-origin-proxy`, prepare validates that `chat/config.json` `serviceUrl` matches `proxyPrefix`.
+
+### What `npm run deploy:prepare` generates
+
+- **`deploy/chat-proxy.env.defaults`** — nginx defaults (`CHAT_UPSTREAM_URL`, `CHAT_PROXY_PREFIX`, `CHAT_PROXY_HOST`)
+- **Netlify** — `/chat-api/*` redirect in `netlify.toml` (before SPA fallback)
+- **Render Docker** — template at [`templates/nginx.chat-proxy.conf.template`](templates/nginx.chat-proxy.conf.template); [`docker-entrypoint.sh`](../../docker-entrypoint.sh) runs `envsubst` at container start into `/etc/nginx/conf.d/chat-proxy.conf` (included from [`nginx.conf`](../../nginx.conf))
+- **Vite** — dev proxy and build-time `__CHAT_PROXY_PREFIX__` / `__CHAT_DIRECT_UPSTREAM_URL__` defines ([`vite.config.ts`](../../vite.config.ts))
+
+Do **not** hand-edit nginx chat location blocks or Netlify redirect targets — run `npm run deploy:prepare` on the deploy branch and commit the generated files.
 
 ---
 
@@ -161,6 +205,7 @@ flowchart TD
 
 - **`base`** when `host` is `github.io` and `type` is `static`
 - **Dev proxy** map: `routePrefix` → `http://localhost:<localPort>` for services that define `localPort`
+- **Chat dev proxy** — `/chat-api` → resolved upstream when `chat.mode` is `same-origin-proxy`
 - **Social meta tags** — `static.publicUrl` (and branding `social.siteUrl` fallback) for absolute Open Graph / Twitter URLs in `index.html`; see [BRANDING.md — Social link previews](../../BRANDING.md#social-link-previews)
 
 ---
@@ -260,6 +305,8 @@ With this config, `npm run dev` proxies `/api/multiplayer/*` → `localhost:5000
 | Missing `src/server/<name>` | Non-empty unique `name`; prepare exited 0 |
 | Extra languages in Docker image | Current `services` list; run `node src/deployment/scripts/runtime-install-plan.mjs` |
 | Missing Netlify / Pages files | `host` and `type` in `settings.mjs`; re-run `npm run deploy:prepare` |
+| Chat `/chat-api` 404 on Netlify or Render | Run `npm run deploy:prepare` on the deploy branch; commit generated `netlify.toml` or redeploy Docker with updated `deploy/chat-proxy.env.defaults` |
+| Wrong Chat Slayer upstream in production | Set `CHAT_UPSTREAM_URL` (https origin) on Render or Netlify build env; re-run prepare locally if needed |
 
 ---
 
