@@ -161,6 +161,7 @@ flowchart TD
 
 - **`base`** when `host` is `github.io` and `type` is `static`
 - **Dev proxy** map: `routePrefix` → `http://localhost:<localPort>` for services that define `localPort`
+- **Social meta tags** — `static.publicUrl` (and branding `social.siteUrl` fallback) for absolute Open Graph / Twitter URLs in `index.html`; see [BRANDING.md — Social link previews](../../BRANDING.md#social-link-previews)
 
 ---
 
@@ -212,9 +213,10 @@ preserved settings files (on deployment targets) fail the affected matrix job an
 
 ### Static host quick notes
 
-- **github.io** — `host: github.io`, `type: static`, set `static.basePath` and optional `static.githubPages`, run `npm run deploy:prepare`, commit workflow. **Forks:** [FORK_GITHUB_SETUP.md](../../FORK_GITHUB_SETUP.md). **Pages:** [GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](../../GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md).
-- **netlify** — `host: netlify`, `type: static`, prepare, commit `netlify.toml`. Include any backend services (e.g. the Go multiplayer server) in `services[]` with a `localPort` so the Vite dev proxy routes local API calls correctly. `localPort` is ignored by Netlify at deploy time — it only activates the dev proxy.
+- **github.io** — `host: github.io`, `type: static`, set `static.basePath`, optional `static.publicUrl` and `static.githubPages`, run `npm run deploy:prepare`, commit workflow. **Forks:** [FORK_GITHUB_SETUP.md](../../FORK_GITHUB_SETUP.md). **Pages:** [GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](../../GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md). **Social previews:** [BRANDING.md — Social link previews](../../BRANDING.md#social-link-previews).
+- **netlify** — `host: netlify`, `type: static`, prepare, commit `netlify.toml`. Include any backend services (e.g. the Go multiplayer server) in `services[]` with a `localPort` so the Vite dev proxy routes local API calls correctly. `localPort` is ignored by Netlify at deploy time — it only activates the dev proxy. Set `static.publicUrl` on **`netlify-deployment`** for link previews ([BRANDING.md](../../BRANDING.md#social-link-previews)).
 - **render static** — `host: render.com`, `type: static`, prepare.
+- **render web-service** — set `static.publicUrl` on **`render-deploy`** when shipping the SPA from Render ([BRANDING.md](../../BRANDING.md#social-link-previews)).
 
 **Netlify + local multiplayer example** (`settings.mjs`):
 
@@ -231,7 +233,8 @@ const deploymentSettings = {
     }
   ],
   static: {
-    basePath: '/'
+    basePath: '/',
+    publicUrl: 'https://your-site.netlify.app'
   }
 };
 ```

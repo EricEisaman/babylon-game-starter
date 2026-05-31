@@ -37,16 +37,27 @@ function normalizePublicUrl(publicUrl) {
 }
 
 /**
+ * Join canonical site root with a branding asset path.
+ * `publicUrl` is the deployed site root (may include a Vite base subpath).
+ * Asset paths in config (`/branding/...`) are relative to that root — do not apply `base` again.
  * @param {string} publicUrl
  * @param {string} assetPath
  * @param {string} base
  * @returns {string}
  */
 export function toAbsolutePublicUrl(publicUrl, assetPath, base) {
-  const origin = normalizePublicUrl(publicUrl);
+  const siteRoot = normalizePublicUrl(publicUrl);
+  const strippedAsset = assetPath.replace(/^\/+/, '');
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+  const baseSegment = normalizedBase.replace(/^\/+|\/+$/g, '');
+
+  if (baseSegment && siteRoot.endsWith(`/${baseSegment}`)) {
+    return `${siteRoot}/${strippedAsset}`;
+  }
+
   const pathWithBase = toManifestPath(assetPath, base);
-  const normalizedPath = pathWithBase.startsWith('/') ? pathWithBase : `/${pathWithBase}`;
-  return `${origin}${normalizedPath}`;
+  const pathname = pathWithBase.startsWith('/') ? pathWithBase : `/${pathWithBase}`;
+  return `${siteRoot}${pathname}`;
 }
 
 /**

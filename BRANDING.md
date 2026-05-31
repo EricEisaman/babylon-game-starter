@@ -80,7 +80,58 @@ Injected into `dist/index.html` at build time for link previews.
 | `imageType` | string | MIME type (default `image/png`) |
 | `twitterCard` | string | Usually `summary_large_image` |
 
-**Absolute URLs:** `og:image` and `og:url` require full HTTPS URLs. Set `static.publicUrl` in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) per deployment host (preserved on deploy branches). Optional `social.siteUrl` in branding is the fallback when settings omit `publicUrl`.
+**Absolute URLs:** `og:image` and `og:url` require full HTTPS URLs. See [Social link previews](#social-link-previews) for where to set them.
+
+---
+
+## Social link previews
+
+Open Graph and Twitter Card tags are written into **`dist/index.html` at build time**. Discord, Slack, iMessage, and similar crawlers read that static HTML — they do not run your app JavaScript.
+
+### Where canonical URLs come from
+
+At build time, [`vite.config.ts`](vite.config.ts) resolves absolute `og:url` and `og:image` from:
+
+1. **`static.publicUrl`** in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) (preferred), then
+2. **`social.siteUrl`** in [`config.json`](src/client/public/branding/config.json) (fallback)
+
+If neither is set, **`og:url` and absolute `og:image` / `twitter:image` are omitted** from the built HTML. Title, description, and other tags still render.
+
+### Per-host `publicUrl` (deploy branches)
+
+Each deployment target has its **own** `settings.mjs`. The [feature tag sync workflow](FEATURE_RELEASE.md) **preserves** those files on `gh-deploy`, `netlify-deployment`, and `render-deploy` — values you set on `main` or another branch do **not** automatically apply elsewhere.
+
+Set `static.publicUrl` on **each branch you build and deploy** to that host's live URL (no trailing slash required):
+
+| Host | Branch (typical) | Example `publicUrl` |
+| ---- | ---------------- | ------------------- |
+| GitHub Pages (project site) | `gh-deploy` | `https://ericeisaman.github.io/babylon-game-starter` |
+| Netlify | `netlify-deployment` | `https://your-site.netlify.app` |
+| Render (web service SPA) | `render-deploy` | `https://your-service.onrender.com` |
+
+Example (`gh-deploy` / GitHub Pages):
+
+```js
+static: {
+  basePath: '/babylon-game-starter/',
+  publicUrl: 'https://ericeisaman.github.io/babylon-game-starter'
+}
+```
+
+Example (Netlify or Render at site root):
+
+```js
+static: {
+  basePath: '/',
+  publicUrl: 'https://your-site.netlify.app'
+}
+```
+
+After editing settings on a deploy branch, rebuild and redeploy. Validate locally with `npm run social:test`.
+
+### Branding-only fallback
+
+If you cannot set `publicUrl` on a deploy branch yet, add **`social.siteUrl`** to `config.json` with your primary public demo URL. That applies to **every** build that uses that branding file — use it only when one canonical URL is correct for all hosts, or as a temporary fallback.
 
 ---
 
@@ -100,10 +151,11 @@ Injected into `dist/index.html` at build time for link previews.
    npm run build && npm run preview
    ```
 
-5. Validate full installability:
+5. Validate installability and social previews:
 
    ```sh
    npm run pwa:test
+   npm run social:test
    ```
 
 ---
@@ -127,14 +179,14 @@ Injected into `dist/index.html` at build time for link previews.
 
 - **Cache strategy:** CacheFirst (local-first) for static assets, branding files, GitHub-hosted models, and Babylon CDN scripts. Configured in [`vite.config.ts`](vite.config.ts).
 - **Updates:** When a new build deploys, a versioned service worker waits in the background. **Settings → Update App** applies the update.
-- **Purge:** **Settings → Purge Cache** clears all caches, unregisters the service worker, and reloads.
-- **Registration:** [`src/client/pwa/pwa_client.ts`](src/client/pwa/pwa_client.ts), wired from [`src/client/main.ts`](src/client/main.ts) only.
+- **Purge:** **Settings → Purge Cache** clears all caches, unregisters the service worker, and reloads. Use this once after a deploy if you see `importScripts` / Workbox errors from a stale service worker (common when `sw.js` was previously cached aggressively).
+- **Registration:** [`src/client/pwa/pwa_client.ts`](src/client/pwa/pwa_client.ts), wired from [`src/client/main.ts`](src/client/main.ts) only (deferred via `requestIdleCallback` so Babylon init is not blocked).
 
 ### iPad Safari install (Share → Add to Home Screen)
 
 iPadOS Safari does **not** support Chrome’s automatic install prompt. This starter implements the recommended coach pattern:
 
-- **iOS meta tags** — `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-touch-icon` (set in [`branding_config.ts`](src/client/utils/branding_config.ts)).
+- **iOS meta tags** — `mobile-web-app-capable`, `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-touch-icon` (set in [`branding_config.ts`](src/client/utils/branding_config.ts)).
 - **Repeat-visit coach** — After the second visit in Safari on iPad (not already installed), a modal explains: *Tap Share → Add to Home Screen*.
 - **Settings → Install App** — On iPad Safari, opens the Share → Add to Home Screen coach modal. On Chromium (desktop/Android), triggers the browser’s native install prompt directly.
 
@@ -164,7 +216,13 @@ Runs `npm run build`, validates `config.json` and `dist/` artifacts, starts `vit
 
 ## Deployment
 
-Branding paths are relative to the Vite `base` URL (same as the rest of the static site). If favicon or loading-screen assets 404 after deploy, verify `static.basePath` in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) matches the live URL. For social previews, also set `static.publicUrl` to the canonical HTTPS origin + path (no trailing slash required).
+Branding paths are relative to the Vite **`base`** URL (same as the rest of the static site). If favicon or loading-screen assets 404 after deploy, verify **`static.basePath`** in [`src/deployment/settings/settings.mjs`](src/deployment/settings/settings.mjs) matches the live URL.
+
+For **social link previews**, set **`static.publicUrl`** on each deployment branch you ship — see [Social link previews](#social-link-previews).
+
+Host-specific guides:
 
 - [GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md](GITHUB_PAGES_STATIC_SITE_DEPLOYMENT.md)
 - [NETLIFY_STATIC_SITE_DEPLOYMENT.md](NETLIFY_STATIC_SITE_DEPLOYMENT.md)
+- [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
+- [src/deployment/DEPLOYMENT.md](src/deployment/DEPLOYMENT.md) — settings model and feature-tag sync

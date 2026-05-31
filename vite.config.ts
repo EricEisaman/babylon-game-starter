@@ -117,7 +117,14 @@ export default defineConfig({
     open: false,
     host: '0.0.0.0',
     strictPort: false,
-    proxy: serviceProxy
+    proxy: {
+      ...serviceProxy,
+      '/chat-api': {
+        target: 'https://chat-slayer.onrender.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/chat-api/, '')
+      }
+    }
   },
   build: {
     target: 'ES2020',
@@ -148,6 +155,7 @@ export default defineConfig({
               globIgnores: ['**/playground.json', '**/playground/**'],
               navigateFallback: 'index.html',
               maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+              cleanupOutdatedCaches: true,
               runtimeCaching: cacheFirstRuntime
             },
             devOptions: {

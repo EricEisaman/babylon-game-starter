@@ -138,6 +138,7 @@ The default game is unchanged. To try the optional **SynapticLab** simulation de
 | URL | Effect |
 |-----|--------|
 | [`http://localhost:3000/?sim=1`](http://localhost:3000/?sim=1) | Enables state simulation, loads **SynapticLab**, HUD meters, DOM hunger vignette — see [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md) |
+| [`http://localhost:3000/?chatui=true`](http://localhost:3000/?chatui=true) | Dev: chat overlay UI with mock data (no Chat Slayer service) — see [CHAT.md](CHAT.md) |
 | `?overlay=Drug%20Hunger%20Vignette` | Dev: force an overlay catalog entry (use with `?sim=1`) |
 
 Or set `CONFIG.SIMULATION.ENABLED: true` in [`src/client/config/game_config.ts`](src/client/config/game_config.ts) and switch to **SynapticLab** in Settings.
@@ -205,7 +206,7 @@ eslint.config.js
 
 ## Documentation
 
-- **[BRANDING.md](BRANDING.md)** — Loading screen, favicon, and PWA manifest/icons/screenshots via `public/branding/config.json`
+- **[BRANDING.md](BRANDING.md)** — Loading screen, favicon, PWA manifest, and [social link previews](BRANDING.md#social-link-previews) via `public/branding/config.json` and `static.publicUrl`
 - **[docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md)** — `?sim=1`, SynapticLab gameplay, overlays, and playground testing
 - **[docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md)** — Particle, NME, and overlay catalog authoring
 - **[USERS_GUIDE.md](USERS_GUIDE.md)** — Architecture, configuration, behaviors, fall respawn, condensed narrative notes
