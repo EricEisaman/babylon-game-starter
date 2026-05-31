@@ -37,6 +37,8 @@ RUN CGO_ENABLED=0 go build -o /multiplayer-server .
 
 FROM nginx:alpine
 
+RUN apk add --no-cache gettext
+
 # Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 

@@ -30,6 +30,8 @@ envsubst '${CHAT_UPSTREAM_URL} ${CHAT_PROXY_PREFIX} ${CHAT_PROXY_HOST}' \
   < /etc/nginx/templates/chat-proxy.conf.template \
   > /etc/nginx/conf.d/chat-proxy.conf
 
+nginx -t
+
 # Go multiplayer binds :5000; nginx proxies /api/multiplayer/ there.
 PORT=5000 /usr/local/bin/multiplayer-server &
 exec nginx -g "daemon off;"
