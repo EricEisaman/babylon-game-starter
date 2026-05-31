@@ -63,6 +63,11 @@ if (multiplayerPrefix && serviceProxy[multiplayerPrefix]) {
 
 const cacheFirstRuntime = [
   {
+    urlPattern: ({ url }: { url: URL }) =>
+      url.pathname.startsWith('/chat-api/') || url.pathname.startsWith('/api/'),
+    handler: 'NetworkOnly' as const
+  },
+  {
     urlPattern: ({ request, sameOrigin }: { request: Request; sameOrigin: boolean }) =>
       sameOrigin &&
       (request.destination === 'image' ||
@@ -154,6 +159,7 @@ export default defineConfig({
               globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2,json}'],
               globIgnores: ['**/playground.json', '**/playground/**'],
               navigateFallback: 'index.html',
+              navigateFallbackDenylist: [/^\/api\//, /^\/chat-api\//],
               maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
               cleanupOutdatedCaches: true,
               runtimeCaching: cacheFirstRuntime
