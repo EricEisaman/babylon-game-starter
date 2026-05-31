@@ -183,8 +183,28 @@ function createRenderYaml(settings) {
   return `services:\n  - type: web\n    name: babylon-game-starter\n    env: docker\n    plan: free\n    region: oregon\n    dockerfilePath: ./Dockerfile\n    dockerContext: .\n    healthCheckPath: /\n    autoDeploy: true\n    envVars:\n      - key: NODE_ENV\n        value: production\n      - key: PORT\n        value: 10000\n`;
 }
 
+const CHAT_SLAYER_ORIGIN = 'https://chat-slayer.onrender.com';
+
 function createNetlifyToml() {
-  return `[build]\ncommand = "npm ci && npm run build"\npublish = "dist"\n\n[build.environment]\nNODE_VERSION = "22"\nNODE_OPTIONS = "--max-old-space-size=4096"\n\n[[redirects]]\nfrom = "/*"\nto = "/index.html"\nstatus = 200\n`;
+  return `[build]
+command = "npm ci && npm run build"
+publish = "dist"
+
+[build.environment]
+NODE_VERSION = "22"
+NODE_OPTIONS = "--max-old-space-size=4096"
+
+[[redirects]]
+from = "/chat-api/*"
+to = "${CHAT_SLAYER_ORIGIN}/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+`;
 }
 
 function createGithubPagesWorkflow(settings) {

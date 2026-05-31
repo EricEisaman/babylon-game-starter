@@ -75,6 +75,15 @@ function normalizeFingerprint(hex: string): string {
   return hex.trim().toLowerCase();
 }
 
+function isHtmlErrorBody(body: string): boolean {
+  const lower = body.trim().toLowerCase();
+  return (
+    lower.startsWith('<!doctype') ||
+    lower.startsWith('<html') ||
+    lower.includes('<title>page not found</title>')
+  );
+}
+
 function formatChatHttpError(status: number, body: string, config: ResolvedChatConfig): string {
   const trimmedBody = body.trim();
   let serverMessage = trimmedBody;
@@ -85,6 +94,12 @@ function formatChatHttpError(status: number, body: string, config: ResolvedChatC
     }
   } catch {
     // Body is plain text or non-JSON.
+  }
+
+  if (isHtmlErrorBody(trimmedBody)) {
+    return (
+      'Chat API unreachable at /chat-api. Configure a host proxy (Netlify redirect or Render nginx). See CHAT.md.'
+    );
   }
 
   if (status === 403 && serverMessage.toLowerCase().includes('unknown or missing client id')) {
