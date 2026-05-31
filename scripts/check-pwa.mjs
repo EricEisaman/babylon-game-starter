@@ -149,6 +149,23 @@ async function validateDistArtifacts(base, resolved) {
   const swPath = path.join(distDir, 'sw.js');
   assert(await fileExists(swPath), 'dist/sw.js service worker is missing');
 
+  const swText = await fs.readFile(swPath, 'utf8');
+  assert(swText.includes('precache'), 'dist/sw.js does not look like a Workbox service worker');
+
+  const workboxImportMatch =
+    swText.match(/importScripts\(["'](workbox-[a-f0-9]+\.js)["']\)/) ??
+    swText.match(/define\(\["\.\/(workbox-[a-f0-9]+)"\]/);
+  if (workboxImportMatch) {
+    const workboxFile = workboxImportMatch[1].endsWith('.js')
+      ? workboxImportMatch[1]
+      : `${workboxImportMatch[1]}.js`;
+    const workboxPath = path.join(distDir, workboxFile);
+    assert(
+      await fileExists(workboxPath),
+      `dist/sw.js imports missing companion: ${workboxFile}`
+    );
+  }
+
   console.log('dist/ PWA artifacts: OK');
 }
 
@@ -260,6 +277,29 @@ async function validatePreviewInstallability(previewUrl, basePath) {
   const swText = await swRes.text();
   assert(swText.includes('precache'), 'preview sw.js does not look like a Workbox service worker');
 
+  const swCacheControl = swRes.headers.get('cache-control') ?? '';
+  assert(
+    !/immutable/i.test(swCacheControl),
+    `preview sw.js must not be cached as immutable (got: ${swCacheControl || 'none'})`
+  );
+
+  const workboxImportMatch =
+    swText.match(/importScripts\(["'](workbox-[a-f0-9]+\.js)["']\)/) ??
+    swText.match(/define\(\["\.\/(workbox-[a-f0-9]+)"\]/);
+  if (workboxImportMatch) {
+    const workboxFile = workboxImportMatch[1].endsWith('.js')
+      ? workboxImportMatch[1]
+      : `${workboxImportMatch[1]}.js`;
+    const workboxUrl = new URL(workboxFile, previewUrl).href;
+    const workboxRes = await fetch(workboxUrl);
+    assert(workboxRes.ok, `preview workbox companion fetch failed: ${workboxRes.status} ${workboxUrl}`);
+    const workboxCacheControl = workboxRes.headers.get('cache-control') ?? '';
+    assert(
+      !/immutable/i.test(workboxCacheControl),
+      `preview workbox companion must not be cached as immutable (got: ${workboxCacheControl || 'none'})`
+    );
+  }
+
   const indexRes = await fetch(indexUrl);
   assert(indexRes.ok, `preview index fetch failed: ${indexRes.status}`);
   const indexHtml = await indexRes.text();
@@ -270,8 +310,9 @@ async function validatePreviewInstallability(previewUrl, basePath) {
   assert(
     indexHtml.includes('branding_config?.ts') ||
       indexHtml.includes('branding_config') ||
-      indexHtml.includes('apple-mobile-web-app-capable'),
-    'index.html must load branding_config (iOS PWA meta tags applied at runtime)'
+      indexHtml.includes('apple-mobile-web-app-capable') ||
+      indexHtml.includes('mobile-web-app-capable'),
+    'index.html must load branding_config (PWA meta tags applied at runtime)'
   );
 
   console.log('Preview installability (HTTP): OK');
