@@ -97,5 +97,13 @@ export interface InventoryConfig {
   readonly TILES: readonly Tile[];
 }
 
+export interface ChatUiConfig {
+  readonly HEADING_TEXT: string;
+  readonly PANEL_WIDTH_RATIO: number;
+  readonly FULL_SCREEN_THRESHOLD: number;
+  readonly Z_INDEX: number;
+  readonly BUTTON_Z_INDEX: number;
+}
+
 // Import ItemEffectKind from config to avoid circular dependency
 import type { ItemEffectKind } from './config';

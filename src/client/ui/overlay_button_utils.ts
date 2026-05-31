@@ -11,9 +11,14 @@ const ACTIVATION_DEBOUNCE_MS = 400;
 
 export type OverlayCorner = 'bottom-left' | 'bottom-right';
 
+/** Bottom-left stack: chat above settings. */
+export type OverlayBottomLeftSlot = 'chat' | 'settings';
+
 export interface OverlayButtonStyleOptions {
   corner: OverlayCorner;
   zIndex: number;
+  /** When `corner` is bottom-left, places chat above settings. */
+  bottomLeftSlot?: OverlayBottomLeftSlot;
 }
 
 export interface OverlayButtonLayout {
@@ -42,14 +47,20 @@ export function shouldUseMobileOverlayLayout(): boolean {
   return DeviceDetector.isMobileDevice() || document.getElementById('mobile-joystick') != null;
 }
 
-export function getOverlayButtonLayout(corner: OverlayCorner): OverlayButtonLayout {
+export function getOverlayButtonLayout(
+  corner: OverlayCorner,
+  bottomLeftSlot: OverlayBottomLeftSlot = 'settings'
+): OverlayButtonLayout {
   const margin = DESKTOP_CORNER_INSET;
+  const stackedOffset =
+    bottomLeftSlot === 'chat' ? OVERLAY_BUTTON_SIZE + 12 : 0;
 
   if (shouldUseMobileOverlayLayout()) {
     if (corner === 'bottom-left') {
+      const slot = bottomLeftSlot === 'chat' ? MOBILE_CONTROLS.OVERLAY.CHAT : MOBILE_CONTROLS.OVERLAY.SETTINGS;
       return {
-        bottom: MOBILE_CONTROLS.OVERLAY.SETTINGS.BOTTOM,
-        left: MOBILE_CONTROLS.OVERLAY.SETTINGS.LEFT
+        bottom: slot.BOTTOM,
+        left: slot.LEFT
       };
     }
     return {
@@ -59,7 +70,7 @@ export function getOverlayButtonLayout(corner: OverlayCorner): OverlayButtonLayo
   }
 
   if (corner === 'bottom-left') {
-    return { bottom: margin, left: margin };
+    return { bottom: margin + stackedOffset, left: margin };
   }
   return { bottom: margin, right: margin };
 }
@@ -85,7 +96,7 @@ export function applyOverlayButtonBaseStyles(
   el: HTMLElement,
   options: OverlayButtonStyleOptions
 ): void {
-  const layout = getOverlayButtonLayout(options.corner);
+  const layout = getOverlayButtonLayout(options.corner, options.bottomLeftSlot);
   const positionCss = layoutToCss(layout);
   const zIndex = shouldUseMobileOverlayLayout() ? MOBILE_CONTROLS.OVERLAY_Z_INDEX : options.zIndex;
 
@@ -113,8 +124,12 @@ export function applyOverlayButtonBaseStyles(
   `;
 }
 
-export function repositionOverlayButton(el: HTMLElement, corner: OverlayCorner): void {
-  const layout = getOverlayButtonLayout(corner);
+export function repositionOverlayButton(
+  el: HTMLElement,
+  corner: OverlayCorner,
+  bottomLeftSlot: OverlayBottomLeftSlot = 'settings'
+): void {
+  const layout = getOverlayButtonLayout(corner, bottomLeftSlot);
   el.style.top = '';
   el.style.bottom = layout.bottom != null ? `${layout.bottom}px` : '';
   el.style.left = layout.left != null ? `${layout.left}px` : '';
@@ -123,6 +138,7 @@ export function repositionOverlayButton(el: HTMLElement, corner: OverlayCorner):
 
 let settingsPanelOpen = false;
 let inventoryPanelOpen = false;
+let chatPanelOpen = false;
 
 /** Hide corner trigger so it does not cover controls. */
 export function setOverlayTriggerVisible(el: HTMLElement | null, visible: boolean): void {
@@ -134,17 +150,19 @@ export function setOverlayTriggerVisible(el: HTMLElement | null, visible: boolea
 }
 
 function syncCornerOverlayTriggers(): void {
-  const showTriggers = !settingsPanelOpen && !inventoryPanelOpen;
+  const showTriggers = !settingsPanelOpen && !inventoryPanelOpen && !chatPanelOpen;
   const settings = document.getElementById('settings-button');
+  const chat = document.getElementById('chat-button');
   const inventory = document.getElementById('inventory-button');
   setOverlayTriggerVisible(settings instanceof HTMLElement ? settings : null, showTriggers);
+  setOverlayTriggerVisible(chat instanceof HTMLElement ? chat : null, showTriggers);
   setOverlayTriggerVisible(inventory instanceof HTMLElement ? inventory : null, showTriggers);
   if (showTriggers) {
     repositionAllOverlayButtons();
   }
 }
 
-export type OverlayPanelId = 'settings' | 'inventory';
+export type OverlayPanelId = 'settings' | 'inventory' | 'chat';
 
 const OVERLAY_PANEL_OPEN_EVENT = 'overlay-panel-open';
 
@@ -186,11 +204,21 @@ export function setInventoryPanelOpen(open: boolean): void {
   syncCornerOverlayTriggers();
 }
 
+/** Call when chat panel opens or closes. */
+export function setChatPanelOpen(open: boolean): void {
+  chatPanelOpen = open;
+  syncCornerOverlayTriggers();
+}
+
 export function repositionAllOverlayButtons(): void {
   const settings = document.getElementById('settings-button');
+  const chat = document.getElementById('chat-button');
   const inventory = document.getElementById('inventory-button');
+  if (chat instanceof HTMLElement) {
+    repositionOverlayButton(chat, 'bottom-left', 'chat');
+  }
   if (settings instanceof HTMLElement) {
-    repositionOverlayButton(settings, 'bottom-left');
+    repositionOverlayButton(settings, 'bottom-left', 'settings');
   }
   if (inventory instanceof HTMLElement) {
     repositionOverlayButton(inventory, 'bottom-right');

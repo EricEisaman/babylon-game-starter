@@ -24,6 +24,7 @@ import {
 } from './pwa/pwa_client';
 import { initChromiumInstallPrompt } from './pwa/pwa_install';
 import { loadBrandingConfig } from './utils/branding_config';
+import { loadChatConfig } from './utils/chat_config';
 import { devLog } from './utils/dev_log';
 import {
   isInstallOfferAvailable,
@@ -129,6 +130,7 @@ async function initialize(): Promise<void> {
   try {
     devLog('[Main] Initializing Babylon Game Starter...');
     await loadBrandingConfig();
+    await loadChatConfig();
     registerPwaRuntime({
       isSupported: isPwaSupportedImpl,
       isUpdateAvailable: isPwaUpdateAvailableImpl,
