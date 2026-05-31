@@ -150,7 +150,16 @@ function formatChatFetchError(
   if (usingProxy) {
     return `Chat request failed (${requestUrl}). Check that the /chat-api proxy is configured on your host and Chat Slayer is reachable. See CHAT.md.`;
   }
-  return `Chat server blocked or unreachable from ${origin}. Add ${origin} to Chat Slayer ALLOWED_CLIENTS for clientId "${config.clientId}", or set serviceUrl to "/chat-api" for same-origin proxy. See CHAT.md.`;
+  if (origin.endsWith('.github.io')) {
+    return (
+      `Chat server blocked or unreachable from ${origin}. Add ${origin} to Chat Slayer ALLOWED_CLIENTS ` +
+      `for clientId "${config.clientId}" (host only — no /repo path). See CHAT.md.`
+    );
+  }
+  return (
+    `Chat server blocked or unreachable from ${origin}. Add ${origin} to Chat Slayer ALLOWED_CLIENTS ` +
+    `for clientId "${config.clientId}", or set serviceUrl to "/chat-api" for same-origin proxy. See CHAT.md.`
+  );
 }
 
 export class ChatManager {
