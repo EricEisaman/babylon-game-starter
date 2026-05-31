@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "serviceUrl": "/chat-api",
+  "clientId": "web-demo",
+  "roomMode": "per-environment",
+  "gameRoomName": "Lobby"
+}

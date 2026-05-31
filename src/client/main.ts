@@ -24,6 +24,7 @@ import {
 } from './pwa/pwa_client';
 import { initChromiumInstallPrompt } from './pwa/pwa_install';
 import { loadBrandingConfig } from './utils/branding_config';
+import { loadChatConfig } from './utils/chat_config';
 import { devLog } from './utils/dev_log';
 import {
   isInstallOfferAvailable,
@@ -122,6 +123,17 @@ async function initializeRuntimeGlobals(): Promise<void> {
   }
 }
 
+function scheduleInitPwa(): void {
+  const run = (): void => {
+    void initPwa();
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 2000 });
+  } else {
+    setTimeout(run, 0);
+  }
+}
+
 /**
  * Initializes the application
  */
@@ -129,6 +141,7 @@ async function initialize(): Promise<void> {
   try {
     devLog('[Main] Initializing Babylon Game Starter...');
     await loadBrandingConfig();
+    await loadChatConfig();
     registerPwaRuntime({
       isSupported: isPwaSupportedImpl,
       isUpdateAvailable: isPwaUpdateAvailableImpl,
@@ -144,7 +157,7 @@ async function initialize(): Promise<void> {
     initChromiumInstallPrompt();
     recordPwaVisit();
     maybeShowInstallCoach();
-    void initPwa();
+    scheduleInitPwa();
     await loadInspectorIfDev();
 
     // Get canvas element
