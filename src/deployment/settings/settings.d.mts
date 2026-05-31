@@ -1,3 +1,3 @@
-declare const deploymentSettings: import('../types/settings').DeploymentSettings<'github.io'>;
+declare const deploymentSettings: import('../types/settings').DeploymentSettings<'netlify'>;
 
 export default deploymentSettings;

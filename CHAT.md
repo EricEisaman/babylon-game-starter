@@ -97,6 +97,7 @@ When using a **cross-origin** `serviceUrl` (for example `https://chat-slayer.onr
 | CORS error on `GET /health` during warmup | Chat Slayer build without health CORS | Deploy latest **chat-slayer** (`/health` echoes `Origin`; game warmup uses a simple GET without client header). |
 | `403` on `/demo/actions/*` or `/demo/stream` (other messages) | Origin not listed for your `clientId` | Confirm `ALLOWED_CLIENTS` includes your deployed game origin under the same `id` as `clientId`. |
 | `400` + `Invalid datastar signals` on `GET /demo/stream` | Stream opened with Bearer auth instead of Datastar query param | Deploy a client that passes `{ "accessToken": "..." }` in the `datastar` query param on `GET /demo/stream`. POST actions use JSON body; only the stream uses the query param. |
+| `404` on `/chat-api/*` from Netlify (HTML error in chat status) | Static host has no `/chat-api` proxy | Redeploy **`netlify-deployment`** with updated `netlify.toml` (`/chat-api/*` → Chat Slayer). See [NETLIFY_STATIC_SITE_DEPLOYMENT.md](NETLIFY_STATIC_SITE_DEPLOYMENT.md). |
 
 Deploy **chat-slayer** before relying on cross-origin warmup from a hosted game.
 

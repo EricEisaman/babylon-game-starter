@@ -32,14 +32,19 @@ export type EndpointService =
   | GoEndpointService
   | PythonEndpointService;
 
+/** CI metadata for GitHub Pages when `host` is `github.io`. */
+export interface GithubPagesDeploymentConfig {
+  /** Branch that triggers a production Pages deploy on `push`. Defaults to `gh-deploy`. */
+  deployBranch?: string;
+  /** GitHub Actions `environment` name for the deploy job. Defaults to `github-pages`. */
+  environmentName?: string;
+}
+
 export interface StaticDeploymentConfig {
   basePath?: `/${string}`;
   /** Canonical public site URL for Open Graph (no trailing slash required). */
   publicUrl?: string;
-  githubPages?: {
-    deployBranch?: string;
-    environmentName?: string;
-  };
+  githubPages?: GithubPagesDeploymentConfig;
 }
 
 export type HostTypeCompatibility<H extends DeploymentHost> = H extends 'github.io' | 'netlify'
