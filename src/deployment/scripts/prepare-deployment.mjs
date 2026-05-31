@@ -2,6 +2,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import deploymentSettings from '../settings/settings.mjs';
+import { validateChatProxyConfig } from '../chat-proxy/validate.mjs';
 
 const repoRoot = path.resolve(process.cwd());
 
@@ -182,31 +183,49 @@ function createRenderYaml(settings) {
     return `services:\n  - type: static_site\n    name: babylon-game-starter\n    buildCommand: npm ci && npm run build\n    staticPublishPath: ./dist\n    pullRequestPreviewsEnabled: false\n    envVars:\n      - key: NODE_VERSION\n        value: 22\n`;
   }
 
-  return `services:\n  - type: web\n    name: babylon-game-starter\n    env: docker\n    plan: free\n    region: oregon\n    dockerfilePath: ./Dockerfile\n    dockerContext: .\n    healthCheckPath: /\n    autoDeploy: true\n    envVars:\n      - key: NODE_ENV\n        value: production\n      - key: PORT\n        value: 10000\n`;
+  return `services:\n  - type: web\n    name: babylon-game-starter\n    env: docker\n    plan: free\n    region: oregon\n    dockerfilePath: ./Dockerfile\n    dockerContext: .\n    healthCheckPath: /\n    autoDeploy: true\n    envVars:\n      - key: NODE_ENV\n        value: production\n      - key: PORT\n        value: 10000\n      # Optional: override Chat Slayer upstream (https origin). Defaults from deploy/chat-proxy.env.defaults.\n      # - key: CHAT_UPSTREAM_URL\n      #   value: https://chat-slayer.onrender.com\n`;
 }
 
-const CHAT_SLAYER_ORIGIN = 'https://chat-slayer.onrender.com';
+function createNetlifyToml(resolved) {
+  const chatRedirect =
+    resolved.mode === 'same-origin-proxy' && resolved.materializer === 'netlify-redirect'
+      ? `
+[[redirects]]
+from = "${resolved.proxyPrefix}/*"
+to = "${resolved.upstreamUrl}/:splat"
+status = 200
+force = true
+`
+      : '';
 
-function createNetlifyToml() {
   return `[build]
-command = "npm ci && npm run build"
+command = "npm ci && npm run deploy:prepare && npm run build"
 publish = "dist"
 
 [build.environment]
 NODE_VERSION = "22"
 NODE_OPTIONS = "--max-old-space-size=4096"
-
-[[redirects]]
-from = "/chat-api/*"
-to = "${CHAT_SLAYER_ORIGIN}/:splat"
-status = 200
-force = true
-
+${chatRedirect}
 [[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200
 `;
+}
+
+async function writeChatProxyArtifacts(resolved) {
+  const deployDir = path.join(repoRoot, 'deploy');
+  await writeFile(
+    path.join(deployDir, 'chat-proxy.env.defaults'),
+    [
+      '# Defaults for nginx chat proxy. Regenerate: npm run deploy:prepare',
+      '# Override at runtime: CHAT_UPSTREAM_URL (https origin only)',
+      `CHAT_UPSTREAM_URL=${resolved.upstreamUrl}`,
+      `CHAT_PROXY_PREFIX=${resolved.proxyPrefix}`,
+      `CHAT_PROXY_HOST=${resolved.upstreamHost}`,
+      ''
+    ].join('\n')
+  );
 }
 
 function createGithubPagesWorkflow(settings) {
@@ -217,13 +236,13 @@ function createGithubPagesWorkflow(settings) {
   return `name: Deploy GitHub Pages\n\non:\n  push:\n    branches: [${branchesYaml}]\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  pages: write\n  id-token: write\n\nconcurrency:\n  group: "pages"\n  cancel-in-progress: true\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci\n      - run: npm run build\n      - uses: actions/upload-pages-artifact@v3\n        with:\n          path: dist\n\n  deploy:\n    environment:\n      name: ${environmentYaml}\n      url: \${{ steps.deployment.outputs.page_url }}\n    runs-on: ubuntu-latest\n    needs: build\n    steps:\n      - id: deployment\n        uses: actions/deploy-pages@v4\n`;
 }
 
-async function writeHostArtifacts(settings) {
+async function writeHostArtifacts(settings, resolved) {
   if (settings.host === 'render.com') {
     await writeFile(path.join(repoRoot, 'render.yaml'), createRenderYaml(settings));
   }
 
   if (settings.host === 'netlify' && settings.type === 'static') {
-    await writeFile(path.join(repoRoot, 'netlify.toml'), createNetlifyToml());
+    await writeFile(path.join(repoRoot, 'netlify.toml'), createNetlifyToml(resolved));
   }
 
   if (settings.host === 'github.io' && settings.type === 'static') {
@@ -237,14 +256,20 @@ async function writeHostArtifacts(settings) {
 async function main() {
   validateSettings(deploymentSettings);
 
+  const resolved = await validateChatProxyConfig(repoRoot, deploymentSettings);
+
   for (const service of deploymentSettings.services ?? []) {
     await scaffoldService(service);
   }
 
-  await writeHostArtifacts(deploymentSettings);
+  await writeChatProxyArtifacts(resolved);
+  await writeHostArtifacts(deploymentSettings, resolved);
 
   console.log(`Prepared deployment for host=${deploymentSettings.host} type=${deploymentSettings.type}`);
   console.log(`Services: ${(deploymentSettings.services ?? []).map((s) => s.name).join(', ') || '(none)'}`);
+  console.log(
+    `Chat proxy: mode=${resolved.mode} materializer=${resolved.materializer} prefix=${resolved.proxyPrefix} upstream=${resolved.upstreamUrl}`
+  );
 }
 
 main().catch((error) => {

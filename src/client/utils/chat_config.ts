@@ -29,6 +29,21 @@ const DEFAULT_CHAT: ResolvedChatConfig = {
   allowedUsers: []
 };
 
+/** Direct Chat Slayer URL on static hosts without a reverse proxy (injected at build from deployment settings). */
+function resolveServiceUrlForHost(configured: string): string {
+  if (configured !== __CHAT_PROXY_PREFIX__) {
+    return configured;
+  }
+  if (typeof window === 'undefined') {
+    return configured;
+  }
+  // GitHub Pages is static-only — no nginx/Netlify proxy for the configured prefix.
+  if (window.location.hostname.endsWith('.github.io')) {
+    return __CHAT_DIRECT_UPSTREAM_URL__;
+  }
+  return configured;
+}
+
 let cachedConfig: ResolvedChatConfig | null = null;
 let loadPromise: Promise<ResolvedChatConfig> | null = null;
 
@@ -65,7 +80,10 @@ function resolveChatConfig(raw: ChatConfig): ResolvedChatConfig {
 
   return {
     enabled,
-    serviceUrl: enabled && raw.serviceUrl ? normalizeServiceUrl(raw.serviceUrl) : '',
+    serviceUrl:
+      enabled && raw.serviceUrl
+        ? normalizeServiceUrl(resolveServiceUrlForHost(raw.serviceUrl))
+        : '',
     clientId: raw.clientId?.trim() ?? DEFAULT_CHAT.clientId,
     roomMode,
     gameRoomName: raw.gameRoomName?.trim() ?? DEFAULT_CHAT.gameRoomName,

@@ -10,6 +10,8 @@ import {
   renderSocialMetaHtml,
   resolveBrandingConfig
 } from './src/deployment/branding/load_branding_config.mjs';
+import { resolveChatProxy } from './src/deployment/chat-proxy/resolve.mjs';
+import { validateChatProxyConfig } from './src/deployment/chat-proxy/validate.mjs';
 import deploymentSettings from './src/deployment/settings/settings';
 
 import type { EndpointService } from './src/deployment/types/settings';
@@ -19,6 +21,7 @@ import type { EndpointService } from './src/deployment/types/settings';
 // the real workspace and breaks the HTML entry / dev server.
 const clientRoot = fileURLToPath(new URL('./src/client/', import.meta.url));
 const distOutDir = fileURLToPath(new URL('./dist/', import.meta.url));
+const repoRoot = fileURLToPath(new URL('.', import.meta.url));
 
 const isStaticGithub =
   deploymentSettings.host === 'github.io' && deploymentSettings.type === 'static';
@@ -30,6 +33,22 @@ const webManifest = buildWebManifest(brandingResolved, base);
 const publicUrl = deploymentSettings.static?.publicUrl;
 const socialMetaTags = buildSocialMetaTags(brandingResolved, { base, publicUrl });
 const socialMetaHtml = renderSocialMetaHtml(socialMetaTags);
+
+const chatProxy = resolveChatProxy(deploymentSettings, process.env);
+const chatProxyPrefixPattern = new RegExp(
+  `^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`
+);
+
+const chatDevProxy =
+  chatProxy.mode === 'same-origin-proxy'
+    ? {
+        [chatProxy.proxyPrefix]: {
+          target: chatProxy.upstreamUrl,
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(new RegExp(`^${chatProxy.proxyPrefix}`), '')
+        }
+      }
+    : {};
 
 // Longer prefixes must win: `/api` matches `/api/multiplayer/*` if registered first,
 // sending multiplayer traffic to the wrong backend (Node :8787 vs Go :5000).
@@ -64,7 +83,7 @@ if (multiplayerPrefix && serviceProxy[multiplayerPrefix]) {
 const cacheFirstRuntime = [
   {
     urlPattern: ({ url }: { url: URL }) =>
-      url.pathname.startsWith('/chat-api/') || url.pathname.startsWith('/api/'),
+      chatProxyPrefixPattern.test(url.pathname) || url.pathname.startsWith('/api/'),
     handler: 'NetworkOnly' as const
   },
   {
@@ -114,62 +133,71 @@ const cacheFirstRuntime = [
   }
 ];
 
-export default defineConfig({
-  root: clientRoot,
-  base,
-  server: {
-    port: 3000,
-    open: false,
-    host: '0.0.0.0',
-    strictPort: false,
-    proxy: {
-      ...serviceProxy,
-      '/chat-api': {
-        target: 'https://chat-slayer.onrender.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/chat-api/, '')
-      }
-    }
-  },
-  build: {
-    target: 'ES2020',
-    outDir: distOutDir,
-    sourcemap: true,
-    emptyOutDir: true
-  },
-  plugins: [
-    {
-      name: 'branding-social-meta',
-      transformIndexHtml(html) {
-        const withTitle = html.replace(
-          /<title>[^<]*<\/title>/,
-          `<title>${socialMetaTags.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>`
-        );
-        return withTitle.replace('</head>', `    ${socialMetaHtml}\n</head>`);
+export default defineConfig(async () => {
+  await validateChatProxyConfig(repoRoot, deploymentSettings);
+
+  return {
+    root: clientRoot,
+    base,
+    define: {
+      __CHAT_PROXY_PREFIX__: JSON.stringify(chatProxy.proxyPrefix),
+      __CHAT_DIRECT_UPSTREAM_URL__: JSON.stringify(chatProxy.upstreamUrl)
+    },
+    server: {
+      port: 3000,
+      open: false,
+      host: '0.0.0.0',
+      strictPort: false,
+      proxy: {
+        ...serviceProxy,
+        ...chatDevProxy
       }
     },
-    ...(brandingResolved.pwa.enabled
-      ? [
-          VitePWA({
-            registerType: 'prompt',
-            injectRegister: false,
-            includeAssets: ['branding/**/*'],
-            manifest: webManifest,
-            workbox: {
-              globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2,json}'],
-              globIgnores: ['**/playground.json', '**/playground/**'],
-              navigateFallback: 'index.html',
-              navigateFallbackDenylist: [/^\/api\//, /^\/chat-api\//],
-              maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
-              cleanupOutdatedCaches: true,
-              runtimeCaching: cacheFirstRuntime
-            },
-            devOptions: {
-              enabled: true,
-              type: 'module'
-            }
-          })
-        ]
-      : [])
-  ]
+    build: {
+      target: 'ES2020',
+      outDir: distOutDir,
+      sourcemap: true,
+      emptyOutDir: true
+    },
+    plugins: [
+      {
+        name: 'branding-social-meta',
+        transformIndexHtml(html: string) {
+          const withTitle = html.replace(
+            /<title>[^<]*<\/title>/,
+            `<title>${socialMetaTags.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>`
+          );
+          return withTitle.replace('</head>', `    ${socialMetaHtml}\n</head>`);
+        }
+      },
+      ...(brandingResolved.pwa.enabled
+        ? [
+            VitePWA({
+              registerType: 'prompt',
+              injectRegister: false,
+              includeAssets: ['branding/**/*'],
+              manifest: webManifest,
+              workbox: {
+                globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2,json}'],
+                globIgnores: ['**/playground.json', '**/playground/**'],
+                navigateFallback: 'index.html',
+                navigateFallbackDenylist: [
+                  /^\/api\//,
+                  new RegExp(
+                    `^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`
+                  )
+                ],
+                maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+                cleanupOutdatedCaches: true,
+                runtimeCaching: cacheFirstRuntime
+              },
+              devOptions: {
+                enabled: true,
+                type: 'module'
+              }
+            })
+          ]
+        : [])
+    ]
+  };
 });
