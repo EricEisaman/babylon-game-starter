@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "serviceUrl": "/chat-api",
-  "clientId": "babylon-game",
+  "clientId": "web-demo",
   "roomMode": "per-environment",
   "gameRoomName": "Lobby"
 }

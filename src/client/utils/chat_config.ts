@@ -15,7 +15,7 @@ import { isQueryFlagEnabled } from './query_hook';
 const DEFAULT_CHAT: ResolvedChatConfig = {
   enabled: false,
   serviceUrl: '',
-  clientId: 'babylon-game',
+  clientId: 'web-demo',
   roomMode: 'per-environment',
   gameRoomName: 'Lobby',
   roomNamePrefix: '',

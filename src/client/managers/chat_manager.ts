@@ -76,6 +76,37 @@ function normalizeFingerprint(hex: string): string {
   return hex.trim().toLowerCase();
 }
 
+function formatChatHttpError(
+  status: number,
+  body: string,
+  config: ResolvedChatConfig
+): string {
+  let serverMessage = '';
+  try {
+    const json = JSON.parse(body) as { error?: string };
+    if (typeof json.error === 'string' && json.error.trim()) {
+      serverMessage = json.error.trim();
+    }
+  } catch {
+    // Body is plain text or non-JSON.
+  }
+
+  if (
+    status === 403 &&
+    serverMessage.toLowerCase().includes('unknown or missing client id')
+  ) {
+    return (
+      `Chat client id "${config.clientId}" is not registered on Chat Slayer. ` +
+      'Set clientId in chat/config.json to a known ALLOWED_CLIENTS id (e.g. "web-demo"). See CHAT.md.'
+    );
+  }
+
+  if (serverMessage) {
+    return serverMessage;
+  }
+  return body.trim() || `HTTP ${status}`;
+}
+
 function formatChatFetchError(err: unknown, config: ResolvedChatConfig, requestUrl: string): string {
   if (err instanceof Error && err.message && err.message !== 'Failed to fetch') {
     return err.message;
@@ -641,7 +672,7 @@ export class ChatManager {
       }
       if (!response.ok) {
         const body = await response.text();
-        throw new Error(body || `HTTP ${response.status}`);
+        throw new Error(formatChatHttpError(response.status, body, config));
       }
       return response;
     } catch (err) {
