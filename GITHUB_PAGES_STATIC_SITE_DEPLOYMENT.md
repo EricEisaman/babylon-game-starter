@@ -111,7 +111,7 @@ Custom servers must allow CORS from `https://<owner>.github.io` (path is not par
 | **`main` not allowed** on **Deploy GitHub Pages** | Run from **`gh-deploy`**, not **`main`** |
 | **`gh-deploy` not allowed** | Add **`gh-deploy`** under **Environments → github-pages** |
 | **`assert_deploy_branch`** failed | Wrong branch for manual run or fix **`on.push.branches`** / **`deployBranch`** |
-| Chat blocked on Pages (CORS) | Add `https://<owner>.github.io` (**no path**) to Chat Slayer `web-demo` origins; see [CHAT.md — ALLOWED_CLIENTS](CHAT.md#clientid-and-allowed_clients) |
+| Chat blocked on Pages (CORS) | Add `https://<owner>.github.io` (**no path**) to Chat Slayer `web-demo` origins; see [CHAT.md — ALLOWED_CLIENTS](CHAT.md#clientid-and-allowed_clients). On Pages, `/chat-api` in config resolves to the build-time default upstream (not a host proxy) — see [src/deployment/DEPLOYMENT.md — Chat proxy](src/deployment/DEPLOYMENT.md#chat-proxy-chat-slayer). |
 
 ## See also
 

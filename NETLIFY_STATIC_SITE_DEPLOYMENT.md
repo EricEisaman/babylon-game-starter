@@ -88,7 +88,7 @@ The generated `netlify.toml` pins the static build settings used by Netlify:
 
 ```toml
 [build]
-command = "npm ci && npm run build"
+command = "npm ci && npm run deploy:prepare && npm run build"
 publish = "dist"
 
 [build.environment]
@@ -107,7 +107,9 @@ to = "/index.html"
 status = 200
 ```
 
-When chat is enabled (`serviceUrl: "/chat-api"` in `chat/config.json`), the **`/chat-api/*`** redirect proxies same-origin to Chat Slayer (same pattern as Render nginx). It must appear **before** the SPA `/*` fallback. Regenerate via `npm run prepare:deployment` on the **`netlify-deployment`** branch.
+The `/chat-api/*` redirect target is **generated** from [`src/deployment/chat-proxy.defaults.mjs`](src/deployment/chat-proxy.defaults.mjs) when you run prepare (default upstream shown above). Override with `CHAT_UPSTREAM_URL` in Netlify build environment variables before deploy if you use a non-default Chat Slayer host.
+
+When chat is enabled (`serviceUrl: "/chat-api"` in `chat/config.json`), the **`/chat-api/*`** redirect proxies same-origin to Chat Slayer (same pattern as Render nginx). It must appear **before** the SPA `/*` fallback. Regenerate via `npm run deploy:prepare` on the **`netlify-deployment`** branch. See [src/deployment/DEPLOYMENT.md — Chat proxy](src/deployment/DEPLOYMENT.md#chat-proxy-chat-slayer).
 
 `NODE_OPTIONS` raises the Node heap for Vite's production build; the `npm run build` script also sets the same heap limit so local and hosted builds behave consistently. The Babylon Inspector is loaded only in Vite development, so production builds should not bundle the Inspector's React/Fluent UI dependency graph.
 
@@ -126,6 +128,7 @@ This produces the static assets under `dist/`.
 In your Netlify site settings, add the environment variables:
 
 - `VITE_MULTIPLAYER_HOST` — optional, set only when using a custom multiplayer server
+- `CHAT_UPSTREAM_URL` — optional, https origin only; overrides default Chat Slayer upstream when Netlify runs `deploy:prepare` during build
 - `NODE_ENV=production` — optional, but recommended for production builds
 - `NODE_VERSION=22` and `NODE_OPTIONS=--max-old-space-size=4096` are already provided by `netlify.toml`; only override them in the Netlify UI if you intentionally want different build runtime settings.
 
