@@ -304,6 +304,14 @@ export const CONFIG: GameConfig = {
     TILES: [] // Tiles will be added dynamically by InventoryManager
   },
 
+  CHAT: {
+    HEADING_TEXT: 'Chat',
+    PANEL_WIDTH_RATIO: 1 / 3,
+    FULL_SCREEN_THRESHOLD: 500,
+    Z_INDEX: 1800,
+    BUTTON_Z_INDEX: 2000
+  },
+
   // Multiplayer: forks can point the client at their own Go server without editing this block
   // by setting VITE_MULTIPLAYER_HOST in .env / .env.local (see repo .env.example).
   // Students running the exported playground snippet can override at runtime via
