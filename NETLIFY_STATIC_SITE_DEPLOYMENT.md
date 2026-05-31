@@ -61,7 +61,8 @@ const deploymentSettings = {
     }
   ],
   static: {
-    basePath: '/'
+    basePath: '/',
+    publicUrl: 'https://your-site.netlify.app'
   }
 };
 
@@ -71,6 +72,7 @@ export default deploymentSettings;
 - `host: 'netlify'` and `type: 'static'` are required.
 - `services` should include the multiplayer Go server entry with `localPort: 5000`. This tells the Vite dev server to proxy `/api/multiplayer/*` → `localhost:5000` when running `npm run dev` locally, so that `npm run dev:multiplayer` is reachable from the browser. **`localPort` is only used by the Vite dev proxy — it has no effect on the Netlify build or deployment.** Omitting the service entry (leaving `services: []`) causes every multiplayer API call to 404 in local dev.
 - `basePath` controls the deployed base URL if you publish to a subpath; `/` is the default.
+- `publicUrl` is the canonical HTTPS URL for Open Graph / Twitter Card tags at build time. Set it on the **`netlify-deployment`** branch (not only on `main`). See [BRANDING.md — Social link previews](BRANDING.md#social-link-previews).
 
 ### Step 2: Prepare deployment artifacts
 
@@ -155,6 +157,12 @@ Deploy the generated site through Netlify as usual:
 ## Troubleshooting
 
 - If the page loads without favicon or loading-screen logo, check that `static.basePath` matches the deployed path; branding assets under `src/client/public/branding/` use the same Vite base path as the rest of the build. See [BRANDING.md](BRANDING.md) for the full config reference and PWA asset requirements.
+- If shared links show no preview image or wrong URL, set **`static.publicUrl`** on **`netlify-deployment`** to your Netlify site URL and redeploy. See [BRANDING.md — Social link previews](BRANDING.md#social-link-previews).
 - If the site loads but multiplayer fails, open the browser console and confirm the client is probing the expected host.
 - If using a custom host, confirm the server responds to `/api/multiplayer/health` and that CORS allows the site origin.
 - If multiplayer should be disabled, verify `CONFIG.MULTIPLAYER.ENABLED` is `false` and not overwritten by another build-time setting.
+
+## See also
+
+- **[BRANDING.md](BRANDING.md)** — PWA, loading screen, and [social link previews](BRANDING.md#social-link-previews) (`static.publicUrl` on `netlify-deployment`)
+- **[src/deployment/DEPLOYMENT.md](src/deployment/DEPLOYMENT.md)** — Settings model and feature-tag sync

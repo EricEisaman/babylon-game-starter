@@ -45,6 +45,7 @@ const deploymentSettings = {
   ],
   static: {
     basePath: '/babylon-game-starter/',
+    publicUrl: 'https://ericeisaman.github.io/babylon-game-starter',
     githubPages: {
       deployBranch: 'gh-deploy',
       environmentName: 'github-pages'
@@ -54,6 +55,7 @@ const deploymentSettings = {
 ```
 
 - **`basePath`**: repo subpath with slashes, or `'/'` for user/org site or custom domain at root.
+- **`publicUrl`**: canonical HTTPS URL for Open Graph / Twitter Card tags (see [BRANDING.md — Social link previews](BRANDING.md#social-link-previews)).
 - **`githubPages`**: optional; defaults above if omitted.
 
 ### 2. Generate workflow
@@ -104,6 +106,7 @@ Custom servers must allow CORS from `https://<owner>.github.io` (path is not par
 | Symptom | Action |
 | ------- | ------ |
 | Broken assets / favicon | Match **`basePath`** to the live URL; see [BRANDING.md](BRANDING.md) |
+| Weak or missing link previews (Discord, Slack) | Set **`static.publicUrl`** on **`gh-deploy`** to your Pages URL; see [BRANDING.md — Social link previews](BRANDING.md#social-link-previews) |
 | **`pages build and deployment`** fails on **`main`** | **Pages → Source** = **GitHub Actions** ([fork checklist](FORK_GITHUB_SETUP.md)) |
 | **`main` not allowed** on **Deploy GitHub Pages** | Run from **`gh-deploy`**, not **`main`** |
 | **`gh-deploy` not allowed** | Add **`gh-deploy`** under **Environments → github-pages** |
@@ -111,6 +114,7 @@ Custom servers must allow CORS from `https://<owner>.github.io` (path is not par
 
 ## See also
 
+- **[BRANDING.md](BRANDING.md)** — Loading screen, PWA, and [social link previews](BRANDING.md#social-link-previews) (`static.publicUrl`)
 - **[FORK_GITHUB_SETUP.md](FORK_GITHUB_SETUP.md)** — Fork one-time GitHub settings
 - **[FEATURE_RELEASE.md](FEATURE_RELEASE.md)** — **`feature/**`** tag → sync PRs
 - **[src/deployment/DEPLOYMENT.md](src/deployment/DEPLOYMENT.md)** — Settings model and other hosts

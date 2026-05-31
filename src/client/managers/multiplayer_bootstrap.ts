@@ -4,6 +4,7 @@
 
 import { ASSETS } from '../config/assets';
 import { CONFIG } from '../config/game_config';
+import { LOCAL_DEV_DEBUG } from '../config/local_dev';
 import {
   applyRemoteConfiguredCollections,
   applyRemoteConfiguredItemState,
@@ -27,6 +28,7 @@ import {
   deriveWireAnimToken,
   yawRadiansToWireQuaternion
 } from '../utils/multiplayer_serialization';
+import { isQueryFlagEnabled } from '../utils/query_hook';
 
 import { CollectiblesManager } from './collectibles_manager';
 import { getMultiplayerManager } from './multiplayer_manager';
@@ -50,6 +52,10 @@ import type {
 
 const SYNC_INTERVAL_MS = 80;
 const WORLD_PHYS_SYNC_MS = 120;
+
+function isSyncGateDebugEnabled(): boolean {
+  return import.meta.env.DEV || isQueryFlagEnabled(LOCAL_DEV_DEBUG.paramName);
+}
 
 function vec3FromMesh(m: BABYLON.AbstractMesh): [number, number, number] {
   const p = m.position;
@@ -777,21 +783,22 @@ export async function initMultiplayerAfterCharacterReady(
         void mp.updateItemState(worldUpdate);
       }
 
-      // Periodic publish-gate diagnostic: log once every 10 s so silent publish
-      // failures surface without flooding the console (Appendix B.8).
-      const nowMs = Date.now();
-      if (nowMs - lastPublishDiagMs >= 10_000) {
-        lastPublishDiagMs = nowMs;
-        const selfId = authorityTracker.getSelfClientId();
-        const envAuth = authorityTracker.getEnvAuthority(envNow);
-        const snapshotApplied = authorityTracker.hasSnapshotAppliedFor(envNow);
-        const isSelf = selfId && envAuth === selfId;
-        console.warn(
-          `[SYNC_GATE] env="${envNow}" selfId="${selfId}" envAuth="${envAuth}" isEnvAuth=${isSelf} ` +
-            `snapshotApplied=${snapshotApplied} isSynchronizer=${mp.isSynchronizer()} ` +
-            `items=${itemStates.length} included=${includedCount} excluded=${excludedCount} ` +
-            `updateRows=${worldUpdate?.updates?.length ?? 0}`
-        );
+      // Periodic publish-gate diagnostic: log once every 10 s when ?debug=1 (Appendix B.8).
+      if (isSyncGateDebugEnabled()) {
+        const nowMs = Date.now();
+        if (nowMs - lastPublishDiagMs >= 10_000) {
+          lastPublishDiagMs = nowMs;
+          const selfId = authorityTracker.getSelfClientId();
+          const envAuth = authorityTracker.getEnvAuthority(envNow);
+          const snapshotApplied = authorityTracker.hasSnapshotAppliedFor(envNow);
+          const isSelf = selfId && envAuth === selfId;
+          console.warn(
+            `[SYNC_GATE] env="${envNow}" selfId="${selfId}" envAuth="${envAuth}" isEnvAuth=${isSelf} ` +
+              `snapshotApplied=${snapshotApplied} isSynchronizer=${mp.isSynchronizer()} ` +
+              `items=${itemStates.length} included=${includedCount} excluded=${excludedCount} ` +
+              `updateRows=${worldUpdate?.updates?.length ?? 0}`
+          );
+        }
       }
     }
 
