@@ -1,8 +1,14 @@
-/** @type {import('../types/settings').DeploymentSettings<'github.io'>} */
+/** @type {import('../types/settings').DeploymentSettings<'render.com'>} */
 const deploymentSettings = {
-  host: 'github.io',
-  type: 'static',
+  host: 'render.com',
+  type: 'web-service',
   services: [
+    {
+      name: 'api',
+      type: 'node',
+      routePrefix: '/api',
+      localPort: 8787
+    },
     {
       name: 'multiplayer',
       type: 'go',
@@ -11,8 +17,7 @@ const deploymentSettings = {
     }
   ],
   static: {
-    basePath: '/babylon-game-starter/',
-    publicUrl: 'https://ericeisaman.github.io/babylon-game-starter/'
+    basePath: '/'
   }
 };
 

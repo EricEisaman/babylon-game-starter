@@ -44,7 +44,7 @@ const DEFAULT_BRANDING: ResolvedBrandingConfig = {
   },
   social: {
     title: 'Babylon Game Starter',
-    description: 'A modular 3D browser game built with Babylon.js',
+    description: 'A modular 3D browser game platform built with Babylon.js',
     siteName: 'Babylon Game Starter',
     image: '/branding/screenshots/og-card.png',
     imageWidth: 1200,
@@ -207,6 +207,7 @@ function applyPwaHeadTags(config: ResolvedBrandingConfig): void {
 
   const appleTitle = pwa.shortName || pwa.name;
   const iosMetaTags: [string, string][] = [
+    ['mobile-web-app-capable', 'yes'],
     ['apple-mobile-web-app-capable', 'yes'],
     ['apple-mobile-web-app-title', appleTitle],
     ['apple-mobile-web-app-status-bar-style', 'black-translucent']

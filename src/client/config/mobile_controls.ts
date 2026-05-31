@@ -7,6 +7,8 @@ const BUTTON_SIZE = 72;
 const BUTTON_SPACING = 12;
 const JOYSTICK_DIAMETER = 60 * 2;
 const OVERLAY_GAP = 12;
+const OVERLAY_BUTTON_SIZE = 50;
+const OVERLAY_BUTTON_GAP = 12;
 
 export const MOBILE_CONTROLS = {
   EDGE_INSET,
@@ -40,8 +42,13 @@ export const MOBILE_CONTROLS = {
       RIGHT: EDGE_INSET
     }
   },
-  /** Settings / inventory sit above gameplay controls (no overlap with joystick or actions). */
+  /** Chat / settings / inventory sit above gameplay controls (no overlap with joystick or actions). */
   OVERLAY: {
+    CHAT: {
+      BOTTOM:
+        EDGE_INSET + JOYSTICK_DIAMETER + OVERLAY_GAP + OVERLAY_BUTTON_SIZE + OVERLAY_BUTTON_GAP,
+      LEFT: EDGE_INSET
+    },
     SETTINGS: {
       BOTTOM: EDGE_INSET + JOYSTICK_DIAMETER + OVERLAY_GAP,
       LEFT: EDGE_INSET

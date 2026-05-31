@@ -138,6 +138,7 @@ The default game is unchanged. To try the optional **SynapticLab** simulation de
 | URL | Effect |
 |-----|--------|
 | [`http://localhost:3000/?sim=1`](http://localhost:3000/?sim=1) | Enables state simulation, loads **SynapticLab**, HUD meters, DOM hunger vignette — see [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md) |
+| [`http://localhost:3000/?chatui=true`](http://localhost:3000/?chatui=true) | Dev: chat overlay UI with mock data (no Chat Slayer service) — see [CHAT.md](CHAT.md) |
 | `?overlay=Drug%20Hunger%20Vignette` | Dev: force an overlay catalog entry (use with `?sim=1`) |
 
 Or set `CONFIG.SIMULATION.ENABLED: true` in [`src/client/config/game_config.ts`](src/client/config/game_config.ts) and switch to **SynapticLab** in Settings.
