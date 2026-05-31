@@ -28,7 +28,7 @@ export CHAT_PROXY_HOST="${CHAT_PROXY_HOST:?CHAT_PROXY_HOST is required}"
 
 envsubst '${CHAT_UPSTREAM_URL} ${CHAT_PROXY_PREFIX} ${CHAT_PROXY_HOST}' \
   < /etc/nginx/templates/chat-proxy.conf.template \
-  > /etc/nginx/conf.d/chat-proxy.conf
+  > /etc/nginx/snippets/chat-proxy.conf
 
 nginx -t
 

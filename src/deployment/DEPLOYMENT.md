@@ -192,7 +192,7 @@ When `mode` is `same-origin-proxy`, prepare validates that `chat/config.json` `s
 
 - **`deploy/chat-proxy.env.defaults`** — nginx defaults (`CHAT_UPSTREAM_URL`, `CHAT_PROXY_PREFIX`, `CHAT_PROXY_HOST`)
 - **Netlify** — `/chat-api/*` redirect in `netlify.toml` (before SPA fallback)
-- **Render Docker** — template at [`templates/nginx.chat-proxy.conf.template`](templates/nginx.chat-proxy.conf.template); [`docker-entrypoint.sh`](../../docker-entrypoint.sh) runs `envsubst` at container start into `/etc/nginx/conf.d/chat-proxy.conf` (included from [`nginx.conf`](../../nginx.conf))
+- **Render Docker** — template at [`templates/nginx.chat-proxy.conf.template`](templates/nginx.chat-proxy.conf.template); [`docker-entrypoint.sh`](../../docker-entrypoint.sh) runs `envsubst` at container start into `/etc/nginx/snippets/chat-proxy.conf` (included from [`nginx.conf`](../../nginx.conf); not under `conf.d/` so nginx does not load `location` at http context)
 - **Vite** — dev proxy and build-time `__CHAT_PROXY_PREFIX__` / `__CHAT_DIRECT_UPSTREAM_URL__` defines ([`vite.config.ts`](../../vite.config.ts))
 
 Do **not** hand-edit nginx chat location blocks or Netlify redirect targets — run `npm run deploy:prepare` on the deploy branch and commit the generated files.
