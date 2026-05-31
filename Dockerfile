@@ -26,7 +26,7 @@ RUN set -eux; \
 			done; \
 		fi
 
-RUN npm run build
+RUN npm run deploy:prepare && npm run build
 
 # Static Go binary for multiplayer (listens on :5000; nginx proxies /api/multiplayer/ here).
 FROM golang:1.24-alpine AS go-builder
@@ -42,8 +42,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 COPY --from=go-builder /multiplayer-server /usr/local/bin/multiplayer-server
 
-# Copy nginx config
+# Copy nginx config and chat proxy artifacts (from deploy:prepare in builder)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/deploy/chat-proxy.env.defaults /etc/nginx/chat-proxy.env.defaults
+COPY --from=builder /app/src/deployment/templates/nginx.chat-proxy.conf.template /etc/nginx/templates/chat-proxy.conf.template
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh /usr/local/bin/multiplayer-server
