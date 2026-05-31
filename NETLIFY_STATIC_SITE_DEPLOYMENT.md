@@ -94,7 +94,20 @@ publish = "dist"
 [build.environment]
 NODE_VERSION = "22"
 NODE_OPTIONS = "--max-old-space-size=4096"
+
+[[redirects]]
+from = "/chat-api/*"
+to = "https://chat-slayer.onrender.com/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
 ```
+
+When chat is enabled (`serviceUrl: "/chat-api"` in `chat/config.json`), the **`/chat-api/*`** redirect proxies same-origin to Chat Slayer (same pattern as Render nginx). It must appear **before** the SPA `/*` fallback. Regenerate via `npm run prepare:deployment` on the **`netlify-deployment`** branch.
 
 `NODE_OPTIONS` raises the Node heap for Vite's production build; the `npm run build` script also sets the same heap limit so local and hosted builds behave consistently. The Babylon Inspector is loaded only in Vite development, so production builds should not bundle the Inspector's React/Fluent UI dependency graph.
 

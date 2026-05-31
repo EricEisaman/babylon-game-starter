@@ -75,6 +75,15 @@ function normalizeFingerprint(hex: string): string {
   return hex.trim().toLowerCase();
 }
 
+function isHtmlErrorBody(body: string): boolean {
+  const lower = body.trim().toLowerCase();
+  return (
+    lower.startsWith('<!doctype') ||
+    lower.startsWith('<html') ||
+    lower.includes('<title>page not found</title>')
+  );
+}
+
 function formatChatHttpError(status: number, body: string, config: ResolvedChatConfig): string {
   const trimmedBody = body.trim();
   let serverMessage = trimmedBody;
@@ -85,6 +94,12 @@ function formatChatHttpError(status: number, body: string, config: ResolvedChatC
     }
   } catch {
     // Body is plain text or non-JSON.
+  }
+
+  if (isHtmlErrorBody(trimmedBody)) {
+    return (
+      'Chat API unreachable at /chat-api. Configure a host proxy (Netlify redirect or Render nginx). See CHAT.md.'
+    );
   }
 
   if (status === 403 && serverMessage.toLowerCase().includes('unknown or missing client id')) {
@@ -551,7 +566,13 @@ export class ChatManager {
     }
 
     if (Array.isArray(patch.inbox)) {
-      this.inbox = [...patch.inbox];
+      if (patch.inbox.length > 0) {
+        this.inbox = [...patch.inbox];
+      } else if (typeof patch.roomId === 'string' && patch.roomId.length > 0) {
+        // Empty inbox on room join = no history for this room; drop stale lines for it only.
+        this.inbox = this.inbox.filter((line) => line.room_id !== patch.roomId);
+      }
+      // Send acks include inbox:[] — ignore; stream room-message events carry new lines.
     } else if (patch.cs?.name === 'room-message' && patch.cs.payload) {
       const line = patch.cs.payload as ChatMessageLine;
       if (line.room_id === this.activeRoomId || !this.activeRoomId) {
