@@ -3,7 +3,13 @@
 // ============================================================================
 
 import type { EffectsConfig } from './effects';
-import type { ChatUiConfig, HUDConfig, HudMeterDefinition, InventoryConfig, SettingsConfig } from './ui';
+import type {
+  ChatUiConfig,
+  HUDConfig,
+  HudMeterDefinition,
+  InventoryConfig,
+  SettingsConfig
+} from './ui';
 
 export interface CharacterSpeed {
   readonly WALK: number;

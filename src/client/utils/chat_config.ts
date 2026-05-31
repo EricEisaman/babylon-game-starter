@@ -7,10 +7,10 @@
 // requests will fail CORS / 403. See ../chat-slayer/CLIENT_GUIDE.md and
 // ../chat-slayer/RENDER_DEPLOYMENT.md.
 
-import type { ChatConfig, ChatRoomMode, ResolvedChatConfig } from '../types/chat';
-
 import { withAppBasePath } from './branding_config';
 import { isQueryFlagEnabled } from './query_hook';
+
+import type { ChatConfig, ChatRoomMode, ResolvedChatConfig } from '../types/chat';
 
 const DEFAULT_CHAT: ResolvedChatConfig = {
   enabled: false,
@@ -59,17 +59,16 @@ function normalizeAllowedUsers(users: readonly string[] | undefined): readonly s
 
 function resolveChatConfig(raw: ChatConfig): ResolvedChatConfig {
   const enabled = raw.enabled === true;
-  const roomMode: ChatRoomMode =
-    raw.roomMode === 'game-wide' ? 'game-wide' : 'per-environment';
+  const roomMode: ChatRoomMode = raw.roomMode === 'game-wide' ? 'game-wide' : 'per-environment';
   const allowRegistration = raw.allowRegistration !== false;
   const allowedUsers = allowRegistration ? [] : normalizeAllowedUsers(raw.allowedUsers);
 
   return {
     enabled,
     serviceUrl: enabled && raw.serviceUrl ? normalizeServiceUrl(raw.serviceUrl) : '',
-    clientId: raw.clientId?.trim() || DEFAULT_CHAT.clientId,
+    clientId: raw.clientId?.trim() ?? DEFAULT_CHAT.clientId,
     roomMode,
-    gameRoomName: raw.gameRoomName?.trim() || DEFAULT_CHAT.gameRoomName,
+    gameRoomName: raw.gameRoomName?.trim() ?? DEFAULT_CHAT.gameRoomName,
     roomNamePrefix: raw.roomNamePrefix ?? DEFAULT_CHAT.roomNamePrefix,
     e2eeEnabled: raw.e2eeEnabled === true,
     tlsPinEnforced: raw.tlsPinEnforced === true,
@@ -143,11 +142,7 @@ export function getChatAllowedUsers(): readonly string[] {
 /** True when login is restricted to `allowedUsers` (non-empty, registration off). */
 export function isChatLoginRestrictedToAllowedUsers(): boolean {
   const config = cachedConfig;
-  return (
-    config !== null &&
-    !config.allowRegistration &&
-    config.allowedUsers.length > 0
-  );
+  return config !== null && !config.allowRegistration && config.allowedUsers.length > 0;
 }
 
 export function isChatUsernameAllowed(username: string): boolean {

@@ -56,9 +56,7 @@ export function parseDemoActionSseBody(body: string): ChatSignalPatch | null {
   for (const block of blocks) {
     const patch = extractSignalsFromEventBlock(block);
     if (patch) {
-      merged = merged
-        ? (Object.assign({}, merged, patch) as ChatSignalPatch)
-        : patch;
+      merged = merged ? Object.assign({}, merged, patch) : patch;
     }
   }
 

@@ -52,12 +52,12 @@ export function getOverlayButtonLayout(
   bottomLeftSlot: OverlayBottomLeftSlot = 'settings'
 ): OverlayButtonLayout {
   const margin = DESKTOP_CORNER_INSET;
-  const stackedOffset =
-    bottomLeftSlot === 'chat' ? OVERLAY_BUTTON_SIZE + 12 : 0;
+  const stackedOffset = bottomLeftSlot === 'chat' ? OVERLAY_BUTTON_SIZE + 12 : 0;
 
   if (shouldUseMobileOverlayLayout()) {
     if (corner === 'bottom-left') {
-      const slot = bottomLeftSlot === 'chat' ? MOBILE_CONTROLS.OVERLAY.CHAT : MOBILE_CONTROLS.OVERLAY.SETTINGS;
+      const slot =
+        bottomLeftSlot === 'chat' ? MOBILE_CONTROLS.OVERLAY.CHAT : MOBILE_CONTROLS.OVERLAY.SETTINGS;
       return {
         bottom: slot.BOTTOM,
         left: slot.LEFT

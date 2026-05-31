@@ -17,9 +17,9 @@ import type {
   ChatMessageLine,
   ChatRoomListEntry,
   ChatSession,
-  ChatSignalPatch
+  ChatSignalPatch,
+  ResolvedChatConfig
 } from '../types/chat';
-import type { ResolvedChatConfig } from '../types/chat';
 
 const SESSION_STORAGE_KEYS = {
   accessToken: 'bgs_chat_access_token',
@@ -31,8 +31,7 @@ const SESSION_STORAGE_KEYS = {
 const NORMAL_REQUEST_TIMEOUT_MS = 15_000;
 const CLIENT_HEADER = 'X-Chat-Slayer-Client-Id';
 const PREVIEW_SESSION_TOKEN = 'ui-preview';
-const PREVIEW_ERROR =
-  'UI preview — configure chat/config.json for live chat.';
+const PREVIEW_ERROR = 'UI preview — configure chat/config.json for live chat.';
 
 function previewRoomId(environmentName: string): string {
   return `!preview-${environmentName.replace(/\s+/g, '-').toLowerCase()}:local`;
@@ -76,11 +75,7 @@ function normalizeFingerprint(hex: string): string {
   return hex.trim().toLowerCase();
 }
 
-function formatChatHttpError(
-  status: number,
-  body: string,
-  config: ResolvedChatConfig
-): string {
+function formatChatHttpError(status: number, body: string, config: ResolvedChatConfig): string {
   const trimmedBody = body.trim();
   let serverMessage = trimmedBody;
   try {
@@ -92,20 +87,14 @@ function formatChatHttpError(
     // Body is plain text or non-JSON.
   }
 
-  if (
-    status === 403 &&
-    serverMessage.toLowerCase().includes('unknown or missing client id')
-  ) {
+  if (status === 403 && serverMessage.toLowerCase().includes('unknown or missing client id')) {
     return (
       `Chat client id "${config.clientId}" is not registered on Chat Slayer. ` +
       'Set clientId in chat/config.json to a known ALLOWED_CLIENTS id (e.g. "web-demo"). See CHAT.md.'
     );
   }
 
-  if (
-    status === 400 &&
-    serverMessage.toLowerCase().includes('invalid datastar signals')
-  ) {
+  if (status === 400 && serverMessage.toLowerCase().includes('invalid datastar signals')) {
     return (
       'Chat stream auth failed. GET /demo/stream requires accessToken in the Datastar ' +
       '`datastar` query param (not Authorization Bearer). Update the game client or purge cached assets. See CHAT.md.'
@@ -133,7 +122,11 @@ function mergeAbortSignals(signals: readonly AbortSignal[]): AbortSignal {
   return controller.signal;
 }
 
-function formatChatFetchError(err: unknown, config: ResolvedChatConfig, requestUrl: string): string {
+function formatChatFetchError(
+  err: unknown,
+  config: ResolvedChatConfig,
+  requestUrl: string
+): string {
   if (err instanceof Error && err.message && err.message !== 'Failed to fetch') {
     return err.message;
   }
@@ -164,9 +157,7 @@ export class ChatManager {
   private environmentChangedHandler: ((e: Event) => void) | null = null;
 
   public static getInstance(): ChatManager {
-    if (!ChatManager.instance) {
-      ChatManager.instance = new ChatManager();
-    }
+    ChatManager.instance ??= new ChatManager();
     return ChatManager.instance;
   }
 
@@ -246,7 +237,9 @@ export class ChatManager {
 
   private completePreviewLogin(username: string, register: boolean): void {
     const initialEnv =
-      ASSETS.ENVIRONMENTS.find((e) => e.isDefault)?.name ?? ASSETS.ENVIRONMENTS[0]?.name ?? 'Level Test';
+      ASSETS.ENVIRONMENTS.find((e) => e.isDefault)?.name ??
+      ASSETS.ENVIRONMENTS[0]?.name ??
+      'Level Test';
     const roomId = previewRoomId(initialEnv);
     const matrixUser = username.includes(':') ? username : `@${username}:local`;
 
@@ -286,7 +279,11 @@ export class ChatManager {
     }
   }
 
-  public async connectWithCredentials(username: string, password: string, register: boolean): Promise<void> {
+  public async connectWithCredentials(
+    username: string,
+    password: string,
+    register: boolean
+  ): Promise<void> {
     const trimmedUsername = username.trim();
     if (!trimmedUsername || !password) {
       throw new Error('Username and password are required');
@@ -526,8 +523,8 @@ export class ChatManager {
     if (!patch?.accessToken) {
       const message =
         patch?.cs?.name === 'error' && typeof patch.cs.payload === 'object' && patch.cs.payload
-          ? String((patch.cs.payload as { message?: string }).message ?? 'Auth failed')
-          : patch?.status ?? 'Auth failed';
+          ? ((patch.cs.payload as { message?: string }).message ?? 'Auth failed')
+          : (patch?.status ?? 'Auth failed');
       throw new Error(message);
     }
     this.session = {
@@ -623,7 +620,9 @@ export class ChatManager {
 
   private async probeHealth(config: ResolvedChatConfig, timeoutMs: number): Promise<boolean> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
     try {
       const response = await fetch(`${config.serviceUrl}/health`, {
         method: 'GET',
@@ -682,7 +681,9 @@ export class ChatManager {
     const url = `${config.serviceUrl}${path.startsWith('/') ? path : `/${path}`}`;
     const timeoutMs = init.timeoutMs ?? NORMAL_REQUEST_TIMEOUT_MS;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
 
     try {
       const response = await fetch(url, {
@@ -716,7 +717,9 @@ export class ChatManager {
     const url = `${config.serviceUrl}${path.startsWith('/') ? path : `/${path}`}`;
     const headerTimeoutMs = init.headerTimeoutMs ?? config.warmupTimeoutMs;
     const headerTimeout = new AbortController();
-    const timeout = setTimeout(() => headerTimeout.abort(), headerTimeoutMs);
+    const timeout = setTimeout(() => {
+      headerTimeout.abort();
+    }, headerTimeoutMs);
     const signals = init.signal ? [init.signal, headerTimeout.signal] : [headerTimeout.signal];
 
     try {
@@ -748,7 +751,7 @@ export class ChatManager {
   }
 
   private startDemoStream(): void {
-    void this.openDemoStream().catch((err) => {
+    void this.openDemoStream().catch((err: unknown) => {
       if (this.streamAbort?.signal.aborted) {
         return;
       }

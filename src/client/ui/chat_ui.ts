@@ -26,8 +26,8 @@ import {
 } from './overlay_button_utils';
 
 import type { OutsideCloseBinding, OverlayToggleBinding } from './overlay_button_utils';
-import type { ChatConnectionState } from '../types/chat';
 import type { SceneManager } from '../managers/scene_manager';
+import type { ChatConnectionState } from '../types/chat';
 
 export class ChatUI {
   private static chatButton: HTMLDivElement | null = null;
@@ -236,10 +236,7 @@ export class ChatUI {
       .replace(/"/g, '&quot;');
   }
 
-  private static renderPanelContent(
-    state?: ChatConnectionState,
-    status?: string
-  ): void {
+  private static renderPanelContent(state?: ChatConnectionState, status?: string): void {
     if (!this.chatPanel) {
       return;
     }
@@ -279,8 +276,7 @@ export class ChatUI {
       ? `<select id="chat-username" aria-label="Username" style="${usernameControlStyle}">
           ${allowedUsers
             .map(
-              (name) =>
-                `<option value="${this.escapeHtml(name)}">${this.escapeHtml(name)}</option>`
+              (name) => `<option value="${this.escapeHtml(name)}">${this.escapeHtml(name)}</option>`
             )
             .join('')}
         </select>`
@@ -383,22 +379,30 @@ export class ChatUI {
               : ''
           }
         </div>
-        ${isWarming ? `<button type="button" id="chat-cancel-warmup" style="
+        ${
+          isWarming
+            ? `<button type="button" id="chat-cancel-warmup" style="
           padding: 8px;
           border: none;
           background: transparent;
           color: rgba(255,255,255,0.7);
           cursor: pointer;
           font-size: 12px;
-        ">Cancel</button>` : ''}
-        ${isError ? `<button type="button" id="chat-retry-btn" style="
+        ">Cancel</button>`
+            : ''
+        }
+        ${
+          isError
+            ? `<button type="button" id="chat-retry-btn" style="
           padding: 10px;
           border-radius: 8px;
           border: none;
           background: #ff6b35;
           color: white;
           cursor: pointer;
-        ">Retry</button>` : ''}
+        ">Retry</button>`
+            : ''
+        }
       </form>
       <div id="chat-messages" class="chat-messages" style="
         flex: 1 1 auto;
@@ -446,7 +450,9 @@ export class ChatUI {
     this.messageInput = this.chatPanel.querySelector('#chat-message-input');
 
     const closeBtn = this.chatPanel.querySelector('.overlay-panel-close');
-    closeBtn?.addEventListener('click', () => this.closePanel());
+    closeBtn?.addEventListener('click', () => {
+      this.closePanel();
+    });
 
     this.chatPanel.querySelector('#chat-login-btn')?.addEventListener('click', (event) => {
       event.preventDefault();
@@ -463,7 +469,9 @@ export class ChatUI {
       ChatManager.getInstance().cancelWarmup();
     });
     this.chatPanel.querySelector('#chat-retry-btn')?.addEventListener('click', () => {
-      void ChatManager.getInstance().reconnectFromSession().catch(() => undefined);
+      void ChatManager.getInstance()
+        .reconnectFromSession()
+        .catch(() => undefined);
     });
     this.chatPanel.querySelector('#chat-send-btn')?.addEventListener('click', () => {
       void this.handleSend();
@@ -485,11 +493,14 @@ export class ChatUI {
     }
     const manager = ChatManager.getInstance();
     const activeRoomId = manager.getActiveRoomId();
-    const lines = manager.getInbox().filter((line) => !activeRoomId || line.room_id === activeRoomId);
+    const lines = manager
+      .getInbox()
+      .filter((line) => !activeRoomId || line.room_id === activeRoomId);
     if (lines.length === 0) {
-      const placeholder = isChatUiPreviewMode() && !manager.getSession()?.accessToken
-        ? 'Sign in or register above to load mock messages.'
-        : 'No messages yet.';
+      const placeholder =
+        isChatUiPreviewMode() && !manager.getSession()?.accessToken
+          ? 'Sign in or register above to load mock messages.'
+          : 'No messages yet.';
       container.innerHTML = `<p style="opacity: 0.6; font-size: 13px; margin: 0;">${placeholder}</p>`;
       return;
     }
