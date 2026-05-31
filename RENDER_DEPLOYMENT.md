@@ -273,6 +273,14 @@ curl http://localhost:10000/api/multiplayer/health
 - [ ] **Health check**: `curl https://your-service.onrender.com/api/multiplayer/health`
 - [ ] **Client loads**: Open in browser, check console for errors
 - [ ] **Multiplayer connects**: Client should connect to production server
+- [ ] **Service worker**: DevTools → Network shows `sw.js` / `workbox-*.js` with `Cache-Control: no-cache` (not `immutable`). If users see Workbox `importScripts` errors from an older deploy, use **Settings → Purge Cache** once.
+- [ ] **Chat (optional)**: With `"serviceUrl": "/chat-api"` in `chat/config.json`, login/register works without browser CORS errors (nginx proxies to Chat Slayer).
+
+### PWA service worker notes
+
+[`nginx.conf`](nginx.conf) must **not** long-cache `sw.js`, `workbox-*.js`, or `manifest.webmanifest`. Those files use `Cache-Control: no-cache` so deploys can update the service worker cleanly. Hashed Vite assets under `/assets/` remain long-cached.
+
+If a browser tab still shows `importScripts() of new scripts after service worker installation is not allowed`, purge the stale worker: in-game **Settings → Purge Cache**, or DevTools → Application → Service Workers → Unregister, then hard-reload.
 
 ### Peer visibility (same environment)
 
@@ -286,7 +294,7 @@ Remote avatars are shown only when each client’s **`environmentName`** (from `
 babylon-game-starter/
 ├── Dockerfile                          # Client build + Go binary + nginx runtime
 ├── docker-entrypoint.sh                # Starts Go :5000 + nginx :10000
-├── nginx.conf                          # Proxies /api/multiplayer to port 5000
+├── nginx.conf                          # Proxies /api/multiplayer to port 5000; /chat-api to Chat Slayer; no-cache SW
 ├── render.yaml                         # Render config
 ├── vite.config.ts                      # Dev server proxy setup
 ├── src/

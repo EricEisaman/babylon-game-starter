@@ -272,6 +272,7 @@ export class SettingsUI {
 
     applyOverlayButtonBaseStyles(this.settingsButton, {
       corner: 'bottom-left',
+      bottomLeftSlot: 'settings',
       zIndex: CONFIG.SETTINGS.BUTTON_Z_INDEX
     });
     this.settingsButton.style.background = 'rgba(0, 0, 0, 0.7)';
@@ -1176,6 +1177,10 @@ export class SettingsUI {
     if (this.sceneManager.getCurrentCharacterName() !== null) {
       this.sceneManager.showPlayerMeshResumePhysicsAndRevealEnvironment();
     }
+
+    window.dispatchEvent(
+      new CustomEvent('environment-changed', { detail: { name: environmentName } })
+    );
 
     this.syncEnvironmentDropdown(environmentName);
   }

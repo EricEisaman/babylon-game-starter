@@ -56,7 +56,9 @@ export async function initPwa(): Promise<void> {
   }
 
   const swUrl = `${import.meta.env.BASE_URL}sw.js`.replace(/\/{2,}/g, '/').replace(':/', '://');
-  workbox = new Workbox(swUrl, { type: 'module' });
+  // vite.config devOptions.type: 'module' applies only in DEV; production generateSW is classic.
+  const swOptions = import.meta.env.DEV ? { type: 'module' as const } : undefined;
+  workbox = new Workbox(swUrl, swOptions);
 
   workbox.addEventListener('waiting', () => {
     updateAvailable = true;
