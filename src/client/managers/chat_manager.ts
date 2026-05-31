@@ -81,7 +81,8 @@ function formatChatHttpError(
   body: string,
   config: ResolvedChatConfig
 ): string {
-  let serverMessage = '';
+  const trimmedBody = body.trim();
+  let serverMessage = trimmedBody;
   try {
     const json = JSON.parse(body) as { error?: string };
     if (typeof json.error === 'string' && json.error.trim()) {
@@ -101,10 +102,35 @@ function formatChatHttpError(
     );
   }
 
+  if (
+    status === 400 &&
+    serverMessage.toLowerCase().includes('invalid datastar signals')
+  ) {
+    return (
+      'Chat stream auth failed. GET /demo/stream requires accessToken in the Datastar ' +
+      '`datastar` query param (not Authorization Bearer). Update the game client or purge cached assets. See CHAT.md.'
+    );
+  }
+
   if (serverMessage) {
     return serverMessage;
   }
-  return body.trim() || `HTTP ${status}`;
+  return `HTTP ${status}`;
+}
+
+function mergeAbortSignals(signals: readonly AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  const onAbort = (): void => {
+    controller.abort();
+  };
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort();
+      return controller.signal;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+  return controller.signal;
 }
 
 function formatChatFetchError(err: unknown, config: ResolvedChatConfig, requestUrl: string): string {
@@ -480,8 +506,8 @@ export class ChatManager {
     }
 
     this.closeStream();
-    await this.openDemoStream();
     this.setState('ready', this.statusText || 'Connected');
+    this.startDemoStream();
   }
 
   private async joinRoom(roomId: string): Promise<void> {
@@ -682,10 +708,56 @@ export class ChatManager {
     }
   }
 
+  private async chatStreamFetch(
+    path: string,
+    init: RequestInit & { headerTimeoutMs?: number }
+  ): Promise<Response> {
+    const config = this.requireConfig();
+    const url = `${config.serviceUrl}${path.startsWith('/') ? path : `/${path}`}`;
+    const headerTimeoutMs = init.headerTimeoutMs ?? config.warmupTimeoutMs;
+    const headerTimeout = new AbortController();
+    const timeout = setTimeout(() => headerTimeout.abort(), headerTimeoutMs);
+    const signals = init.signal ? [init.signal, headerTimeout.signal] : [headerTimeout.signal];
+
+    try {
+      const { signal: _signal, headerTimeoutMs: _headerTimeoutMs, ...fetchInit } = init;
+      const response = await fetch(url, {
+        ...fetchInit,
+        signal: mergeAbortSignals(signals),
+        headers: {
+          [CLIENT_HEADER]: config.clientId,
+          ...(init.headers as Record<string, string>)
+        }
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(formatChatHttpError(response.status, body, config));
+      }
+      return response;
+    } catch (err) {
+      throw new Error(formatChatFetchError(err, config, url));
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   private closeStream(): void {
     this.streamAbort?.abort();
     this.streamAbort = null;
     this.streamParser = new ChatSseStreamParser();
+  }
+
+  private startDemoStream(): void {
+    void this.openDemoStream().catch((err) => {
+      if (this.streamAbort?.signal.aborted) {
+        return;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.setState(
+        'ready',
+        `${this.statusText || 'Connected'} — live updates unavailable (${message}). You can still send messages.`
+      );
+    });
   }
 
   private async openDemoStream(): Promise<void> {
@@ -694,17 +766,20 @@ export class ChatManager {
       return;
     }
 
+    this.closeStream();
     this.streamAbort = new AbortController();
     const signal = this.streamAbort.signal;
 
-    const response = await this.chatFetch('/demo/stream', {
+    const datastar = JSON.stringify({ accessToken: this.session.accessToken });
+    const path = `/demo/stream?${new URLSearchParams({ datastar }).toString()}`;
+
+    const response = await this.chatStreamFetch(path, {
       method: 'GET',
       headers: {
-        Accept: 'text/event-stream',
-        Authorization: `Bearer ${this.session.accessToken}`
+        Accept: 'text/event-stream'
       },
       signal,
-      timeoutMs: config.warmupTimeoutMs
+      headerTimeoutMs: config.warmupTimeoutMs
     });
 
     const reader = response.body?.getReader();
@@ -729,7 +804,8 @@ export class ChatManager {
       } catch {
         if (!signal.aborted) {
           this.serviceWarmed = false;
-          this.setState('error', 'Chat stream disconnected. Open chat to reconnect.');
+          this.setState('ready', `${this.statusText || 'Connected'} — reconnecting…`);
+          this.startDemoStream();
         }
       }
     })();

@@ -96,6 +96,7 @@ When using a **cross-origin** `serviceUrl` (for example `https://chat-slayer.onr
 | CORS error on `/demo/actions/*` from hosted game | Cross-origin `serviceUrl` without matching `ALLOWED_CLIENTS` entry | Use `"serviceUrl": "/chat-api"` on Render (nginx proxy), **or** add your game origin to the correct `clientId` in `ALLOWED_CLIENTS`. |
 | CORS error on `GET /health` during warmup | Chat Slayer build without health CORS | Deploy latest **chat-slayer** (`/health` echoes `Origin`; game warmup uses a simple GET without client header). |
 | `403` on `/demo/actions/*` or `/demo/stream` (other messages) | Origin not listed for your `clientId` | Confirm `ALLOWED_CLIENTS` includes your deployed game origin under the same `id` as `clientId`. |
+| `400` + `Invalid datastar signals` on `GET /demo/stream` | Stream opened with Bearer auth instead of Datastar query param | Deploy a client that passes `{ "accessToken": "..." }` in the `datastar` query param on `GET /demo/stream`. POST actions use JSON body; only the stream uses the query param. |
 
 Deploy **chat-slayer** before relying on cross-origin warmup from a hosted game.
 
