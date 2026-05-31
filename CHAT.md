@@ -66,12 +66,15 @@ On Chat Slayer, set `BACKEND_INITIAL_USERS=alice:secret1;bob:secret2` (or create
 
 ## Allow the game origin on Chat Slayer
 
-Browser login and chat API calls require your game origin in Chat Slayer `ALLOWED_CLIENTS` for the same `clientId` (for example `https://bgs-mp.onrender.com` alongside local dev URLs). See [chat-slayer/CLIENT_GUIDE.md](../chat-slayer/CLIENT_GUIDE.md) and [chat-slayer/RENDER_DEPLOYMENT.md](../chat-slayer/RENDER_DEPLOYMENT.md).
+Browser login and chat API calls require your game origin in Chat Slayer `ALLOWED_CLIENTS` for the same `clientId` when using a **cross-origin** `serviceUrl` (for example `https://chat-slayer.onrender.com` from `https://bgs-mp.onrender.com`). See [chat-slayer/CLIENT_GUIDE.md](../chat-slayer/CLIENT_GUIDE.md) and [chat-slayer/RENDER_DEPLOYMENT.md](../chat-slayer/RENDER_DEPLOYMENT.md).
+
+**Render Docker deploy (recommended):** [`chat/config.json`](src/client/public/chat/config.json) uses `"serviceUrl": "/chat-api"`. Nginx proxies `/chat-api/` to Chat Slayer same-origin, so browsers never hit cross-origin CORS. Vite dev proxies `/chat-api` the same way (`vite.config.ts`).
 
 ## Production troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|----------------|-----|
+| CORS error on `/demo/actions/*` from hosted game | Cross-origin `serviceUrl` without `ALLOWED_CLIENTS` entry | Use `"serviceUrl": "/chat-api"` on Render (nginx proxy), **or** add your game origin to Chat Slayer `ALLOWED_CLIENTS` for `babylon-game`. |
 | CORS error on `GET /health` during warmup | Chat Slayer build without health CORS | Deploy latest **chat-slayer** (`/health` echoes `Origin`; game warmup uses a simple GET without client header). |
 | `403` on `/demo/actions/*` or `/demo/stream` | Origin or `clientId` mismatch | Confirm `ALLOWED_CLIENTS` includes your deployed game origin and `babylon-game` (or your `clientId`). |
 
@@ -83,8 +86,8 @@ On Render’s free tier, Chat Slayer **sleeps when idle**. The first request aft
 
 ## Local development
 
-1. In **chat-slayer**: copy `.env.example` to `.env`, add `babylon-game` to `ALLOWED_CLIENTS` with `http://localhost:5173`, run `npm run dev` (default `http://localhost:8008`).
-2. In **babylon-game-starter**: enable `chat/config.json` with `"serviceUrl": "http://localhost:8008"`.
+1. In **chat-slayer**: copy `.env.example` to `.env`, add `babylon-game` to `ALLOWED_CLIENTS` with `http://localhost:3000`, run `npm run dev` (default `http://localhost:8008`).
+2. In **babylon-game-starter**: enable `chat/config.json` with `"serviceUrl": "/chat-api"` (Vite proxies to Chat Slayer) **or** `"serviceUrl": "http://localhost:8008"` for direct local Chat Slayer.
 3. Run the game (`npm run dev`), open chat, register or log in (unless `allowRegistration` is `false`), send messages.
 
 ## Room behavior

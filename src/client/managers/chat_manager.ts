@@ -76,6 +76,18 @@ function normalizeFingerprint(hex: string): string {
   return hex.trim().toLowerCase();
 }
 
+function formatChatFetchError(err: unknown, config: ResolvedChatConfig, requestUrl: string): string {
+  if (err instanceof Error && err.message && err.message !== 'Failed to fetch') {
+    return err.message;
+  }
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'this origin';
+  const usingProxy = config.serviceUrl.startsWith('/');
+  if (usingProxy) {
+    return `Chat request failed (${requestUrl}). Check that the /chat-api proxy is configured on your host and Chat Slayer is reachable. See CHAT.md.`;
+  }
+  return `Chat server blocked or unreachable from ${origin}. Add ${origin} to Chat Slayer ALLOWED_CLIENTS for clientId "${config.clientId}", or set serviceUrl to "/chat-api" for same-origin proxy. See CHAT.md.`;
+}
+
 export class ChatManager {
   private static instance: ChatManager | null = null;
 
@@ -247,7 +259,7 @@ export class ChatManager {
       if (this.connectionState !== 'warming') {
         this.setState('error', message);
       }
-      throw err;
+      throw err instanceof Error ? err : new Error(message);
     }
   }
 
@@ -632,6 +644,8 @@ export class ChatManager {
         throw new Error(body || `HTTP ${response.status}`);
       }
       return response;
+    } catch (err) {
+      throw new Error(formatChatFetchError(err, config, url));
     } finally {
       clearTimeout(timeout);
     }

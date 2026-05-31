@@ -335,7 +335,7 @@ export class ChatUI {
       ">UI preview — no Chat Slayer service. Use Log in / Register below; messages are local mock data only.</div>`
           : ''
       }
-      <div class="chat-auth" style="
+      <form id="chat-auth-form" class="chat-auth" autocomplete="on" style="
         flex: 0 0 auto;
         padding: 12px 20px;
         display: ${showAuth ? 'flex' : 'none'};
@@ -358,7 +358,7 @@ export class ChatUI {
           font-size: 14px;
         " />
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button type="button" id="chat-login-btn" ${disableActions ? 'disabled' : ''} style="
+          <button type="submit" id="chat-login-btn" ${disableActions ? 'disabled' : ''} style="
             flex: 1;
             padding: 10px;
             border-radius: 8px;
@@ -399,7 +399,7 @@ export class ChatUI {
           color: white;
           cursor: pointer;
         ">Retry</button>` : ''}
-      </div>
+      </form>
       <div id="chat-messages" class="chat-messages" style="
         flex: 1 1 auto;
         overflow-y: auto;
@@ -448,7 +448,12 @@ export class ChatUI {
     const closeBtn = this.chatPanel.querySelector('.overlay-panel-close');
     closeBtn?.addEventListener('click', () => this.closePanel());
 
-    this.chatPanel.querySelector('#chat-login-btn')?.addEventListener('click', () => {
+    this.chatPanel.querySelector('#chat-login-btn')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      void this.handleAuth(false);
+    });
+    this.chatPanel.querySelector('#chat-auth-form')?.addEventListener('submit', (event) => {
+      event.preventDefault();
       void this.handleAuth(false);
     });
     this.chatPanel.querySelector('#chat-register-btn')?.addEventListener('click', () => {

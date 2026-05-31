@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "serviceUrl": "https://chat-slayer.onrender.com",
+  "serviceUrl": "/chat-api",
   "clientId": "babylon-game",
   "roomMode": "per-environment",
   "gameRoomName": "Lobby"

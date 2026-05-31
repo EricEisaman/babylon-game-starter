@@ -123,6 +123,17 @@ async function initializeRuntimeGlobals(): Promise<void> {
   }
 }
 
+function scheduleInitPwa(): void {
+  const run = (): void => {
+    void initPwa();
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 2000 });
+  } else {
+    setTimeout(run, 0);
+  }
+}
+
 /**
  * Initializes the application
  */
@@ -146,7 +157,7 @@ async function initialize(): Promise<void> {
     initChromiumInstallPrompt();
     recordPwaVisit();
     maybeShowInstallCoach();
-    void initPwa();
+    scheduleInitPwa();
     await loadInspectorIfDev();
 
     // Get canvas element

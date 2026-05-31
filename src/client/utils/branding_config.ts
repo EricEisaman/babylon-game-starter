@@ -207,6 +207,7 @@ function applyPwaHeadTags(config: ResolvedBrandingConfig): void {
 
   const appleTitle = pwa.shortName || pwa.name;
   const iosMetaTags: [string, string][] = [
+    ['mobile-web-app-capable', 'yes'],
     ['apple-mobile-web-app-capable', 'yes'],
     ['apple-mobile-web-app-title', appleTitle],
     ['apple-mobile-web-app-status-bar-style', 'black-translucent']
