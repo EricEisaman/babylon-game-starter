@@ -26,8 +26,10 @@ import {
   isSimulationActive,
   setSimulationQueryOverride
 } from './simulation/simulation_bootstrap';
+import { ChatUI } from './ui/chat_ui';
 import { InventoryUI } from './ui/inventory_ui';
 import { SettingsUI } from './ui/settings_ui';
+import { isChatUiVisible, loadChatConfig } from './utils/chat_config';
 import { getQueryParam, isQueryFlagEnabled, queryHook } from './utils/query_hook';
 import { switchToEnvironment } from './utils/switch_environment';
 
@@ -40,6 +42,7 @@ function cleanupUI(): void {
   HUDManager.cleanup();
   SettingsUI.cleanup();
   InventoryUI.cleanup();
+  ChatUI.cleanup();
   OverlayManager.dispose();
 }
 
@@ -80,6 +83,12 @@ class Playground {
 
     // Initialize inventory UI with scene manager
     InventoryUI.initialize(canvas, sceneManager);
+
+    void loadChatConfig().then(() => {
+      if (isChatUiVisible()) {
+        ChatUI.initialize(canvas, sceneManager);
+      }
+    });
 
     // Check for fullscreen query parameter and activate if present
     queryHook(['fullscreen'], (values) => {

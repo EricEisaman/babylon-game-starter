@@ -179,14 +179,14 @@ If you cannot set `publicUrl` on a deploy branch yet, add **`social.siteUrl`** t
 
 - **Cache strategy:** CacheFirst (local-first) for static assets, branding files, GitHub-hosted models, and Babylon CDN scripts. Configured in [`vite.config.ts`](vite.config.ts).
 - **Updates:** When a new build deploys, a versioned service worker waits in the background. **Settings → Update App** applies the update.
-- **Purge:** **Settings → Purge Cache** clears all caches, unregisters the service worker, and reloads.
-- **Registration:** [`src/client/pwa/pwa_client.ts`](src/client/pwa/pwa_client.ts), wired from [`src/client/main.ts`](src/client/main.ts) only.
+- **Purge:** **Settings → Purge Cache** clears all caches, unregisters the service worker, and reloads. Use this once after a deploy if you see `importScripts` / Workbox errors from a stale service worker (common when `sw.js` was previously cached aggressively).
+- **Registration:** [`src/client/pwa/pwa_client.ts`](src/client/pwa/pwa_client.ts), wired from [`src/client/main.ts`](src/client/main.ts) only (deferred via `requestIdleCallback` so Babylon init is not blocked).
 
 ### iPad Safari install (Share → Add to Home Screen)
 
 iPadOS Safari does **not** support Chrome’s automatic install prompt. This starter implements the recommended coach pattern:
 
-- **iOS meta tags** — `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-touch-icon` (set in [`branding_config.ts`](src/client/utils/branding_config.ts)).
+- **iOS meta tags** — `mobile-web-app-capable`, `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-touch-icon` (set in [`branding_config.ts`](src/client/utils/branding_config.ts)).
 - **Repeat-visit coach** — After the second visit in Safari on iPad (not already installed), a modal explains: *Tap Share → Add to Home Screen*.
 - **Settings → Install App** — On iPad Safari, opens the Share → Add to Home Screen coach modal. On Chromium (desktop/Android), triggers the browser’s native install prompt directly.
 
