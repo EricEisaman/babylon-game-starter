@@ -807,7 +807,11 @@ export async function initMultiplayerAfterCharacterReady(
       return;
     }
     lastSend = now;
-    const state = sampleLocalState(clientId, ctrl, envNow);
+    const selfId = mp.getClientID();
+    if (!selfId) {
+      return;
+    }
+    const state = sampleLocalState(selfId, ctrl, envNow);
     if (!state) {
       return;
     }

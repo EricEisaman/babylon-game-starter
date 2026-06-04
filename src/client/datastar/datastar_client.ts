@@ -146,6 +146,8 @@ export class DatastarClient {
             return;
           }
           const error = new Error('SSE connection closed');
+          this.eventSource = null;
+          this.emit('disconnected');
           this.emit('error', error);
           if (!this.isIntentionallyClosed) {
             this.attemptReconnect();
@@ -173,6 +175,7 @@ export class DatastarClient {
       this.eventSource.close();
       this.eventSource = null;
     }
+    this.emit('disconnected');
   }
 
   /**
