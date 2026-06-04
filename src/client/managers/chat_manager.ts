@@ -154,8 +154,9 @@ function formatChatFetchError(
   }
   if (origin.endsWith('.github.io')) {
     return (
-      `Chat server blocked or unreachable from ${origin}. Add ${origin} to Chat Slayer ALLOWED_CLIENTS ` +
-      `for clientId "${config.clientId}" (host only — no /repo path). See CHAT.md.`
+      `Chat request to ${requestUrl} failed from ${origin}. ` +
+      'If DevTools shows a CORS error, add this origin (host only — no repo path) to Chat Slayer ALLOWED_CLIENTS for your clientId. ' +
+      'Otherwise the server may be waking up (Render free tier), rate-limited (429), or temporarily unreachable. See CHAT.md.'
     );
   }
   return (
@@ -176,6 +177,7 @@ export class ChatManager {
   private roomIdByDisplayName = new Map<string, string>();
   private serviceWarmed = false;
   private warmupAbort: AbortController | null = null;
+  private warmupInFlight: Promise<void> | null = null;
   private streamAbort: AbortController | null = null;
   private streamParser = new ChatSseStreamParser();
   private streamOpenInFlight: Promise<void> | null = null;
@@ -732,7 +734,19 @@ export class ChatManager {
     if (this.serviceWarmed) {
       return;
     }
+    if (this.warmupInFlight) {
+      return this.warmupInFlight;
+    }
 
+    this.warmupInFlight = this.runServiceWarmup();
+    try {
+      await this.warmupInFlight;
+    } finally {
+      this.warmupInFlight = null;
+    }
+  }
+
+  private async runServiceWarmup(): Promise<void> {
     const config = this.requireConfig();
     if (config.tlsPinEnforced && config.expectedTlsFingerprintSha256) {
       await this.verifyTlsPin(config);
@@ -750,11 +764,13 @@ export class ChatManager {
       }
       const remaining = deadline - Date.now();
       try {
-        const ok = await this.probeHealth(config, Math.min(remaining, config.warmupTimeoutMs));
-        if (ok) {
+        const probe = await this.probeHealth(config, Math.min(remaining, config.warmupTimeoutMs));
+        if (probe.ready) {
           this.serviceWarmed = true;
           return;
         }
+        await sleep(probe.retryAfterMs ?? config.warmupRetryIntervalMs);
+        continue;
       } catch (err) {
         if (outerSignal.aborted) {
           throw err;
@@ -767,7 +783,10 @@ export class ChatManager {
     throw new Error('Chat warmup timed out');
   }
 
-  private async probeHealth(config: ResolvedChatConfig, timeoutMs: number): Promise<boolean> {
+  private async probeHealth(
+    config: ResolvedChatConfig,
+    timeoutMs: number
+  ): Promise<{ ready: boolean; retryAfterMs?: number }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort();
@@ -777,9 +796,17 @@ export class ChatManager {
         method: 'GET',
         signal: controller.signal
       });
-      return response.ok;
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        const retryAfterSeconds = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : Number.NaN;
+        const retryAfterMs = Number.isFinite(retryAfterSeconds)
+          ? retryAfterSeconds * 1000
+          : config.warmupRetryIntervalMs * 3;
+        return { ready: false, retryAfterMs };
+      }
+      return { ready: response.ok };
     } catch {
-      return false;
+      return { ready: false };
     } finally {
       clearTimeout(timeout);
     }

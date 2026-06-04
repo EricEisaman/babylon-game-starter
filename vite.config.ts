@@ -82,8 +82,11 @@ if (multiplayerPrefix && serviceProxy[multiplayerPrefix]) {
 
 const cacheFirstRuntime = [
   {
-    urlPattern: ({ url }: { url: URL }) =>
-      chatProxyPrefixPattern.test(url.pathname) || url.pathname.startsWith('/api/'),
+    urlPattern: chatProxyPrefixPattern,
+    handler: 'NetworkOnly' as const
+  },
+  {
+    urlPattern: /^\/api\//,
     handler: 'NetworkOnly' as const
   },
   {
