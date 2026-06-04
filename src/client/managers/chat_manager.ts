@@ -888,7 +888,8 @@ export class ChatManager {
     init: RequestInit & { headerTimeoutMs?: number }
   ): Promise<Response> {
     const config = this.requireConfig();
-    const url = `${config.serviceUrl}${path.startsWith('/') ? path : `/${path}`}`;
+    const base = config.streamServiceUrl || config.serviceUrl;
+    const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
     const headerTimeoutMs = init.headerTimeoutMs ?? config.warmupTimeoutMs;
     const headerTimeout = new AbortController();
     const timeout = setTimeout(() => {
