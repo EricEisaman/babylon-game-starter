@@ -99,9 +99,7 @@ function formatChatHttpError(status: number, body: string, config: ResolvedChatC
   }
 
   if (isHtmlErrorBody(trimmedBody)) {
-    return (
-      'Chat API unreachable at /chat-api. Configure a host proxy (Netlify redirect or Render nginx). See CHAT.md.'
-    );
+    return 'Chat API unreachable at /chat-api. Configure a host proxy (Netlify redirect or Render nginx). See CHAT.md.';
   }
 
   if (status === 403 && serverMessage.toLowerCase().includes('unknown or missing client id')) {
@@ -663,9 +661,7 @@ export class ChatManager {
     }
 
     const capped =
-      merged.length > ROOM_INBOX_HISTORY_LIMIT
-        ? merged.slice(-ROOM_INBOX_HISTORY_LIMIT)
-        : merged;
+      merged.length > ROOM_INBOX_HISTORY_LIMIT ? merged.slice(-ROOM_INBOX_HISTORY_LIMIT) : merged;
     this.inbox = roomId ? [...otherRooms, ...capped] : capped;
   }
 
@@ -798,7 +794,9 @@ export class ChatManager {
       });
       if (response.status === 429) {
         const retryAfterHeader = response.headers.get('Retry-After');
-        const retryAfterSeconds = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : Number.NaN;
+        const retryAfterSeconds = retryAfterHeader
+          ? Number.parseInt(retryAfterHeader, 10)
+          : Number.NaN;
         const retryAfterMs = Number.isFinite(retryAfterSeconds)
           ? retryAfterSeconds * 1000
           : config.warmupRetryIntervalMs * 3;
@@ -945,9 +943,7 @@ export class ChatManager {
           return;
         }
         const message = err instanceof Error ? err.message : String(err);
-        this.rejectStreamReadyWaiters(
-          err instanceof Error ? err : new Error(message)
-        );
+        this.rejectStreamReadyWaiters(err instanceof Error ? err : new Error(message));
         this.setState(
           'ready',
           `${this.statusText || 'Connected'} — live updates unavailable (${message}). You can still send messages.`

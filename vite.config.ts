@@ -186,9 +186,7 @@ export default defineConfig(async () => {
                 navigateFallback: 'index.html',
                 navigateFallbackDenylist: [
                   /^\/api\//,
-                  new RegExp(
-                    `^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`
-                  )
+                  new RegExp(`^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`)
                 ],
                 maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
                 cleanupOutdatedCaches: true,
