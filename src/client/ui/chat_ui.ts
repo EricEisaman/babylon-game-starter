@@ -14,6 +14,7 @@ import {
 import {
   applyOverlayButtonBaseStyles,
   bindOutsideClose,
+  bindOverlayPanelViewport,
   bindOverlayPressFeedback,
   bindOverlayToggle,
   bindPreventTextSelection,
@@ -22,7 +23,8 @@ import {
   notifyOverlayPanelOpening,
   onOtherOverlayPanelOpening,
   repositionOverlayButton,
-  setChatPanelOpen
+  setChatPanelOpen,
+  syncOverlayPanelViewport
 } from './overlay_button_utils';
 
 import type { OutsideCloseBinding, OverlayToggleBinding } from './overlay_button_utils';
@@ -40,6 +42,7 @@ export class ChatUI {
   private static panelIsolationBinding: OverlayToggleBinding | null = null;
   private static otherPanelBinding: OverlayToggleBinding | null = null;
   private static outsideCloseBinding: OutsideCloseBinding | null = null;
+  private static viewportBinding: (() => void) | null = null;
   private static stateUnsubscribe: (() => void) | null = null;
   private static inboxUnsubscribe: (() => void) | null = null;
   private static usernameField: HTMLInputElement | HTMLSelectElement | null = null;
@@ -131,7 +134,7 @@ export class ChatUI {
       top: 0;
       left: -${panelWidth}px;
       width: ${panelWidth}px;
-      height: 100vh;
+      height: 100dvh;
       background: rgba(0, 0, 0, 0.95);
       backdrop-filter: blur(20px);
       border-right: 2px solid rgba(255, 255, 255, 0.2);
@@ -148,6 +151,7 @@ export class ChatUI {
     `;
 
     document.body.appendChild(this.chatPanel);
+    syncOverlayPanelViewport(this.chatPanel);
   }
 
   private static setupEventListeners(): void {
@@ -172,6 +176,7 @@ export class ChatUI {
         this.closePanel();
       }
     });
+    this.viewportBinding = bindOverlayPanelViewport(this.chatPanel);
 
     window.addEventListener('resize', this.handleResize);
   }
@@ -182,6 +187,7 @@ export class ChatUI {
     }
     const panelWidth = this.getPanelWidthPx();
     this.chatPanel.style.width = `${panelWidth}px`;
+    syncOverlayPanelViewport(this.chatPanel);
     if (!this.isPanelOpen) {
       this.chatPanel.style.left = `-${panelWidth}px`;
     }
@@ -212,6 +218,7 @@ export class ChatUI {
     this.chatButton.dataset.panelOpen = 'true';
     this.chatButton.style.transform = 'scale(1.05)';
     this.chatButton.style.background = 'rgba(0, 0, 0, 0.9)';
+    syncOverlayPanelViewport(this.chatPanel);
     this.renderPanelContent();
   }
 
@@ -413,6 +420,7 @@ export class ChatUI {
       <div class="chat-compose" style="
         flex: 0 0 auto;
         padding: 16px 20px;
+        padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
         border-top: 1px solid rgba(255, 255, 255, 0.2);
         display: flex;
         gap: 8px;
@@ -569,6 +577,8 @@ export class ChatUI {
     this.otherPanelBinding = null;
     this.outsideCloseBinding?.remove();
     this.outsideCloseBinding = null;
+    this.viewportBinding?.();
+    this.viewportBinding = null;
 
     if (this.isPanelOpen) {
       setChatPanelOpen(false);
