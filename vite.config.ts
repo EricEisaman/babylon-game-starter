@@ -144,7 +144,8 @@ export default defineConfig(async () => {
     base,
     define: {
       __CHAT_PROXY_PREFIX__: JSON.stringify(chatProxy.proxyPrefix),
-      __CHAT_DIRECT_UPSTREAM_URL__: JSON.stringify(chatProxy.upstreamUrl)
+      __CHAT_DIRECT_UPSTREAM_URL__: JSON.stringify(chatProxy.upstreamUrl),
+      __CHAT_SAME_ORIGIN_PROXY_AVAILABLE__: JSON.stringify(chatProxy.mode === 'same-origin-proxy')
     },
     server: {
       port: 3000,
