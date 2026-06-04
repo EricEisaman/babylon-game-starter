@@ -38,6 +38,8 @@ export interface SimulationBehaviorHandlers {
   readonly setVolumeZone: (zoneId: string, active: boolean) => void;
 }
 
+
+
 /**
  * Internal tracking structure for behavior instances
  */

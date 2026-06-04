@@ -874,8 +874,24 @@ export const ASSETS = {
         TYPE: 'SPHERE' satisfies SkyType
       },
       spawnPoint: new BABYLON.Vector3(0, 15, -20),
-      spawnRotation: new BABYLON.Vector3(0, 0, 0)
-    },
+      spawnRotation: new BABYLON.Vector3(0, 0, 0),
+      particles:[
+        {
+          name: 'Smoke Trail',
+          position: new BABYLON.Vector3(0, 1, -4),
+          updateSpeed: 0.01,
+          instanceName: 'withdrawal-zone',
+          behavior: {
+            triggerKind: 'proximity',
+            radius: 100,
+            checkPeriod: { type: 'interval', milliseconds: 1000 },
+            action:{
+              actionType:'',
+              target:'',
+              amount:'',
+            }
+      ]
+      },
     {
       name: 'The Cave',
       locked: true,
