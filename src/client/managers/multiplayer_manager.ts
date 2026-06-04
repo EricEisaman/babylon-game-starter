@@ -91,6 +91,7 @@ export class MultiplayerManager {
 
   // Signal unsubscribers
   private unsubscribers: (() => void)[] = [];
+  private characterStateForbiddenLogged = false;
 
   constructor(config?: MultiplayerManagerConfig) {
     void config;
@@ -256,7 +257,23 @@ export class MultiplayerManager {
         { updates: update.updates, timestamp: update.timestamp },
         { headers: { 'X-Client-ID': st.clientId } }
       );
+      this.characterStateForbiddenLogged = false;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('403')) {
+        if (!this.characterStateForbiddenLogged) {
+          this.characterStateForbiddenLogged = true;
+          console.warn(
+            '[MultiplayerManager] Character state rejected (403): server no longer recognizes this session ' +
+              '(SSE drop, server restart, or stale client id). Pose sync paused until you rejoin.'
+          );
+        }
+        if (this.isConnected) {
+          this.isConnected = false;
+          this.emit('disconnected', undefined);
+        }
+        return;
+      }
       console.error('[MultiplayerManager] Failed to update character state:', error);
     }
   }
@@ -549,8 +566,9 @@ export class MultiplayerManager {
     this.datastarClient.addEventListener('disconnected', () => {
       console.log('[MultiplayerManager] SSE disconnected');
       if (this.isConnected) {
-        this.emit('disconnected', undefined);
         this.isConnected = false;
+        this.characterStateForbiddenLogged = false;
+        this.emit('disconnected', undefined);
       }
     });
 
