@@ -82,8 +82,11 @@ if (multiplayerPrefix && serviceProxy[multiplayerPrefix]) {
 
 const cacheFirstRuntime = [
   {
-    urlPattern: ({ url }: { url: URL }) =>
-      chatProxyPrefixPattern.test(url.pathname) || url.pathname.startsWith('/api/'),
+    urlPattern: chatProxyPrefixPattern,
+    handler: 'NetworkOnly' as const
+  },
+  {
+    urlPattern: /^\/api\//,
     handler: 'NetworkOnly' as const
   },
   {
@@ -183,9 +186,7 @@ export default defineConfig(async () => {
                 navigateFallback: 'index.html',
                 navigateFallbackDenylist: [
                   /^\/api\//,
-                  new RegExp(
-                    `^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`
-                  )
+                  new RegExp(`^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`)
                 ],
                 maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
                 cleanupOutdatedCaches: true,
