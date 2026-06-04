@@ -49,6 +49,7 @@ In `src/deployment/settings/settings.mjs`, configure the deployment for Netlify 
 Example (with local multiplayer dev server):
 
 ```js
+/** @type {import('../types/settings').DeploymentSettings<'netlify'>} */
 const deploymentSettings = {
   host: 'netlify',
   type: 'static',
@@ -61,8 +62,7 @@ const deploymentSettings = {
     }
   ],
   static: {
-    basePath: '/',
-    publicUrl: 'https://your-site.netlify.app'
+    basePath: '/'
   }
 };
 
