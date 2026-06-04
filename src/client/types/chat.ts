@@ -27,7 +27,10 @@ export interface ChatConfig {
 
 export interface ResolvedChatConfig {
   readonly enabled: boolean;
+  /** Base URL for REST (health, login, register, send). Often same-origin `/chat-api`. */
   readonly serviceUrl: string;
+  /** Base URL for `GET /demo/stream` SSE. Direct upstream when host proxy breaks chunked SSE. */
+  readonly streamServiceUrl: string;
   readonly clientId: string;
   readonly roomMode: ChatRoomMode;
   readonly gameRoomName: string;

@@ -15,6 +15,7 @@ import type { ChatConfig, ChatRoomMode, ResolvedChatConfig } from '../types/chat
 const DEFAULT_CHAT: ResolvedChatConfig = {
   enabled: false,
   serviceUrl: '',
+  streamServiceUrl: '',
   clientId: 'web-demo',
   roomMode: 'per-environment',
   gameRoomName: 'Lobby',
@@ -29,23 +30,43 @@ const DEFAULT_CHAT: ResolvedChatConfig = {
   allowedUsers: []
 };
 
-/** Static hosts where Netlify/Pages redirects cannot proxy chunked SSE (see CHAT.md). */
-function usesDirectChatSlayerUpstream(hostname: string): boolean {
-  return hostname.endsWith('.github.io') || hostname.endsWith('.netlify.app');
+/** Hosts where Netlify/Pages edge proxies break chunked SSE (see CHAT.md). */
+function needsDirectStreamUpstream(hostname: string): boolean {
+  return hostname.endsWith('.netlify.app') || hostname.endsWith('.github.io');
 }
 
-/** Direct Chat Slayer URL on static hosts without a working SSE proxy (injected at build). */
-function resolveServiceUrlForHost(configured: string): string {
-  if (configured !== __CHAT_PROXY_PREFIX__) {
-    return configured;
+interface ResolvedChatUrls {
+  readonly serviceUrl: string;
+  readonly streamServiceUrl: string;
+}
+
+/**
+ * REST uses same-origin `/chat-api` when the deploy host provides a proxy (avoids CORS on
+ * register/login). SSE uses direct Chat Slayer only on static hosts where the proxy cannot
+ * forward chunked streams.
+ */
+function resolveChatServiceUrls(configured: string): ResolvedChatUrls {
+  const proxyPrefix = __CHAT_PROXY_PREFIX__;
+  const directUpstream = __CHAT_DIRECT_UPSTREAM_URL__;
+
+  if (configured !== proxyPrefix) {
+    const url = normalizeServiceUrl(configured);
+    return { serviceUrl: url, streamServiceUrl: url };
   }
+
+  if (!__CHAT_SAME_ORIGIN_PROXY_AVAILABLE__) {
+    return { serviceUrl: directUpstream, streamServiceUrl: directUpstream };
+  }
+
   if (typeof window === 'undefined') {
-    return configured;
+    return { serviceUrl: proxyPrefix, streamServiceUrl: directUpstream };
   }
-  if (usesDirectChatSlayerUpstream(window.location.hostname)) {
-    return __CHAT_DIRECT_UPSTREAM_URL__;
-  }
-  return configured;
+
+  const streamDirect = needsDirectStreamUpstream(window.location.hostname);
+  return {
+    serviceUrl: proxyPrefix,
+    streamServiceUrl: streamDirect ? directUpstream : proxyPrefix
+  };
 }
 
 let cachedConfig: ResolvedChatConfig | null = null;
@@ -81,13 +102,13 @@ function resolveChatConfig(raw: ChatConfig): ResolvedChatConfig {
   const roomMode: ChatRoomMode = raw.roomMode === 'game-wide' ? 'game-wide' : 'per-environment';
   const allowRegistration = raw.allowRegistration !== false;
   const allowedUsers = allowRegistration ? [] : normalizeAllowedUsers(raw.allowedUsers);
+  const urls =
+    enabled && raw.serviceUrl ? resolveChatServiceUrls(raw.serviceUrl) : { serviceUrl: '', streamServiceUrl: '' };
 
   return {
     enabled,
-    serviceUrl:
-      enabled && raw.serviceUrl
-        ? normalizeServiceUrl(resolveServiceUrlForHost(raw.serviceUrl))
-        : '',
+    serviceUrl: normalizeServiceUrl(urls.serviceUrl),
+    streamServiceUrl: normalizeServiceUrl(urls.streamServiceUrl),
     clientId: raw.clientId?.trim() ?? DEFAULT_CHAT.clientId,
     roomMode,
     gameRoomName: raw.gameRoomName?.trim() ?? DEFAULT_CHAT.gameRoomName,
@@ -135,7 +156,11 @@ export function getChatConfig(): ResolvedChatConfig | null {
 }
 
 export function isChatEnabled(): boolean {
-  return cachedConfig?.enabled === true && cachedConfig.serviceUrl.length > 0;
+  return (
+    cachedConfig?.enabled === true &&
+    cachedConfig.serviceUrl.length > 0 &&
+    cachedConfig.streamServiceUrl.length > 0
+  );
 }
 
 /** `?chatui=true` (also `1` / `yes`) — show chat UI without a configured service. */
