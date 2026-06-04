@@ -7,6 +7,12 @@ NODE_VERSION = "22"
 NODE_OPTIONS = "--max-old-space-size=4096"
 
 [[redirects]]
+from = "/chat-api/*"
+to = "https://chat-slayer.onrender.com/:splat"
+status = 200
+force = true
+
+[[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200

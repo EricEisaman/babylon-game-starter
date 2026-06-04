@@ -47,6 +47,31 @@ export function shouldUseMobileOverlayLayout(): boolean {
   return DeviceDetector.isMobileDevice() || document.getElementById('mobile-joystick') != null;
 }
 
+/** Match fixed overlay panel height to the visible viewport (iPad Safari 100vh fix). */
+export function syncOverlayPanelViewport(panel: HTMLElement): void {
+  const vv = window.visualViewport;
+  const height = vv?.height ?? window.innerHeight;
+  const top = vv?.offsetTop ?? 0;
+  panel.style.height = `${height}px`;
+  panel.style.top = `${top}px`;
+}
+
+/** Keep overlay panel sized to visualViewport on resize, scroll, and keyboard open. */
+export function bindOverlayPanelViewport(panel: HTMLElement): () => void {
+  const sync = (): void => {
+    syncOverlayPanelViewport(panel);
+  };
+  sync();
+  window.addEventListener('resize', sync);
+  window.visualViewport?.addEventListener('resize', sync);
+  window.visualViewport?.addEventListener('scroll', sync);
+  return () => {
+    window.removeEventListener('resize', sync);
+    window.visualViewport?.removeEventListener('resize', sync);
+    window.visualViewport?.removeEventListener('scroll', sync);
+  };
+}
+
 export function getOverlayButtonLayout(
   corner: OverlayCorner,
   bottomLeftSlot: OverlayBottomLeftSlot = 'settings'
