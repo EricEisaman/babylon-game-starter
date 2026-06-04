@@ -180,11 +180,11 @@ export class ChatManager {
   private streamParser = new ChatSseStreamParser();
   private streamOpenInFlight: Promise<void> | null = null;
   private streamReconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private streamReadyWaiters: Array<{
+  private streamReadyWaiters: {
     resolve: () => void;
     reject: (err: Error) => void;
     timeoutId: ReturnType<typeof setTimeout>;
-  }> = [];
+  }[] = [];
   private readonly stateListeners = new Set<StateListener>();
   private readonly inboxListeners = new Set<InboxListener>();
   private environmentChangedHandler: ((e: Event) => void) | null = null;
