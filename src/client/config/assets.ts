@@ -65,9 +65,9 @@ export const ASSETS = {
       height: 1.8,
       radius: 0.6,
       speed: {
-        inAir: 25.0,
-        onGround: 25.0,
-        boostMultiplier: 8.0
+        inAir: 15.0,
+        onGround: 12.5,
+        boostMultiplier: 2.0
       },
       jumpHeight: 2.0,
       rotationSpeed: 0.05, // radians
@@ -79,7 +79,7 @@ export const ASSETS = {
       name: 'Tech Girl',
       model:
         'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/characters/techGirl/tech_girl_2.glb',
-      locked: false,
+      locked: true,
       animations: {
         idle: 'idle',
         walk: 'run',
@@ -103,7 +103,7 @@ export const ASSETS = {
     {
       name: 'Lafoofoo',
       model: 'https://raw.githubusercontent.com/EricEisaman/assets/main/characters/Krysalia.glb',
-      locked: false,
+      locked: true,
       animations: {
         idle: 'idle',
         walk: 'run',
@@ -128,7 +128,7 @@ export const ASSETS = {
       name: 'Zombie',
       model:
         'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/characters/zombie/zombie_2.glb',
-      locked: false,
+      locked: true,
       animations: {
         idle: 'Idle',
         walk: 'Run_InPlace',
