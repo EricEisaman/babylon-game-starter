@@ -179,6 +179,7 @@ export const ASSETS = {
   ENVIRONMENTS: [
     {
       name: 'Level Test',
+      locked: true,
       model:
         'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/environments/levelTest/levelTest.glb',
       lightmap:
@@ -534,6 +535,7 @@ export const ASSETS = {
     },
     {
       name: 'Mushroom Village',
+      locked: true,
       cutScene: {
         type: 'image',
         visualUrl:
@@ -668,6 +670,7 @@ export const ASSETS = {
     },
     {
       name: 'Flat City',
+      locked: true,
       isDefault: false,
       cutScene: {
         type: 'video',
@@ -699,6 +702,7 @@ export const ASSETS = {
     },
     {
       name: 'Dystopia',
+      locked: true,
       model: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/dystopia.glb',
       lightmap: '',
       scale: 2,
@@ -726,6 +730,7 @@ export const ASSETS = {
     },
     {
       name: 'RV Life',
+      locked: true,
       model: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/rv_life.glb',
       lightmap: '',
       scale: 2.3,
@@ -841,6 +846,7 @@ export const ASSETS = {
     },
     {
       name: 'Monochrome',
+      locked: true,
       model: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/monochrome.glb',
       lightmap: '',
       scale: 1,
