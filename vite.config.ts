@@ -35,9 +35,7 @@ const socialMetaTags = buildSocialMetaTags(brandingResolved, { base, publicUrl }
 const socialMetaHtml = renderSocialMetaHtml(socialMetaTags);
 
 const chatProxy = resolveChatProxy(deploymentSettings, process.env);
-const chatProxyPrefixPattern = new RegExp(
-  `^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`
-);
+const escapedChatProxyPrefix = chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const chatDevProxy =
   chatProxy.mode === 'same-origin-proxy'
@@ -82,7 +80,7 @@ if (multiplayerPrefix && serviceProxy[multiplayerPrefix]) {
 
 const cacheFirstRuntime = [
   {
-    urlPattern: chatProxyPrefixPattern,
+    urlPattern: new RegExp(`^${escapedChatProxyPrefix}/`),
     handler: 'NetworkOnly' as const
   },
   {
@@ -185,10 +183,7 @@ export default defineConfig(async () => {
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2,json}'],
                 globIgnores: ['**/playground.json', '**/playground/**'],
                 navigateFallback: 'index.html',
-                navigateFallbackDenylist: [
-                  /^\/api\//,
-                  new RegExp(`^${chatProxy.proxyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/`)
-                ],
+                navigateFallbackDenylist: [/^\/api\//, new RegExp(`^${escapedChatProxyPrefix}/`)],
                 maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
                 cleanupOutdatedCaches: true,
                 runtimeCaching: cacheFirstRuntime
