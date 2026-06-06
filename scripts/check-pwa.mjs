@@ -151,6 +151,10 @@ async function validateDistArtifacts(base, resolved) {
 
   const swText = await fs.readFile(swPath, 'utf8');
   assert(swText.includes('precache'), 'dist/sw.js does not look like a Workbox service worker');
+  assert(
+    !/\bchatProxyPrefixPattern\b/.test(swText),
+    'dist/sw.js must not reference chatProxyPrefixPattern (Workbox serialization bug)'
+  );
 
   const workboxImportMatch =
     swText.match(/importScripts\(["'](workbox-[a-f0-9]+\.js)["']\)/) ??
