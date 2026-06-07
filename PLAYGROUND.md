@@ -139,5 +139,7 @@ Symptoms map to layers as follows:
 | **`HavokPhysics is not defined`** during scene build | Havok WASM plugin toggle is off | Top-right plugin menu → **Add WASM plugin → Havok** |
 | **`CORS blocked`** on `fetch`/`EventSource` when pointing at an instructor server | `MULTIPLAYER_CORS_ALLOW_ORIGIN` is pinned to something that doesn't include `https://playground.babylonjs.com` | See [`RENDER_DEPLOYMENT.md` → Cross-origin access](RENDER_DEPLOYMENT.md#cross-origin-access) |
 | **`Cannot find module '../sync/...'`** at import time | A folder is imported but missing from `exportRoots` | `npm run check:playground` will name the offending file and specifier |
+| **`/chat/config.json` 404** in Network tab | Snippet fetched JSON from the playground host (no static file server) | Fixed builds embed config via [`config/playground_chat.ts`](src/client/config/playground_chat.ts); re-export with `npm run export:playground` |
+| **`Cannot find name '__…__'`** in Monaco | Vite `define` global leaked into bundled code | Use runtime defaults — see [`config/chat_proxy.ts`](src/client/config/chat_proxy.ts) |
 
 If you get past all of these and the scene still misbehaves, the multiplayer-specific runtime concerns (server selection, cold starts, URL override, verification checklist) live in [`MULTIPLAYER.md` → Running in the Babylon playground](MULTIPLAYER.md#running-in-the-babylon-playground).
