@@ -15,6 +15,7 @@
 
 import { ASSETS, SIMULATION_LAB_ENVIRONMENT_NAME } from './config/assets';
 import { AudioManager } from './managers/audio_manager';
+import { BehaviorManager } from './managers/behavior_manager';
 import { CharacterLoader } from './managers/character_loader';
 import { HUDManager } from './managers/hud_manager';
 import { initMultiplayerAfterCharacterReady } from './managers/multiplayer_bootstrap';
@@ -39,6 +40,7 @@ import { switchToEnvironment } from './utils/switch_environment';
  */
 function cleanupUI(): void {
   disposeSimulation();
+  BehaviorManager.dispose();
   HUDManager.cleanup();
   SettingsUI.cleanup();
   InventoryUI.cleanup();
@@ -121,10 +123,12 @@ class Playground {
     const labEnv = ASSETS.ENVIRONMENTS.find((env) => env.name === SIMULATION_LAB_ENVIRONMENT_NAME);
     const initialEnv = useSimulationLab && labEnv ? labEnv : defaultEnv;
     const initialEnvironmentName = initialEnv.name;
-    void switchToEnvironment(initialEnvironmentName).then(() => {
-      const spawnPoint = initialEnv.spawnPoint ?? new BABYLON.Vector3(0, 1, 0);
-      CharacterLoader.loadCharacterModel(undefined, undefined, spawnPoint);
-      void initMultiplayerAfterCharacterReady(sceneManager, initialEnvironmentName);
+    void sceneManager.whenReady().then(() => {
+      void switchToEnvironment(initialEnvironmentName).then(() => {
+        const spawnPoint = initialEnv.spawnPoint ?? new BABYLON.Vector3(0, 1, 0);
+        CharacterLoader.loadCharacterModel(undefined, undefined, spawnPoint);
+        void initMultiplayerAfterCharacterReady(sceneManager, initialEnvironmentName);
+      });
     });
 
     return sceneManager.getScene();
