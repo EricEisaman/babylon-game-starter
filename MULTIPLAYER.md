@@ -221,6 +221,7 @@ Use this as a classroom-ready smoke test right after pasting:
 - [ ] If a cold start is in progress, console shows the warming-up notice.
 - [ ] `GET /api/multiplayer/stream` in the Network tab has `Content-Encoding: br` (or `gzip`) and no `Content-Length`.
 - [ ] Open a second playground tab in the same env; each tab sees the other's character move. Both tabs converge on the same inventory / scoreboard state.
+- [ ] Chat button is visible; register or log in works. Network tab shows requests to `chat-slayer.onrender.com` (not `/chat/config.json` 404). See [`CHAT.md`](CHAT.md#babylon-playground).
 
 > [!NOTE]
 > The shared default server is best-effort. It is adequate for classroom demos but is **not** suitable for graded assessments or large cohorts. For either of those, stand up a per-class server (see [`RENDER_DEPLOYMENT.md`](RENDER_DEPLOYMENT.md)) and use the `?mp=` override.
