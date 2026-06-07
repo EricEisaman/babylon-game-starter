@@ -87,6 +87,7 @@ export class BehaviorManager {
    * Initializes the BehaviorManager with a scene and character controller
    */
   public static initialize(scene: BABYLON.Scene, characterController: CharacterController): void {
+    this.stopUpdateLoop();
     this.scene = scene;
     this.characterController = characterController;
     this.instances.clear();
@@ -218,8 +219,10 @@ export class BehaviorManager {
    * Stops the update loop
    */
   private static stopUpdateLoop(): void {
-    if (this.updateObserver && this.scene) {
-      this.scene.onBeforeRenderObservable.remove(this.updateObserver);
+    if (this.updateObserver) {
+      if (this.scene) {
+        this.scene.onBeforeRenderObservable.remove(this.updateObserver);
+      }
       this.updateObserver = null;
     }
   }
