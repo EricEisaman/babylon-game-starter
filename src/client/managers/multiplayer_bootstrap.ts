@@ -29,6 +29,7 @@ import {
   yawRadiansToWireQuaternion
 } from '../utils/multiplayer_serialization';
 import { isQueryFlagEnabled } from '../utils/query_hook';
+import { readViteEnv } from '../utils/vite_env';
 
 import { CollectiblesManager } from './collectibles_manager';
 import { getMultiplayerManager } from './multiplayer_manager';
@@ -54,7 +55,7 @@ const SYNC_INTERVAL_MS = 80;
 const WORLD_PHYS_SYNC_MS = 120;
 
 function isSyncGateDebugEnabled(): boolean {
-  return import.meta.env.DEV || isQueryFlagEnabled(LOCAL_DEV_DEBUG.paramName);
+  return readViteEnv()?.DEV === true || isQueryFlagEnabled(LOCAL_DEV_DEBUG.paramName);
 }
 
 function vec3FromMesh(m: BABYLON.AbstractMesh): [number, number, number] {
