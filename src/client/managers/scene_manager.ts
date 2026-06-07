@@ -435,18 +435,24 @@ export class SceneManager {
     }
     try {
       for (const particle of environment.particles) {
+        const trackingKey =
+          particle.instanceName ??
+          `particle_${particle.name}_${particle.position.x}_${particle.position.y}_${particle.position.z}`;
+
         const particleSystem = await VisualEffectsManager.createParticleSystem(
           particle.name,
-          particle.position
+          particle.position,
+          {
+            fogOverrides: particle.fog,
+            trackingKey,
+            trackAsEnvironment: true
+          }
         );
         if (particleSystem != null && particle.updateSpeed !== undefined) {
           particleSystem.updateSpeed = particle.updateSpeed;
         }
         if (particleSystem != null && 'behavior' in particle && particle.behavior !== undefined) {
-          const identifier =
-            'instanceName' in particle && particle.instanceName !== undefined
-              ? particle.instanceName
-              : `particle_${particle.name}_${particle.position.x}_${particle.position.y}_${particle.position.z}`;
+          const identifier = trackingKey;
           BehaviorManager.registerInstance(
             identifier,
             particleSystem,
