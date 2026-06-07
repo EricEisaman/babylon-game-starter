@@ -2,6 +2,8 @@
 // BRANDING CONFIG LOADER (runtime)
 // ============================================================================
 
+import { readViteEnv } from './vite_env';
+
 import type { BrandingConfig, ResolvedBrandingConfig } from '../types/branding';
 
 const DEFAULT_BRANDING: ResolvedBrandingConfig = {
@@ -71,20 +73,18 @@ function inferBaseUrlFromLocation(): string {
   return '/';
 }
 
-/** Vite inlines `import.meta.env.BASE_URL` only for direct property access (not optional chaining). */
+/** Prefer Vite `BASE_URL` when present; infer GitHub Pages subpath base otherwise. */
 function readViteBaseUrl(): string {
-  let base = '/';
+  const base = readViteEnv()?.BASE_URL ?? '/';
   try {
-    base = import.meta.env.BASE_URL;
+    if (!base || base === '/') {
+      const inferred = inferBaseUrlFromLocation();
+      if (inferred !== '/') {
+        return inferred;
+      }
+    }
   } catch {
     return inferBaseUrlFromLocation();
-  }
-
-  if (!base || base === '/') {
-    const inferred = inferBaseUrlFromLocation();
-    if (inferred !== '/') {
-      return inferred;
-    }
   }
 
   return base.endsWith('/') ? base : `${base}/`;
