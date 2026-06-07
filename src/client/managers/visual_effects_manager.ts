@@ -5,7 +5,17 @@
 // /// <reference path="../types/babylon.d.ts" />
 
 import { CONFIG } from '../config/game_config';
+import { createFogParticleSystem } from '../utils/fog_particle_system';
 import { fixParticleSystemTexture, fixParticleSystemsInSet } from '../utils/particle_texture_url';
+
+import type { FogParticleConfig } from '../types/effects';
+
+export interface CreateParticleSystemOptions {
+  readonly targetStopDuration?: number;
+  readonly fogOverrides?: Partial<FogParticleConfig>;
+  readonly trackingKey?: string;
+  readonly trackAsEnvironment?: boolean;
+}
 
 /**
  * Result type for glow effect operations
@@ -42,7 +52,7 @@ export class VisualEffectsManager {
   public static async createParticleSystem(
     snippetName: string,
     emitter?: BABYLON.AbstractMesh | BABYLON.Vector3,
-    options?: { targetStopDuration?: number }
+    options?: CreateParticleSystemOptions
   ): Promise<BABYLON.IParticleSystem | null> {
     if (!this.scene) {
       return null;
@@ -98,6 +108,20 @@ export class VisualEffectsManager {
         } else {
           return null;
         }
+      } else if (snippet.type === 'fog') {
+        const center =
+          emitter instanceof BABYLON.Vector3
+            ? emitter
+            : emitter?.getAbsolutePosition?.() ?? BABYLON.Vector3.Zero();
+        const trackingKey = options?.trackingKey ?? snippetName;
+
+        particleSystem = createFogParticleSystem(
+          this.scene,
+          center,
+          snippet.defaults,
+          trackingKey,
+          options?.fogOverrides
+        );
       } else {
         return null;
       }
@@ -106,16 +130,19 @@ export class VisualEffectsManager {
         return null;
       }
 
-      // Set emitter if provided
-      if (emitter) {
+      // Set emitter if provided (fog already sets center; legacy/nodes may need this)
+      if (emitter && snippet.type !== 'fog') {
         particleSystem.emitter = emitter;
       }
 
       // Start the particle system
       particleSystem.start();
 
-      // Store reference for cleanup
-      this.activeParticleSystems.set(snippetName, particleSystem);
+      const storageKey = options?.trackingKey ?? snippetName;
+      this.activeParticleSystems.set(storageKey, particleSystem);
+      if (options?.trackAsEnvironment) {
+        this.environmentParticleSystems.set(storageKey, particleSystem);
+      }
 
       // Auto-stop after targetStopDuration if specified
       if (options?.targetStopDuration) {
@@ -141,7 +168,7 @@ export class VisualEffectsManager {
   public static async createParticleSystemAt(
     snippetName: string,
     position: BABYLON.Vector3,
-    options?: { targetStopDuration?: number }
+    options?: CreateParticleSystemOptions
   ): Promise<BABYLON.IParticleSystem | null> {
     return this.createParticleSystem(snippetName, position, options);
   }
