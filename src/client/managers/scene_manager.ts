@@ -75,6 +75,9 @@ export class SceneManager {
   /** Env + sky meshes kept isVisible=false until character is ready and physics is resumed. */
   private readonly environmentHiddenUntilCharacterReady: BABYLON.AbstractMesh[] = [];
 
+  /** Resolves when lighting, physics, character, and BehaviorManager are ready. */
+  private readonly ready: Promise<void>;
+
   constructor(engine: BABYLON.Engine, canvas: HTMLCanvasElement) {
     void canvas;
     this.scene = new BABYLON.Scene(engine);
@@ -87,23 +90,30 @@ export class SceneManager {
       : ScenePerformancePriority.Intermediate;
     this.scene.constantlyUpdateMeshUnderPointer = false;
 
-    void this.initializeScene();
+    this.ready = this.initializeScene();
   }
 
   private async initializeScene(): Promise<void> {
     this.setupLighting();
     this.setupPhysics();
     this.setupSky();
-    await this.setupEffects();
 
-    // Initialize character controller and BehaviorManager BEFORE loading environment
-    // This ensures BehaviorManager is ready when behaviors are registered
+    // Character + BehaviorManager before effects/env load so fall-OOB registration never races ahead of init.
     this.setupCharacter();
 
-    // Initialize inventory system
     if (this.characterController) {
       InventoryManager.initialize(this.scene, this.characterController);
     }
+
+    await this.setupEffects();
+  }
+
+  /**
+   * Resolves when scene bootstrap (character, BehaviorManager, effects) is complete.
+   * Await before loadEnvironment so fall-out-of-world monitoring can register reliably.
+   */
+  public whenReady(): Promise<void> {
+    return this.ready;
   }
 
   /**
@@ -181,6 +191,14 @@ export class SceneManager {
 
     // Force activate smooth follow camera
     this.smoothFollowController.forceActivateSmoothFollow();
+
+    // Env may have finished loading before setupCharacter ran (Playground cache timing).
+    if (this.environmentLoaded) {
+      const environment = ASSETS.ENVIRONMENTS.find((env) => env.name === this.currentEnvironment);
+      if (environment) {
+        BehaviorManager.registerFallOutOfWorldForEnvironment(environment);
+      }
+    }
   }
 
   private async setupEffects(): Promise<void> {
