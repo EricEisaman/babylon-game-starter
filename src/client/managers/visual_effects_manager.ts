@@ -112,7 +112,7 @@ export class VisualEffectsManager {
         const center =
           emitter instanceof BABYLON.Vector3
             ? emitter
-            : emitter?.getAbsolutePosition?.() ?? BABYLON.Vector3.Zero();
+            : (emitter?.getAbsolutePosition?.() ?? BABYLON.Vector3.Zero());
         const trackingKey = options?.trackingKey ?? snippetName;
 
         particleSystem = createFogParticleSystem(

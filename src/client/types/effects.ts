@@ -32,9 +32,10 @@ export interface FogParticleConfig {
   readonly seed?: number;
 }
 
-export const DEFAULT_FOG_PARTICLE_CONFIG: Required<
-  Omit<FogParticleConfig, 'useGpu' | 'seed'>
-> & { readonly useGpu: undefined; readonly seed: undefined } = {
+export const DEFAULT_FOG_PARTICLE_CONFIG: Required<Omit<FogParticleConfig, 'useGpu' | 'seed'>> & {
+  readonly useGpu: undefined;
+  readonly seed: undefined;
+} = {
   particleCount: 15000,
   radius: 25,
   voronoiSitesCount: 50,
