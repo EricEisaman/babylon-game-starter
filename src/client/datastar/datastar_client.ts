@@ -26,6 +26,7 @@
  */
 
 import { CONFIG } from '../config/game_config';
+import { readViteEnv } from '../utils/vite_env';
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | JsonObject;
 
@@ -377,21 +378,6 @@ function normalizeMultiplayerHostInput(raw: string): string {
   }
   s = s.split('/')[0] ?? '';
   return s.trim();
-}
-
-/** Subset of Vite `import.meta.env`; playground TS has no `ImportMetaEnv` type. */
-interface ViteEnvLike {
-  readonly DEV?: boolean;
-  readonly VITE_MULTIPLAYER_HOST?: string;
-}
-
-function readViteEnv(): ViteEnvLike | undefined {
-  try {
-    const meta = import.meta as { env?: ViteEnvLike };
-    return meta.env;
-  } catch {
-    return undefined;
-  }
 }
 
 /**
