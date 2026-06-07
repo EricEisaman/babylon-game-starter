@@ -2,6 +2,8 @@
 // GAME CONFIGURATION
 // ============================================================================
 
+import { DEFAULT_FOG_PARTICLE_CONFIG } from '../types/effects';
+
 import { ASSETS } from './assets';
 
 import type { GameConfig } from '../types/config';
@@ -149,6 +151,13 @@ export const CONFIG: GameConfig = {
         description: 'Hyper',
         category: 'magic',
         snippetId: '#UED7L7#1'
+      },
+      {
+        type: 'fog',
+        name: 'Fog',
+        description: 'Voronoi-distributed atmospheric ground fog',
+        category: 'nature',
+        defaults: DEFAULT_FOG_PARTICLE_CONFIG
       }
     ] as const,
     OVERLAY_SNIPPETS: [
