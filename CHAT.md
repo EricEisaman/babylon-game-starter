@@ -62,8 +62,13 @@ For the shared `chat-slayer.onrender.com` deployment, use `"clientId": "web-demo
 | `https://bgs-mp.onrender.com` | `/chat-api` | `web-demo` | `https://bgs-mp.onrender.com` |
 | `https://babylon-game-starter.netlify.app` | `/chat-api` (client uses direct Chat Slayer on Netlify — see below) | `web-demo` | `https://babylon-game-starter.netlify.app` |
 | `https://ericeisaman.github.io/babylon-game-starter/` | `/chat-api` (client uses direct Chat Slayer on Pages) | `web-demo` | `https://ericeisaman.github.io` |
+| `https://playground.babylonjs.com` | direct Chat Slayer (embedded config; no host proxy) | `web-demo` | `https://playground.babylonjs.com` |
 
 The `/chat-api` proxy removes browser CORS errors; it does **not** bypass Chat Slayer’s client-id or origin checks.
+
+### Babylon playground
+
+The exported snippet cannot fetch `/chat/config.json` from the playground host. [`config/playground_chat.ts`](src/client/config/playground_chat.ts) embeds the same defaults as [`public/chat/config.json`](src/client/public/chat/config.json); [`chat_config.ts`](src/client/utils/chat_config.ts) skips the fetch on `playground.babylonjs.com` and resolves `serviceUrl: "/chat-api"` to direct Chat Slayer upstream. Ensure `https://playground.babylonjs.com` is listed under your `clientId` in Chat Slayer `ALLOWED_CLIENTS`.
 
 ### Registration vs preconfigured users
 
