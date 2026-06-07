@@ -875,6 +875,17 @@ export const ASSETS = {
             }
           ]
         }
+      ],
+      particles: [
+        {
+          name: 'Fog',
+          position: new BABYLON.Vector3(0, 1.5, 0),
+          fog: {
+            radius: 20,
+            voronoiSitesCount: 40,
+            particleCount: 8000
+          }
+        }
       ]
     },
     {

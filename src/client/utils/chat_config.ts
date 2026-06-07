@@ -103,7 +103,9 @@ function resolveChatConfig(raw: ChatConfig): ResolvedChatConfig {
   const allowRegistration = raw.allowRegistration !== false;
   const allowedUsers = allowRegistration ? [] : normalizeAllowedUsers(raw.allowedUsers);
   const urls =
-    enabled && raw.serviceUrl ? resolveChatServiceUrls(raw.serviceUrl) : { serviceUrl: '', streamServiceUrl: '' };
+    enabled && raw.serviceUrl
+      ? resolveChatServiceUrls(raw.serviceUrl)
+      : { serviceUrl: '', streamServiceUrl: '' };
 
   return {
     enabled,

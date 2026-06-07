@@ -4,7 +4,7 @@
 
 import type { BehaviorConfig, FallRespawnConfig } from './behaviors';
 import type { ItemEffectKind } from './config';
-import type { EffectType, EnvironmentOverlayBinding } from './effects';
+import type { EffectType, EnvironmentOverlayBinding, FogParticleConfig } from './effects';
 
 export const OBJECT_ROLE = {
   DYNAMIC_BOX: 'DYNAMIC_BOX',
@@ -61,6 +61,7 @@ export interface EnvironmentParticle {
   readonly updateSpeed?: number; // Optional update speed for the particle system
   readonly instanceName?: string; // Optional instance name for behavior registration
   readonly behavior?: BehaviorConfig; // Optional behavior configuration
+  readonly fog?: Partial<FogParticleConfig>; // Per-instance fog overrides when using a fog snippet
 }
 
 export interface BackgroundMusicConfig {
