@@ -55,6 +55,8 @@ export type SettingsActionId =
   | 'split-rendering'
   | 'game-hud'
   | 'inspector'
+  | 'click-to-move'
+  | 'camera-mode'
   | 'pwa-update'
   | 'pwa-purge-cache'
   | 'pwa-install';

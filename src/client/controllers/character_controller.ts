@@ -31,6 +31,8 @@ export class CharacterController {
   /** Reused for zeroing physics velocity without per-call allocations. */
   private readonly zeroLinearVelocity = new BABYLON.Vector3(0, 0, 0);
   private targetRotationY = 0;
+  /** True while click-to-move navigation is driving forward input/facing. */
+  private navMoveActive = false;
   private keysDown = new Set<string>();
   private cameraController: SmoothFollowCameraController | null = null;
   private boostActive = false;
@@ -232,6 +234,10 @@ export class CharacterController {
     return INPUT_KEYS.RESET_CAMERA.some((key) => key === k);
   };
 
+  private isCameraModeKey = (k: string): boolean => {
+    return INPUT_KEYS.CAMERA_MODE.some((key) => key === k);
+  };
+
   private isLeftKey = (k: string): boolean => {
     return INPUT_KEYS.LEFT.some((key) => key === k);
   };
@@ -277,6 +283,8 @@ export class CharacterController {
       this.cycleHUDPosition();
     } else if (this.isResetCameraKey(key)) {
       this.resetCameraToDefaultOffset();
+    } else if (this.isCameraModeKey(key)) {
+      this.cameraController?.toggleViewMode();
     }
 
     // Only update mobile input for iPads with keyboards, not for regular keyboard input
@@ -450,6 +458,16 @@ export class CharacterController {
   };
 
   private updateRotation(): void {
+    // Click-to-move: face the movement direction set by setNavigationMove, bypassing the
+    // camera-driven rotation (which would otherwise turn the capsule to face away from the camera).
+    if (this.navMoveActive) {
+      const rotationSmoothing = this.currentCharacter?.rotationSmoothing ?? 0.2;
+      // Shortest-path wrap so the capsule never spins the long way around.
+      const delta = this.shortestAngleDelta(this.targetRotationY, this.displayCapsule.rotation.y);
+      this.displayCapsule.rotation.y += delta * rotationSmoothing;
+      return;
+    }
+
     // If camera is controlling rotation, don't interfere
     if (this.cameraController?.isRotatingCharacter === true) {
       // Update target rotation to match current rotation to prevent jerking
@@ -473,8 +491,19 @@ export class CharacterController {
       this.targetRotationY += rotationSpeed;
     }
 
+    // Shortest-path wrap so handoffs (navigation end, manual takeover, camera) never spin the
+    // long way around when displayCapsule.rotation.y has drifted beyond +/-PI.
     this.displayCapsule.rotation.y +=
-      (this.targetRotationY - this.displayCapsule.rotation.y) * rotationSmoothing;
+      this.shortestAngleDelta(this.targetRotationY, this.displayCapsule.rotation.y) *
+      rotationSmoothing;
+  }
+
+  /** Smallest signed angle (radians, -PI..PI) to rotate from `current` to `target`. */
+  private shortestAngleDelta(target: number, current: number): number {
+    let delta = target - current;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    return delta;
   }
 
   private updatePosition(): void {
@@ -506,7 +535,8 @@ export class CharacterController {
       return;
     }
 
-    const isMoving = this.isAnyMovementKeyPressed();
+    // Click-to-move counts as moving so the walk clip plays while navigating.
+    const isMoving = this.isAnyMovementKeyPressed() || this.navMoveActive;
 
     // Update animation controller with character state
     this.animationController.updateAnimation(isMoving, this.state);
@@ -514,8 +544,9 @@ export class CharacterController {
     // Update blend weights if currently blending
     this.animationController.updateBlend();
 
-    // Check for walk activation to trigger character rotation
-    if (isMoving && this.cameraController) {
+    // Check for walk activation to trigger character rotation. Skipped during click-to-move:
+    // that lerp would face the capsule away from the camera and fight the nav facing.
+    if (isMoving && !this.navMoveActive && this.cameraController) {
       this.cameraController.checkForWalkActivation();
     }
   }
@@ -1012,6 +1043,97 @@ export class CharacterController {
 
   public resetInputDirection(): void {
     this.inputDirection.setAll(0);
+  }
+
+  // --- Hybrid click-to-move navigation hooks ------------------------------
+  //
+  // Click-to-move never bypasses physics: it only sets the capsule's facing and
+  // applies full forward input, so the existing ground/air velocity, friction,
+  // gravity, rotation-smoothing and animation pipeline drives the capsule exactly
+  // as it does for WASD. Manual input always wins (see ClickToMoveController,
+  // which cancels navigation the moment manual movement is detected).
+
+  /** True when the player is currently providing manual movement (keyboard or touch). */
+  public hasActiveManualMovementInput(): boolean {
+    return this.isAnyMovementKeyPressed();
+  }
+
+  /**
+   * Called when a click-to-move path begins. Resets the camera's walk-activation state so the
+   * tap's POINTERUP does not pause smooth-follow or trigger the face-away-from-camera lerp.
+   */
+  public notifyNavigationStarted(): void {
+    this.cameraController?.forceActivateSmoothFollow();
+  }
+
+  /**
+   * Faces `dirWorld` (horizontal) and applies full forward input so navigation
+   * drives the capsule through the standard physics pipeline.
+   */
+  public setNavigationMove(dirWorld: BABYLON.Vector3): void {
+    this.navMoveActive = true;
+    // Babylon is left-handed: capsule forward is +Z, so face = atan2(x, z).
+    this.targetRotationY = Math.atan2(dirWorld.x, dirWorld.z);
+    this.inputDirection.x = 0;
+    this.inputDirection.z = 1;
+  }
+
+  /** Releases navigation control after the path completes and halts forward input. */
+  public stopNavigationMove(): void {
+    if (!this.navMoveActive) {
+      return;
+    }
+    this.navMoveActive = false;
+    this.inputDirection.x = 0;
+    this.inputDirection.z = 0;
+    this.settleFacingAfterNavigation();
+  }
+
+  /**
+   * Releases navigation control because manual input took over. Rebuilds
+   * inputDirection from the currently held keys so the leftover navigation forward
+   * input does not bleed into manual movement (touch input self-corrects each frame).
+   */
+  public cancelNavigationForManualInput(): void {
+    if (!this.navMoveActive) {
+      return;
+    }
+    this.navMoveActive = false;
+    this.settleFacingAfterNavigation();
+    if (!this.isMobileDevice) {
+      this.syncInputDirectionFromHeldKeys();
+    }
+  }
+
+  /**
+   * Normalizes the capsule's facing into [-PI, PI] and re-syncs `targetRotationY` so the handoff
+   * from navigation to camera/manual control starts with zero residual delta. Without this, the
+   * accumulated `rotation.y` (which can drift a full turn past +/-PI while following a winding path)
+   * would unwind the long way once the general rotation lerp takes over.
+   */
+  private settleFacingAfterNavigation(): void {
+    let y = this.displayCapsule.rotation.y;
+    while (y > Math.PI) y -= 2 * Math.PI;
+    while (y < -Math.PI) y += 2 * Math.PI;
+    this.displayCapsule.rotation.y = y;
+    this.targetRotationY = y;
+  }
+
+  private syncInputDirectionFromHeldKeys(): void {
+    let z = 0;
+    if (INPUT_KEYS.FORWARD.some((key) => this.keysDown.has(key))) {
+      z = 1;
+    } else if (INPUT_KEYS.BACKWARD.some((key) => this.keysDown.has(key))) {
+      z = -1;
+    }
+    let x = 0;
+    if (INPUT_KEYS.STRAFE_LEFT.some((key) => this.keysDown.has(key))) {
+      x = -1;
+    } else if (INPUT_KEYS.STRAFE_RIGHT.some((key) => this.keysDown.has(key))) {
+      x = 1;
+    }
+    this.inputDirection.x = x;
+    this.inputDirection.z = z;
   }
 
   public getCurrentState(): string {
