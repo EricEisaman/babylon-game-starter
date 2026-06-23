@@ -30,7 +30,7 @@ export class AudioManager {
         resolve(null);
       }, timeoutMs);
     });
-    return (await Promise.race([promise, timeout])) as T | null;
+    return (await Promise.race([promise, timeout]));
   }
 
   private static getAudioEngine(): NonNullable<typeof globalThis.__babylonAudioEngine> | null {

@@ -606,7 +606,7 @@ export class ChatManager {
       const payload = patch.cs.payload;
       const message =
         typeof payload === 'object' && payload && 'message' in payload
-          ? String((payload as { message: unknown }).message)
+          ? String((payload).message)
           : 'Chat error';
       this.setState('error', message);
     }
