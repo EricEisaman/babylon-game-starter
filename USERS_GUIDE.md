@@ -139,6 +139,10 @@ Central orchestrator: physics (Havok), mesh import, sky, lights, particles, item
 
 Each **Environment** in `assets.ts` may include `model`, `spawnPoint`, `spawnRotation`, optional `transitionPosition` / `transitionRotation`, `sky`, `particles`, `items`, `physicsObjects`, `lights`, `backgroundMusic`, `ambientSounds`, `cameraOffset`, `cutScene`, and optional **`fallRespawn`** (tuning only; respawn is always registered).
 
+**Gaussian-splat environments** (optional): set `splat` (visible `.ply`), `colliderMesh` (invisible `.glb` for Havok colliders + click-to-move pick target), `navmesh` (prebaked Recast `.nav`), and `clickToMove: true`. These three assets share one untransformed left-handed space, so the GLB X-invert and lightmap paths are skipped; `scale`, `navmeshOffsetY`, and `floorMeshOffsetY` tune alignment. See [MILESTONES.md](MILESTONES.md). "Tropical Compound" is the showcase.
+
+**Camera mode** (optional): `cameraMode` is `'thirdPerson'` (default), `'topDown'`, or `'cycle'`. In `'cycle'` the player switches views with the `2` key or the Settings "Camera View" dropdown; `initialCameraView` (`'thirdPerson'` | `'topDown'`) picks the starting view for cycle envs. Top-down is tuned with `topDownCamera` (offset/position, default `(0, 20, -1)`), `topDownLookAt` (default `true`), and `topDownFollow` (default `true`; `false` = fixed world position). `cameraOffset` is honored as the third-person follow offset and its reset baseline (the `1` key and post-load reset return to it, not the global default).
+
 **Switching at runtime:**
 
 ```typescript
@@ -198,7 +202,7 @@ flowchart TD
 
 ### Physics, camera, HUD, mobile
 
-Match **README** and `game_config.ts`: Havok aggregates for static/dynamic meshes, smooth follow + drag, HUD visibility matrix, **MobileInputManager** for on-screen controls.
+Match **README** and `game_config.ts`: Havok aggregates for static/dynamic meshes, smooth follow + drag, HUD visibility matrix, **MobileInputManager** for on-screen controls. The follow camera (`SmoothFollowCameraController`) also drives the per-environment **camera modes** (third-person / top-down / cycle); `1` resets to the environment's follow offset and `2` cycles views in `'cycle'` environments.
 
 ---
 
