@@ -192,6 +192,16 @@ export class SettingsUI {
           this.toggleInspector(value);
         }
         break;
+      case 'click-to-move':
+        if (typeof value === 'boolean') {
+          this.sceneManager?.setClickToMoveEnabled(value);
+        }
+        break;
+      case 'camera-mode':
+        if (typeof value === 'string') {
+          this.sceneManager?.setCameraView(value === 'Top Down' ? 'topDown' : 'thirdPerson');
+        }
+        break;
       case 'pwa-update':
         await applyPwaUpdate();
         break;

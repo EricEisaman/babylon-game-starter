@@ -34,7 +34,12 @@ export const CONFIG: GameConfig = {
     DRAG_SENSITIVITY: 0.02,
     ZOOM_MIN: -15,
     ZOOM_MAX: -2,
-    FOLLOW_SMOOTHING: 0.1
+    FOLLOW_SMOOTHING: 0.1,
+    // Default top-down camera offset/position (overridable per environment via `topDownCamera`).
+    // The -1 Z keeps the camera 1 unit behind the character instead of exactly overhead: a
+    // perfectly straight-down look gives the TargetCamera a degenerate up-vector and the
+    // rotation flips/spazzes. The slight tilt stays effectively top-down while staying stable.
+    TOP_DOWN_OFFSET: new BABYLON.Vector3(0, 20, -1)
   },
 
   // Physics Settings
@@ -276,6 +281,21 @@ export const CONFIG: GameConfig = {
         visibility: 'all',
         defaultValue: false, // Default state, will be synced with actual element state
         actionId: 'inspector'
+      },
+      {
+        title: 'Click to Move',
+        uiElement: 'toggle',
+        visibility: 'all',
+        defaultValue: true, // On by default in splat envs; no-op elsewhere
+        actionId: 'click-to-move'
+      },
+      {
+        title: 'Camera View',
+        uiElement: 'dropdown',
+        visibility: 'all',
+        options: ['Third Person', 'Top Down'],
+        defaultValue: 'Third Person', // Only effective when the environment's cameraMode is 'cycle'
+        actionId: 'camera-mode'
       },
       {
         title: 'Update App',
