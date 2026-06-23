@@ -14,7 +14,11 @@ import { ScenePerformancePriority } from '@babylonjs/core/scene';
 import { ASSETS } from '../config/assets';
 import { CONFIG } from '../config/game_config';
 import { CharacterController } from '../controllers/character_controller';
-import { SmoothFollowCameraController } from '../controllers/smooth_follow_camera_controller';
+import { ClickToMoveController } from '../controllers/click_to_move_controller';
+import {
+  SmoothFollowCameraController,
+  type CameraViewMode
+} from '../controllers/smooth_follow_camera_controller';
 import { initializeSimulationIfEnabled } from '../simulation/simulation_bootstrap';
 import { OBJECT_ROLE } from '../types/environment';
 import { devLog, isViteDev } from '../utils/dev_log';
@@ -26,6 +30,7 @@ import {
   collectScenePerformanceStats,
   formatScenePerformanceStats
 } from '../utils/scene_performance_stats';
+import { loadInvisibleCollider, loadSplat } from '../utils/splat_loader';
 import { switchToEnvironment } from '../utils/switch_environment';
 
 import { AudioManager } from './audio_manager';
@@ -35,6 +40,7 @@ import { CharacterLoader } from './character_loader';
 import { CollectiblesManager } from './collectibles_manager';
 import { HUDManager } from './hud_manager';
 import { InventoryManager } from './inventory_manager';
+import { NavigationManager } from './navigation_manager';
 import { NodeMaterialManager } from './node_material_manager';
 import { OverlayManager } from './overlay_manager';
 import { SkyManager } from './sky_manager';
@@ -48,6 +54,8 @@ export class SceneManager {
   private readonly camera: BABYLON.TargetCamera;
   private characterController: CharacterController | null = null;
   private smoothFollowController: SmoothFollowCameraController | null = null;
+  /** Active only for splat environments with click-to-move enabled. */
+  private clickToMoveController: ClickToMoveController | null = null;
   private currentEnvironment: string = (() => {
     const defaultEnv = ASSETS.ENVIRONMENTS.find((env) => env.isDefault);
     const name = defaultEnv?.name ?? ASSETS.ENVIRONMENTS[0]?.name;
@@ -96,6 +104,7 @@ export class SceneManager {
   private async initializeScene(): Promise<void> {
     this.setupLighting();
     this.setupPhysics();
+    NavigationManager.initialize(this.scene);
     this.setupSky();
 
     // Character + BehaviorManager before effects/env load so fall-OOB registration never races ahead of init.
@@ -304,33 +313,43 @@ export class SceneManager {
 
     try {
       this.discardEnvironmentHiddenTracking();
+      this.disposeNavigationFeatures();
 
-      const result = await BABYLON.ImportMeshAsync(environment.model, this.scene);
+      if (environment.splat) {
+        // Splat environments load the visible splat + invisible collider + prebaked
+        // navmesh in the same untransformed space (no X-invert, no lightmap). Physics
+        // and click-to-move are wired here instead of via setupEnvironmentPhysics.
+        await this.loadSplatEnvironment(environment);
+      } else {
+        const result = await BABYLON.ImportMeshAsync(environment.model, this.scene);
 
-      // Process node materials for environment meshes
-      await NodeMaterialManager.processImportResult(result);
+        // Process node materials for environment meshes
+        await NodeMaterialManager.processImportResult(result);
 
-      // Rename the root node to "environment" for better organization
-      if (result.meshes.length > 0) {
-        // Find the root mesh (the one without a parent)
-        const rootMesh = result.meshes.find((mesh) => !mesh.parent);
-        if (rootMesh) {
-          rootMesh.name = 'environment';
-          if (environment.scale !== 1) {
-            rootMesh.scaling.x = -environment.scale; // invert X-axis to fix handedness
-            rootMesh.scaling.y = environment.scale;
-            rootMesh.scaling.z = environment.scale;
+        // Rename the root node to "environment" for better organization
+        if (result.meshes.length > 0) {
+          // Find the root mesh (the one without a parent)
+          const rootMesh = result.meshes.find((mesh) => !mesh.parent);
+          if (rootMesh) {
+            rootMesh.name = 'environment';
+            if (environment.scale !== 1) {
+              rootMesh.scaling.x = -environment.scale; // invert X-axis to fix handedness
+              rootMesh.scaling.y = environment.scale;
+              rootMesh.scaling.z = environment.scale;
+            }
           }
         }
-      }
 
-      // Keep env invisible until character GLB is attached and physics is resumed (boot + switch).
-      this.stashEnvironmentMeshesHidden(result.meshes);
+        // Keep env invisible until character GLB is attached and physics is resumed (boot + switch).
+        this.stashEnvironmentMeshesHidden(result.meshes);
+      }
 
       await this.applyEnvironmentBackgroundMusic(environment);
       this.createEnvironmentSky(environment);
 
-      this.setupEnvironmentPhysics(environment);
+      if (!environment.splat) {
+        this.setupEnvironmentPhysics(environment);
+      }
 
       // Set up environment-specific lights if configured
       this.setupEnvironmentLights(environment);
@@ -371,10 +390,11 @@ export class SceneManager {
       // Do not resume physics or show the world here: wait until the playable character is
       // attached and physics is resumed (SettingsUI.changeEnvironment or CharacterLoader).
 
-      // Apply environment-specific camera offset if configured
-      if (environment.cameraOffset !== undefined) {
-        CameraManager.setOffset(environment.cameraOffset);
-      }
+      // Apply the follow camera offset for this environment (falls back to the global default).
+      CameraManager.setOffset(environment.cameraOffset ?? CONFIG.CAMERA.OFFSET);
+
+      // Configure the per-environment camera mode (third person / top down / cycle).
+      this.applyEnvironmentCameraMode(environment);
 
       // Apply environment spawn rotation if transition rotation was not provided
       if (!transitionRotationApplied && this.characterController) {
@@ -383,6 +403,160 @@ export class SceneManager {
     } catch {
       this.recoverFromEnvironmentLoadFailure();
     }
+  }
+
+  /**
+   * Loads a Gaussian-splat environment: the visible splat, an invisible collider
+   * mesh that provides Havok colliders + the click-to-move pick target, and the
+   * prebaked Recast navmesh. All three share one untransformed coordinate space,
+   * so the GLB X-invert/scale and lightmap paths are intentionally skipped.
+   */
+  private async loadSplatEnvironment(environment: Environment): Promise<void> {
+    if (!environment.splat) {
+      return;
+    }
+
+    const { meshes: splatMeshes } = await loadSplat(
+      this.scene,
+      environment.splat.url,
+      'environment-splat',
+      environment.scale
+    );
+    // Keep the splat hidden until the character is attached and physics resumes.
+    this.stashEnvironmentMeshesHidden(splatMeshes);
+
+    let colliderMeshes: BABYLON.AbstractMesh[] = [];
+    if (environment.colliderMesh) {
+      const collider = await loadInvisibleCollider(
+        this.scene,
+        environment.colliderMesh.url,
+        'environment-collider',
+        environment.scale,
+        environment.floorMeshOffsetY ?? 0
+      );
+      colliderMeshes = collider.meshes;
+      // Static MESH colliders so existing WASD/physics movement and gravity work.
+      for (const mesh of collider.geometryMeshes) {
+        new BABYLON.PhysicsAggregate(mesh, BABYLON.PhysicsShapeType.MESH, {
+          mass: 0,
+          friction: 0.9
+        });
+      }
+    }
+
+    if (environment.navmesh) {
+      await this.loadEnvironmentNavMesh(environment);
+    }
+
+    if (environment.clickToMove && environment.navmesh && colliderMeshes.length > 0) {
+      this.setupClickToMove(colliderMeshes);
+    }
+  }
+
+  private async loadEnvironmentNavMesh(environment: Environment): Promise<void> {
+    if (!environment.navmesh) {
+      return;
+    }
+    try {
+      const data = await BABYLON.Tools.LoadFileAsync(environment.navmesh.url, true);
+      if (!(data instanceof ArrayBuffer)) {
+        devLog('[SceneManager] Navmesh fetch did not return binary data');
+        return;
+      }
+      const loaded = await NavigationManager.loadNavMesh(
+        new Uint8Array(data),
+        environment.scale,
+        environment.navmeshOffsetY ?? 0
+      );
+      if (loaded) {
+        this.snapCharacterToNavMesh(environment);
+      }
+    } catch (error) {
+      devLog('[SceneManager] Failed to load navmesh', error);
+    }
+  }
+
+  /**
+   * Snaps an already-loaded character onto the navmesh near the configured spawn so
+   * the capsule starts on the floor. On initial boot the character loads after the
+   * environment; in that case computePath snaps the path start at click time, so a
+   * missing character here is harmless.
+   */
+  private snapCharacterToNavMesh(environment: Environment): void {
+    if (!this.characterController) {
+      return;
+    }
+    const snapped = NavigationManager.findClosestPoint(environment.spawnPoint);
+    if (!snapped) {
+      return;
+    }
+    snapped.y += CONFIG.ANIMATION.PLAYER_Y_OFFSET;
+    this.characterController.setPosition(snapped);
+  }
+
+  private setupClickToMove(colliderMeshes: readonly BABYLON.AbstractMesh[]): void {
+    if (!this.characterController) {
+      return;
+    }
+    this.clickToMoveController = new ClickToMoveController(
+      this.scene,
+      this.characterController,
+      colliderMeshes
+    );
+  }
+
+  /** Tears down click-to-move + navmesh state when leaving a splat environment. */
+  private disposeNavigationFeatures(): void {
+    this.clickToMoveController?.dispose();
+    this.clickToMoveController = null;
+    NavigationManager.dispose();
+    NavigationManager.initialize(this.scene);
+  }
+
+  /** Enables/disables click-to-move at runtime (Settings toggle). No-op outside splat envs. */
+  public setClickToMoveEnabled(enabled: boolean): void {
+    this.clickToMoveController?.setEnabled(enabled);
+  }
+
+  public isClickToMoveAvailable(): boolean {
+    return this.clickToMoveController !== null;
+  }
+
+  /**
+   * Configures the camera for an environment: applies top-down parameters and sets the initial
+   * view + whether the user may switch views (only `cameraMode: 'cycle'` enables switching).
+   */
+  private applyEnvironmentCameraMode(environment: Environment): void {
+    if (!this.smoothFollowController) {
+      return;
+    }
+
+    this.smoothFollowController.configureTopDown(
+      environment.topDownCamera ?? CONFIG.CAMERA.TOP_DOWN_OFFSET,
+      environment.topDownLookAt ?? true,
+      environment.topDownFollow ?? true
+    );
+
+    const mode = environment.cameraMode ?? 'thirdPerson';
+    if (mode === 'cycle') {
+      this.smoothFollowController.setCyclingEnabled(true);
+      this.smoothFollowController.setViewMode(environment.initialCameraView ?? 'thirdPerson');
+    } else {
+      this.smoothFollowController.setCyclingEnabled(false);
+      this.smoothFollowController.setViewMode(mode);
+    }
+  }
+
+  /** Sets the active camera view (used by the Settings dropdown). No-op when cycling is disabled. */
+  public setCameraView(mode: CameraViewMode): void {
+    if (this.smoothFollowController?.isCyclingEnabled() === true) {
+      this.smoothFollowController.setViewMode(mode);
+    }
+  }
+
+  /** Cycles between third person and top down (used by the camera-mode key). No-op when locked. */
+  public cycleCameraView(): void {
+    this.smoothFollowController?.toggleViewMode();
   }
 
   private async stopBackgroundMusicForSwitch(): Promise<void> {

@@ -16,5 +16,7 @@ export const INPUT_KEYS = {
   DEBUG: ['0'],
   HUD_TOGGLE: ['h'],
   HUD_POSITION: ['p'],
-  RESET_CAMERA: ['1']
+  RESET_CAMERA: ['1'],
+  /** Cycle camera view (third person <-> top down) when the environment's cameraMode is 'cycle'. */
+  CAMERA_MODE: ['2']
 } as const;
