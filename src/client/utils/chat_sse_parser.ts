@@ -14,7 +14,7 @@ function parseDatastarSignalsPayload(raw: string): ChatSignalPatch | null {
   try {
     const parsed: unknown = JSON.parse(trimmed);
     if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as ChatSignalPatch;
+      return parsed;
     }
   } catch {
     // Ignore malformed chunks.
