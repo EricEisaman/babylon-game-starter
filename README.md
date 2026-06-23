@@ -99,6 +99,8 @@ To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FE
 - **Optional state simulation** — SynapticLab demo with `?sim=1`, behavior-driven meter updates, and DOM overlays
 - **Physics-based movement** — Havok integration for character movement, jumping, and boost
 - **Environment system** — Switchable 3D worlds with music, particles, items, sky, overlays, optional fall-respawn hooks
+- **Gaussian-splat environments + click-to-move** — Optional splat worlds with hybrid navmesh navigation (Recast): tap-to-walk runs alongside the existing WASD/jump/boost physics controls; see [MILESTONES.md](MILESTONES.md)
+- **Camera modes** — Per-environment third-person follow, top-down, or user-cyclable (`2` key / Settings "Camera View")
 - **Collectibles and inventory** — Pickup, credits, inventory, and temporary item effects
 - **Behavior system** — Proximity triggers, fall-out-of-world respawn, glow, `adjustCredits`, and environment `portal` actions
 - **HUD** — Device-adaptive layout (desktop / mobile / iPad + keyboard) from `game_config.ts`

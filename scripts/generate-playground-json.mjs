@@ -83,15 +83,30 @@ async function readFileMap(files) {
   return map;
 }
 
+async function readImportMap() {
+  // The Babylon Playground V2 manifest resolves bare specifiers through this import map
+  // (specifier -> esm.sh URL). `recast-navigation` must be pinned to our installed version;
+  // otherwise the Playground falls back to the older copy bundled by Babylon's navigation
+  // plugin, which predates `importNavMesh` and breaks compilation.
+  const pkgRaw = await fs.readFile(path.join(repoRoot, 'package.json'), 'utf8');
+  const pkg = JSON.parse(pkgRaw);
+  const recastRange = pkg.dependencies?.['recast-navigation'] ?? '0.43.1';
+  const recastVersion = recastRange.replace(/^[^0-9]*/, '');
+  return {
+    'recast-navigation': `https://esm.sh/recast-navigation@${recastVersion}`,
+  };
+}
+
 async function generate() {
   const files = await collectSourceFiles();
   const fileMap = await readFileMap(files);
+  const imports = await readImportMap();
 
   const codeManifest = {
     v: 2,
     language: 'TS',
     entry: entryFile,
-    imports: {},
+    imports,
     files: fileMap,
   };
 
