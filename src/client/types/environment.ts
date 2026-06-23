@@ -138,10 +138,47 @@ export type LightConfig =
   | HemisphericLightConfig
   | RectangularAreaLightConfig;
 
+/**
+ * Gaussian-splat environment assets. When `splat` is present the environment is treated as a
+ * "splat environment": the visible world is the splat, physics/click-targets come from an invisible
+ * collider mesh, and navigation comes from a prebaked Recast navmesh. These three assets are authored
+ * in the same untransformed (left-handed) space, so the usual GLB X-invert/scale and lightmap paths
+ * are skipped to keep them aligned (see SceneManager.loadEnvironment).
+ */
+export interface SplatAsset {
+  readonly url: string;
+}
+
+export interface ColliderMeshAsset {
+  readonly url: string;
+}
+
+export interface NavMeshAsset {
+  readonly url: string;
+}
+
 export interface Environment {
   readonly name: string;
   readonly model: string;
   isDefault?: boolean;
+  /** Visible Gaussian splat (.ply/.spz/.splat). Presence marks this as a splat environment. */
+  readonly splat?: SplatAsset;
+  /** Invisible mesh (.glb) used for Havok physics colliders and the click-to-move pick target. */
+  readonly colliderMesh?: ColliderMeshAsset;
+  /** Prebaked Recast navmesh binary (.nav) consumed via recast-navigation's importNavMesh. */
+  readonly navmesh?: NavMeshAsset;
+  /** Enables hybrid click-to-move for this environment (requires `navmesh` + `colliderMesh`). */
+  readonly clickToMove?: boolean;
+  /**
+   * World-space Y added to navmesh points (spawn snap + path waypoints) so the prebaked navmesh
+   * can be nudged to sit on the visible floor. Applied after `scale`. Defaults to 0.
+   */
+  readonly navmeshOffsetY?: number;
+  /**
+   * World-space Y offset applied to the invisible collider mesh root (the Havok physics floor and
+   * click-to-move pick target). Applied after `scale`, independent of `navmeshOffsetY`. Defaults to 0.
+   */
+  readonly floorMeshOffsetY?: number;
   readonly lightmap: string;
   readonly scale: number;
   readonly lightmappedMeshes: readonly LightmappedMesh[];

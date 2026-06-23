@@ -278,6 +278,13 @@ export const CONFIG: GameConfig = {
         actionId: 'inspector'
       },
       {
+        title: 'Click to Move',
+        uiElement: 'toggle',
+        visibility: 'all',
+        defaultValue: true, // On by default in splat envs; no-op elsewhere
+        actionId: 'click-to-move'
+      },
+      {
         title: 'Update App',
         uiElement: 'button',
         visibility: 'all',

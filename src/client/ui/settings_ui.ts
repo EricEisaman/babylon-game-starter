@@ -192,6 +192,11 @@ export class SettingsUI {
           this.toggleInspector(value);
         }
         break;
+      case 'click-to-move':
+        if (typeof value === 'boolean') {
+          this.sceneManager?.setClickToMoveEnabled(value);
+        }
+        break;
       case 'pwa-update':
         await applyPwaUpdate();
         break;
