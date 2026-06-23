@@ -15,7 +15,10 @@ import { ASSETS } from '../config/assets';
 import { CONFIG } from '../config/game_config';
 import { CharacterController } from '../controllers/character_controller';
 import { ClickToMoveController } from '../controllers/click_to_move_controller';
-import { SmoothFollowCameraController } from '../controllers/smooth_follow_camera_controller';
+import {
+  SmoothFollowCameraController,
+  type CameraViewMode
+} from '../controllers/smooth_follow_camera_controller';
 import { initializeSimulationIfEnabled } from '../simulation/simulation_bootstrap';
 import { OBJECT_ROLE } from '../types/environment';
 import { devLog, isViteDev } from '../utils/dev_log';
@@ -387,10 +390,11 @@ export class SceneManager {
       // Do not resume physics or show the world here: wait until the playable character is
       // attached and physics is resumed (SettingsUI.changeEnvironment or CharacterLoader).
 
-      // Apply environment-specific camera offset if configured
-      if (environment.cameraOffset !== undefined) {
-        CameraManager.setOffset(environment.cameraOffset);
-      }
+      // Apply the follow camera offset for this environment (falls back to the global default).
+      CameraManager.setOffset(environment.cameraOffset ?? CONFIG.CAMERA.OFFSET);
+
+      // Configure the per-environment camera mode (third person / top down / cycle).
+      this.applyEnvironmentCameraMode(environment);
 
       // Apply environment spawn rotation if transition rotation was not provided
       if (!transitionRotationApplied && this.characterController) {
@@ -516,6 +520,43 @@ export class SceneManager {
 
   public isClickToMoveAvailable(): boolean {
     return this.clickToMoveController !== null;
+  }
+
+  /**
+   * Configures the camera for an environment: applies top-down parameters and sets the initial
+   * view + whether the user may switch views (only `cameraMode: 'cycle'` enables switching).
+   */
+  private applyEnvironmentCameraMode(environment: Environment): void {
+    if (!this.smoothFollowController) {
+      return;
+    }
+
+    this.smoothFollowController.configureTopDown(
+      environment.topDownCamera ?? CONFIG.CAMERA.TOP_DOWN_OFFSET,
+      environment.topDownLookAt ?? true,
+      environment.topDownFollow ?? true
+    );
+
+    const mode = environment.cameraMode ?? 'thirdPerson';
+    if (mode === 'cycle') {
+      this.smoothFollowController.setCyclingEnabled(true);
+      this.smoothFollowController.setViewMode(environment.initialCameraView ?? 'thirdPerson');
+    } else {
+      this.smoothFollowController.setCyclingEnabled(false);
+      this.smoothFollowController.setViewMode(mode);
+    }
+  }
+
+  /** Sets the active camera view (used by the Settings dropdown). No-op when cycling is disabled. */
+  public setCameraView(mode: CameraViewMode): void {
+    if (this.smoothFollowController?.isCyclingEnabled() === true) {
+      this.smoothFollowController.setViewMode(mode);
+    }
+  }
+
+  /** Cycles between third person and top down (used by the camera-mode key). No-op when locked. */
+  public cycleCameraView(): void {
+    this.smoothFollowController?.toggleViewMode();
   }
 
   private async stopBackgroundMusicForSwitch(): Promise<void> {

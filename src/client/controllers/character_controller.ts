@@ -234,6 +234,10 @@ export class CharacterController {
     return INPUT_KEYS.RESET_CAMERA.some((key) => key === k);
   };
 
+  private isCameraModeKey = (k: string): boolean => {
+    return INPUT_KEYS.CAMERA_MODE.some((key) => key === k);
+  };
+
   private isLeftKey = (k: string): boolean => {
     return INPUT_KEYS.LEFT.some((key) => key === k);
   };
@@ -279,6 +283,8 @@ export class CharacterController {
       this.cycleHUDPosition();
     } else if (this.isResetCameraKey(key)) {
       this.resetCameraToDefaultOffset();
+    } else if (this.isCameraModeKey(key)) {
+      this.cameraController?.toggleViewMode();
     }
 
     // Only update mobile input for iPads with keyboards, not for regular keyboard input
@@ -456,10 +462,8 @@ export class CharacterController {
     // camera-driven rotation (which would otherwise turn the capsule to face away from the camera).
     if (this.navMoveActive) {
       const rotationSmoothing = this.currentCharacter?.rotationSmoothing ?? 0.2;
-      let delta = this.targetRotationY - this.displayCapsule.rotation.y;
       // Shortest-path wrap so the capsule never spins the long way around.
-      while (delta > Math.PI) delta -= 2 * Math.PI;
-      while (delta < -Math.PI) delta += 2 * Math.PI;
+      const delta = this.shortestAngleDelta(this.targetRotationY, this.displayCapsule.rotation.y);
       this.displayCapsule.rotation.y += delta * rotationSmoothing;
       return;
     }
@@ -487,8 +491,19 @@ export class CharacterController {
       this.targetRotationY += rotationSpeed;
     }
 
+    // Shortest-path wrap so handoffs (navigation end, manual takeover, camera) never spin the
+    // long way around when displayCapsule.rotation.y has drifted beyond +/-PI.
     this.displayCapsule.rotation.y +=
-      (this.targetRotationY - this.displayCapsule.rotation.y) * rotationSmoothing;
+      this.shortestAngleDelta(this.targetRotationY, this.displayCapsule.rotation.y) *
+      rotationSmoothing;
+  }
+
+  /** Smallest signed angle (radians, -PI..PI) to rotate from `current` to `target`. */
+  private shortestAngleDelta(target: number, current: number): number {
+    let delta = target - current;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    return delta;
   }
 
   private updatePosition(): void {
@@ -1071,6 +1086,7 @@ export class CharacterController {
     this.navMoveActive = false;
     this.inputDirection.x = 0;
     this.inputDirection.z = 0;
+    this.settleFacingAfterNavigation();
   }
 
   /**
@@ -1083,9 +1099,24 @@ export class CharacterController {
       return;
     }
     this.navMoveActive = false;
+    this.settleFacingAfterNavigation();
     if (!this.isMobileDevice) {
       this.syncInputDirectionFromHeldKeys();
     }
+  }
+
+  /**
+   * Normalizes the capsule's facing into [-PI, PI] and re-syncs `targetRotationY` so the handoff
+   * from navigation to camera/manual control starts with zero residual delta. Without this, the
+   * accumulated `rotation.y` (which can drift a full turn past +/-PI while following a winding path)
+   * would unwind the long way once the general rotation lerp takes over.
+   */
+  private settleFacingAfterNavigation(): void {
+    let y = this.displayCapsule.rotation.y;
+    while (y > Math.PI) y -= 2 * Math.PI;
+    while (y < -Math.PI) y += 2 * Math.PI;
+    this.displayCapsule.rotation.y = y;
+    this.targetRotationY = y;
   }
 
   private syncInputDirectionFromHeldKeys(): void {

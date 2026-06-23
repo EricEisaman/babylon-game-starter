@@ -4,12 +4,28 @@
 
 import { CONFIG } from '../config/game_config';
 
+import type { CameraViewMode } from '../types/environment';
+
+export type { CameraViewMode };
+
 export class SmoothFollowCameraController {
   private readonly scene: BABYLON.Scene;
   private readonly camera: BABYLON.TargetCamera;
   private readonly target: BABYLON.AbstractMesh;
   private offset: BABYLON.Vector3;
+  /** Reset baseline for `resetCameraToDefaultOffset`; tracks the active environment's offset. */
+  private readonly defaultOffset: BABYLON.Vector3;
   private readonly dragSensitivity: number;
+
+  // Top-down view state. `viewMode` selects which update path runs each frame;
+  // `cyclingEnabled` gates user switching (only true for `cameraMode: 'cycle'` envs).
+  private viewMode: CameraViewMode = 'thirdPerson';
+  private cyclingEnabled = false;
+  private topDownOffset: BABYLON.Vector3 = CONFIG.CAMERA.TOP_DOWN_OFFSET.clone();
+  private topDownLookAt = true;
+  private topDownFollow = true;
+  /** Reused per-frame target for the top-down camera to avoid allocations. */
+  private readonly topDownScratch = new BABYLON.Vector3();
 
   public isDragging = false;
   public dragDeltaX = 0;
@@ -42,6 +58,7 @@ export class SmoothFollowCameraController {
     this.camera = camera;
     this.target = target;
     this.offset = offset.clone();
+    this.defaultOffset = offset.clone();
     this.dragSensitivity = dragSensitivity;
 
     this.initializeEventListeners();
@@ -61,6 +78,11 @@ export class SmoothFollowCameraController {
   }
 
   private handlePointer = (pointerInfo: BABYLON.PointerInfo): void => {
+    // Top-down camera ignores drag-pan/rotate so it stays locked overhead.
+    if (this.viewMode === 'topDown') {
+      return;
+    }
+
     switch (pointerInfo.type) {
       case BABYLON.PointerEventTypes.POINTERDOWN:
         this.isDragging = true;
@@ -175,6 +197,13 @@ export class SmoothFollowCameraController {
   };
 
   private updateCamera = (): void => {
+    // Top-down view runs its own positioning and skips third-person follow + the
+    // face-away-from-camera character rotation lerp entirely.
+    if (this.viewMode === 'topDown') {
+      this.updateTopDownCamera();
+      return;
+    }
+
     if (!this.isDragging) {
       // Only smooth follow if we're not waiting for walk activation
       if (!this.shouldStartRotationOnWalk) {
@@ -187,6 +216,46 @@ export class SmoothFollowCameraController {
     // Update character rotation lerp
     this.updateCharacterRotationLerp();
   };
+
+  private updateTopDownCamera(): void {
+    // Follow: hold `topDownOffset` above the character. Fixed: sit at the absolute position.
+    if (this.topDownFollow) {
+      this.target.position.addToRef(this.topDownOffset, this.topDownScratch);
+    } else {
+      this.topDownScratch.copyFrom(this.topDownOffset);
+    }
+
+    BABYLON.Vector3.LerpToRef(
+      this.camera.position,
+      this.topDownScratch,
+      CONFIG.CAMERA.FOLLOW_SMOOTHING,
+      this.camera.position
+    );
+
+    // lockedTarget would override setTarget, so clear it for the top-down path.
+    this.camera.lockedTarget = null;
+
+    if (!this.topDownLookAt) {
+      // Look straight down (orientation independent of the character).
+      this.camera.position.addToRef(BABYLON.Vector3.Down(), this.topDownScratch);
+      this.camera.setTarget(this.topDownScratch);
+      return;
+    }
+
+    if (this.topDownFollow) {
+      // Follow + look-at: derive the look point from the fixed offset (camera - offset) rather
+      // than the live character position. The smoothing lerp makes the camera trail the character
+      // laterally; aiming at the live position would tilt the view horizontally and yaw the camera
+      // every frame. Using the constant offset keeps a fixed orientation (no Y-axis rotation) while
+      // still framing the character in steady state.
+      this.camera.position.subtractToRef(this.topDownOffset, this.topDownScratch);
+      this.camera.setTarget(this.topDownScratch);
+    } else {
+      // Fixed position + look-at: the camera is stationary, so it rotates to keep the moving
+      // character framed.
+      this.camera.setTarget(this.target.position);
+    }
+  }
 
   private smoothFollowTarget(): void {
     // If character is rotating, pause the smooth follow camera
@@ -283,8 +352,54 @@ export class SmoothFollowCameraController {
   public checkForWalkActivation(): void {
     if (this.shouldStartRotationOnWalk) {
       this.shouldStartRotationOnWalk = false;
-      this.startCharacterRotationLerp();
+      // The face-away-from-camera lerp only makes sense in third person.
+      if (this.viewMode === 'thirdPerson') {
+        this.startCharacterRotationLerp();
+      }
     }
+  }
+
+  // --- Top-down / view mode API ------------------------------------------
+
+  /** Configures the top-down camera offset/position, look-at, and follow behavior. */
+  public configureTopDown(
+    offset: BABYLON.Vector3,
+    lookAt: boolean,
+    follow: boolean
+  ): void {
+    this.topDownOffset.copyFrom(offset);
+    this.topDownLookAt = lookAt;
+    this.topDownFollow = follow;
+  }
+
+  /** Enables/disables user view switching (only true for `cameraMode: 'cycle'` environments). */
+  public setCyclingEnabled(enabled: boolean): void {
+    this.cyclingEnabled = enabled;
+  }
+
+  public isCyclingEnabled(): boolean {
+    return this.cyclingEnabled;
+  }
+
+  public getViewMode(): CameraViewMode {
+    return this.viewMode;
+  }
+
+  /** Sets the active view mode and resets transient third-person follow state. */
+  public setViewMode(mode: CameraViewMode): void {
+    if (this.viewMode === mode) {
+      return;
+    }
+    this.viewMode = mode;
+    this.forceActivateSmoothFollow();
+  }
+
+  /** Toggles between third person and top down. No-op unless cycling is enabled. */
+  public toggleViewMode(): void {
+    if (!this.cyclingEnabled) {
+      return;
+    }
+    this.setViewMode(this.viewMode === 'thirdPerson' ? 'topDown' : 'thirdPerson');
   }
 
   /**
@@ -304,14 +419,16 @@ export class SmoothFollowCameraController {
    */
   public setOffset(offset: BABYLON.Vector3): void {
     this.offset.copyFrom(offset);
+    // The env-configured offset is now the reset baseline so post-load reset / the `1` key honor it.
+    this.defaultOffset.copyFrom(offset);
   }
 
   /**
    * Reset camera to default offset from player
    */
   public resetCameraToDefaultOffset(): void {
-    // Reset the offset to the default configuration
-    this.offset.copyFrom(CONFIG.CAMERA.OFFSET);
+    // Reset to the active environment's offset baseline (falls back to the global default).
+    this.offset.copyFrom(this.defaultOffset);
 
     // Force activate smooth follow to ensure camera moves to new position
     this.forceActivateSmoothFollow();

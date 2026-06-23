@@ -36,6 +36,17 @@ controller without changing any WASD / jump / boost behavior.
 - **Settings**: a runtime "Click to Move" toggle (`src/client/config/game_config.ts`,
   `src/client/ui/settings_ui.ts`) enables/disables the feature per session; it is a
   no-op outside splat environments.
+- **Facing**: navigation drives the capsule's facing through the standard rotation
+  pipeline and, on arrival (or manual takeover), settles to the final travel
+  direction by the shortest angle — no end-of-path spin.
+- **Camera modes** (`src/client/controllers/smooth_follow_camera_controller.ts`,
+  `scene_manager.ts`): each environment picks `cameraMode` — `thirdPerson`
+  (default), `topDown`, or `cycle`. `cycle` lets the player switch views with the
+  `2` key or the Settings "Camera View" dropdown, with `initialCameraView` choosing
+  the starting view. Top-down is tuned per env via `topDownCamera` / `topDownLookAt`
+  / `topDownFollow`; the third-person `cameraOffset` is honored as the follow offset
+  and reset baseline. Tropical Compound ships as the default env, starting top-down
+  in cycle mode.
 
 ## M2 — NPC system (planned)
 

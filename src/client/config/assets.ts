@@ -890,7 +890,7 @@ export const ASSETS = {
     },
     {
       name: 'Mansion',
-      isDefault: true,
+      isDefault: false,
       model:
         'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/environments/mansion/mansion.glb',
       lightmap: '',
@@ -913,7 +913,9 @@ export const ASSETS = {
       // is a prebaked Recast navmesh. All three are authored in the same untransformed
       // space, so SceneManager skips the GLB X-invert/lightmap paths (scale stays 1).
       name: 'Tropical Compound',
+      isDefault: true,
       model: '', // unused for splat environments
+      cameraOffset: new BABYLON.Vector3(0, 0.5, -4.5),
       splat: {
         url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.ply'
       },
@@ -924,6 +926,10 @@ export const ASSETS = {
         url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.nav'
       },
       clickToMove: true,
+      // Lets the player switch between third-person and top-down with the 2 key or Settings.
+      cameraMode: 'cycle',
+      // Starts overhead; the player can switch to third-person via the 2 key or Settings.
+      initialCameraView: 'topDown',
       lightmap: '',
       scale: 2,
       // Drops the navmesh and physics-collider floor so they rest on the visible splat floor.

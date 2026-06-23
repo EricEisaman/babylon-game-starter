@@ -56,6 +56,7 @@ export type SettingsActionId =
   | 'game-hud'
   | 'inspector'
   | 'click-to-move'
+  | 'camera-mode'
   | 'pwa-update'
   | 'pwa-purge-cache'
   | 'pwa-install';

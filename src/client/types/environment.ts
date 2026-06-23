@@ -23,6 +23,18 @@ export type ColliderType = 'BOX' | 'SPHERE' | 'CAPSULE' | 'CYLINDER' | 'CONVEX_H
 
 export type CutSceneType = 'image' | 'video';
 
+/**
+ * Per-environment camera behavior:
+ * - `thirdPerson`: locked to the smooth-follow third-person camera.
+ * - `topDown`: locked to the overhead top-down camera.
+ * - `cycle`: starts in third person; the user can switch between third person and top down
+ *   via the camera-mode key (2) or the Settings "Camera View" control.
+ */
+/** Concrete camera views. Add future modes here (e.g. 'firstPerson', 'isometric'). */
+export type CameraViewMode = 'thirdPerson' | 'topDown';
+/** Per-environment camera behavior: a concrete view, or 'cycle' to allow user switching. */
+export type CameraMode = CameraViewMode | 'cycle';
+
 export interface CutScene {
   readonly type: CutSceneType;
   readonly visualUrl: string;
@@ -195,6 +207,26 @@ export interface Environment {
   readonly ambientSounds?: readonly AmbientSoundConfig[]; // Optional positional ambient sounds
   readonly lights?: readonly LightConfig[]; // Optional environment-specific lights
   readonly cameraOffset?: BABYLON.Vector3; // Optional camera offset for this environment
+  /** Camera behavior for this environment (third person, top down, or user-cyclable). Defaults to `thirdPerson`. */
+  readonly cameraMode?: CameraMode;
+  /**
+   * Starting view when `cameraMode` is 'cycle'. Ignored for non-cycle modes (those lock to the
+   * mode itself). Defaults to 'thirdPerson'.
+   */
+  readonly initialCameraView?: CameraViewMode;
+  /**
+   * Top-down camera offset (when `topDownFollow`) or fixed world position (when not). Defaults to
+   * `CONFIG.CAMERA.TOP_DOWN_OFFSET` (0,20,-1) — slightly behind the character to avoid a degenerate
+   * straight-down look that makes the camera rotation flip.
+   */
+  readonly topDownCamera?: BABYLON.Vector3;
+  /** When true, the top-down camera looks at the character; otherwise it looks straight down. Defaults to true. */
+  readonly topDownLookAt?: boolean;
+  /**
+   * When true, the top-down camera follows the character (staying at `topDownCamera` above them).
+   * When false, it stays at the fixed world position `topDownCamera`. Defaults to true.
+   */
+  readonly topDownFollow?: boolean;
   readonly cutScene?: CutScene; // Optional cutscene to play when switching to this environment
   /**
    * Optional fall-off-map tuning and per-environment `onRespawnedHandlerId`. Fall respawn to this
