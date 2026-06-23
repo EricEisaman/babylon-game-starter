@@ -36,6 +36,7 @@ export interface CameraConfig {
   readonly ZOOM_MIN: number;
   readonly ZOOM_MAX: number;
   readonly FOLLOW_SMOOTHING: number;
+  readonly TOP_DOWN_OFFSET: BABYLON.Vector3;
 }
 
 export interface PhysicsConfig {
