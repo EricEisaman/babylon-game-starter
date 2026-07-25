@@ -89,12 +89,6 @@ export interface AmbientSoundConfig {
   readonly maxDistance?: number; // Defaults to 40
 }
 
-/** @deprecated Use `overlays` + `CONFIG.EFFECTS.OVERLAY_SNIPPETS` via OverlayManager. */
-export interface EnvironmentSmartFilter {
-  readonly snippetId: string;
-  readonly enabled?: boolean;
-}
-
 // ============================================================================
 // LIGHT TYPE DEFINITIONS
 // ============================================================================
@@ -151,11 +145,13 @@ export type LightConfig =
   | RectangularAreaLightConfig;
 
 /**
- * Gaussian-splat environment assets. When `splat` is present the environment is treated as a
- * "splat environment": the visible world is the splat, physics/click-targets come from an invisible
- * collider mesh, and navigation comes from a prebaked Recast navmesh. These three assets are authored
- * in the same untransformed (left-handed) space, so the usual GLB X-invert/scale and lightmap paths
- * are skipped to keep them aligned (see SceneManager.loadEnvironment).
+ * Gaussian-splat environment assets. When `splat` is present the environment is a
+ * "splat environment" (not a standard mesh world): the visible world is the splat,
+ * Havok/click targets come from a **separate** invisible collider GLB, and navigation
+ * comes from a prebaked Recast navmesh. Presence of `splat` selects
+ * `SceneManager.loadSplatEnvironment` instead of `ImportMeshAsync(model)` +
+ * `setupEnvironmentPhysics`. The three assets are authored in the same untransformed
+ * (left-handed) space so the usual GLB X-invert/lightmap paths are skipped.
  */
 export interface SplatAsset {
   readonly url: string;
@@ -173,9 +169,12 @@ export interface Environment {
   readonly name: string;
   readonly model: string;
   isDefault?: boolean;
-  /** Visible Gaussian splat (.ply/.spz/.splat). Presence marks this as a splat environment. */
+  /** Visible Gaussian splat (.ply/.spz/.splat). Presence marks this as a splat environment (`model` unused). */
   readonly splat?: SplatAsset;
-  /** Invisible mesh (.glb) used for Havok physics colliders and the click-to-move pick target. */
+  /**
+   * Dedicated invisible triangle mesh (.glb / prefer `*.collision.glb`) for Havok static MESH
+   * bodies and click-to-move picks. Never the splat itself; loaded only on the splat path.
+   */
   readonly colliderMesh?: ColliderMeshAsset;
   /** Prebaked Recast navmesh binary (.nav) consumed via recast-navigation's importNavMesh. */
   readonly navmesh?: NavMeshAsset;
@@ -187,8 +186,8 @@ export interface Environment {
    */
   readonly navmeshOffsetY?: number;
   /**
-   * World-space Y offset applied to the invisible collider mesh root (the Havok physics floor and
-   * click-to-move pick target). Applied after `scale`, independent of `navmeshOffsetY`. Defaults to 0.
+   * World-space Y offset applied to the invisible collider mesh root (Havok + click pick target).
+   * Applied after `scale`, independent of `navmeshOffsetY`. Defaults to 0.
    */
   readonly floorMeshOffsetY?: number;
   readonly lightmap: string;
@@ -235,8 +234,6 @@ export interface Environment {
   readonly fallRespawn?: FallRespawnConfig;
   /** Full-screen overlays (SFE / NME / dom) — cleared on every environment switch. */
   readonly overlays?: readonly EnvironmentOverlayBinding[];
-  /** @deprecated Prefer `overlays`. */
-  readonly smartFilter?: EnvironmentSmartFilter;
 }
 
 // Forward declarations for circular dependencies

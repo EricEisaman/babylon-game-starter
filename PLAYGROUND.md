@@ -13,7 +13,21 @@ This document is the authoritative reference for anyone editing code that ends u
 
 ## What gets exported
 
-`npm run export:playground` packages every `.ts` file under the folders listed in [`scripts/generate-playground-json.mjs`](scripts/generate-playground-json.mjs)'s `exportRoots` array — currently `config`, `controllers`, `datastar`, `input`, `managers`, `sync`, `types`, `ui`, `utils` — plus the entry file `src/client/index.ts`. The output is a Babylon playground v2 multifile manifest wrapped in the snippet-server envelope, written to both `src/client/public/playground.json` (served by Vite in dev) and `src/client/playground/playground.json` (the distribution copy).
+`npm run export:playground` packages every `.ts` file under the folders listed in [`scripts/generate-playground-json.mjs`](scripts/generate-playground-json.mjs)'s `exportRoots` array — currently `config`, `controllers`, `datastar`, `input`, `managers`, `sync`, `types`, `ui`, `utils` — plus the entry file `src/client/index.ts`. The output is a Babylon playground v2 multifile manifest wrapped in the snippet-server envelope, written to both `src/client/public/playground.json` (served by Vite in dev) and `src/client/playground/playground.json` (the distribution copy). Payload `engine` is **`WebGL2`** (classroom default).
+
+### WebGPU export
+
+`npm run export:playground:webgpu` runs the same pipeline with `--engine=WebGPU` and writes **`playground-wgpu.json`** next to the WebGL files (it does **not** overwrite `playground.json`). Load that file via Scene → Load in <https://playground.babylonjs.com/>; the playground may prompt to switch engines. Requires a Chromium-based browser with WebGPU enabled.
+
+The Vite app’s engine choice is separate from the playground host:
+
+| Path | How the engine is chosen |
+| ---- | ------------------------ |
+| `npm run dev` | `CONFIG.PERFORMANCE.ENGINE` (default `'webgl'`) |
+| `npm run dev:wgpu` | `VITE_ENGINE=webgpu` overrides config for that Vite process |
+| Playground snippet | Payload `engine` (`WebGL2` / `WebGPU`); host creates the engine |
+
+Env-switch light hygiene (`disposeImportedLights`, orphan light sweep, material light-dirty) runs in both Vite and playground exports so WebGPU UBO size mismatches do not recur on portal / settings environment changes.
 
 Everything under these folders runs inside the playground's Monaco TypeScript service and the playground's blob-URL ESM loader. Both environments are stricter / narrower than your local `tsc` + Vite setup, and the two constraints below exist because of that gap.
 
@@ -137,9 +151,10 @@ Symptoms map to layers as follows:
 | **`Namespace '"@babylonjs/core"' has no exported member ...`** in Monaco | A file has `import * as BABYLON from '@babylonjs/core'` | Grep `exportRoots` folders for that import |
 | **`The playground timed out while preparing the runnable`** on the very first Run | TypeScript hydration hitting the ~10 s compile window cold | Re-click Run; the TS cache almost always succeeds the second time |
 | **`HavokPhysics is not defined`** during scene build | Havok WASM plugin toggle is off | Top-right plugin menu → **Add WASM plugin → Havok** |
-| **`CORS blocked`** on `fetch`/`EventSource` when pointing at an instructor server | `MULTIPLAYER_CORS_ALLOW_ORIGIN` is pinned to something that doesn't include `https://playground.babylonjs.com` | See [`RENDER_DEPLOYMENT.md` → Cross-origin access](RENDER_DEPLOYMENT.md#cross-origin-access) |
+| **`CORS blocked`** on `fetch`/`EventSource` when pointing at an instructor server | Host down (`x-render-routing: no-server`) **or** `MULTIPLAYER_CORS_ALLOW_ORIGIN` pinned away from playground | Redeploy the Render service and leave CORS unset; see [`RENDER_DEPLOYMENT.md` → Multiplayer Health Check Returns 404](RENDER_DEPLOYMENT.md#multiplayer-health-check-returns-404) and [Cross-origin access](RENDER_DEPLOYMENT.md#cross-origin-access) |
 | **`Cannot find module '../sync/...'`** at import time | A folder is imported but missing from `exportRoots` | `npm run check:playground` will name the offending file and specifier |
 | **`/chat/config.json` 404** in Network tab | Snippet fetched JSON from the playground host (no static file server) | Fixed builds embed config via [`config/playground_chat.ts`](src/client/config/playground_chat.ts); re-export with `npm run export:playground` |
 | **`Cannot find name '__…__'`** in Monaco | Vite `define` global leaked into bundled code | Use runtime defaults — see [`config/chat_proxy.ts`](src/client/config/chat_proxy.ts) |
+| **`Property 'env' does not exist on type 'ImportMeta'`** in Monaco | Playground has no `vite/client` types (`vite-env.d.ts` is not exported) | Keep the `declare global` `ImportMeta` / `ImportMetaEnv` augmentation in [`utils/vite_env.ts`](src/client/utils/vite_env.ts) (`env` required as `ImportMetaEnv`; do not redeclare Vite’s required `BASE_URL`/`DEV`); never read `import.meta.env.*` outside `readViteEnv()` |
 
 If you get past all of these and the scene still misbehaves, the multiplayer-specific runtime concerns (server selection, cold starts, URL override, verification checklist) live in [`MULTIPLAYER.md` → Running in the Babylon playground](MULTIPLAYER.md#running-in-the-babylon-playground).

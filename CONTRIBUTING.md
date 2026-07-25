@@ -14,7 +14,7 @@ Be respectful, assume good intent, and keep discussion focused on the work. Hara
 
 ## Versioning — Semantic Versioning 2.0.0
 
-This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The version in `package.json` is the single source of truth and **MUST** match the version in `package-lock.json`. The project is currently at **`1.7.0`** — the public API is stable and the standard `MAJOR.MINOR.PATCH` rules apply.
+This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The version in `package.json` is the single source of truth and **MUST** match the version in `package-lock.json`. The project is currently at **`1.8.0`** — the public API is stable and the standard `MAJOR.MINOR.PATCH` rules apply.
 
 Given a version number `MAJOR.MINOR.PATCH`:
 
@@ -67,7 +67,8 @@ npm install
 ### Running locally
 
 ```sh
-npm run dev               # Vite client on http://localhost:3000
+npm run dev               # Vite client on http://localhost:3000 (WebGL default)
+npm run dev:wgpu          # Same as dev with VITE_ENGINE=webgpu (Chromium + WebGPU)
 npm run dev:fullstack     # Vite client + Go multiplayer server (auto-restarts)
 ```
 

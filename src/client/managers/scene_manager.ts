@@ -23,6 +23,11 @@ import { initializeSimulationIfEnabled } from '../simulation/simulation_bootstra
 import { OBJECT_ROLE } from '../types/environment';
 import { devLog, isViteDev } from '../utils/dev_log';
 import {
+  disposeImportedLights,
+  isWebGpuEngine,
+  markSceneMaterialsLightDirty
+} from '../utils/engine_lights';
+import {
   registerDeferredScenePerfDevLogFlush,
   stampScenePerfConsoleContext
 } from '../utils/scene_perf_console_stamp';
@@ -86,14 +91,13 @@ export class SceneManager {
   /** Resolves when lighting, physics, character, and BehaviorManager are ready. */
   private readonly ready: Promise<void>;
 
-  constructor(engine: BABYLON.Engine, canvas: HTMLCanvasElement) {
+  constructor(engine: BABYLON.AbstractEngine, canvas: HTMLCanvasElement) {
     void canvas;
     this.scene = new BABYLON.Scene(engine);
     this.camera = new BABYLON.TargetCamera('camera1', CONFIG.CAMERA.START_POSITION, this.scene);
     this.camera.maxZ = CONFIG.PERFORMANCE.CAMERA_MAX_Z;
     // WebGPU: Intermediate + dirty blocking / frozen materials can break light UBO bind groups; stay conservative.
-    const webgpu = engine.constructor.name === 'WebGPUEngine';
-    this.scene.performancePriority = webgpu
+    this.scene.performancePriority = isWebGpuEngine(engine)
       ? ScenePerformancePriority.BackwardCompatible
       : ScenePerformancePriority.Intermediate;
     this.scene.constantlyUpdateMeshUnderPointer = false;
@@ -322,6 +326,7 @@ export class SceneManager {
         await this.loadSplatEnvironment(environment);
       } else {
         const result = await BABYLON.ImportMeshAsync(environment.model, this.scene);
+        disposeImportedLights(result);
 
         // Process node materials for environment meshes
         await NodeMaterialManager.processImportResult(result);
@@ -406,10 +411,11 @@ export class SceneManager {
   }
 
   /**
-   * Loads a Gaussian-splat environment: the visible splat, an invisible collider
-   * mesh that provides Havok colliders + the click-to-move pick target, and the
-   * prebaked Recast navmesh. All three share one untransformed coordinate space,
-   * so the GLB X-invert/scale and lightmap paths are intentionally skipped.
+   * Loads a Gaussian-splat environment (not a standard mesh world): visible splat
+   * (no physics), dedicated invisible collider GLB (Havok MESH + click pick), and
+   * optional prebaked Recast navmesh. All three share one untransformed coordinate
+   * space, so the GLB X-invert/lightmap paths are skipped. Caller must only invoke
+   * this when `environment.splat` is set — never use `setupEnvironmentPhysics` here.
    */
   private async loadSplatEnvironment(environment: Environment): Promise<void> {
     if (!environment.splat) {
@@ -711,7 +717,7 @@ export class SceneManager {
   }
 
   private applyPostLoadPerformanceTuning(): void {
-    const webgpu = this.scene.getEngine().constructor.name === 'WebGPUEngine';
+    const webgpu = isWebGpuEngine(this.scene.getEngine());
 
     if (!this.sceneOptimizerStarted && CONFIG.PERFORMANCE.SCENE_OPTIMIZER_ENABLED && !webgpu) {
       this.sceneOptimizerStarted = true;
@@ -1081,9 +1087,10 @@ export class SceneManager {
     );
 
     itemMeshes.forEach((mesh) => {
-      // Dispose physics body if it exists
-      if (mesh.physicsImpostor) {
-        mesh.physicsImpostor.dispose();
+      // Dispose Physics V2 body if it exists (create path uses PhysicsAggregate).
+      if (mesh.physicsBody) {
+        mesh.physicsBody.dispose();
+        mesh.physicsBody = null;
       }
       mesh.dispose();
     });
@@ -1157,7 +1164,8 @@ export class SceneManager {
   }
 
   /**
-   * Disposes all environment-specific lights
+   * Disposes all environment-specific lights and any untracked orphans (e.g. glTF
+   * imports). Keeps defaultLight enabled so the scene never goes lightless mid-switch.
    */
   private disposeEnvironmentLights(): void {
     // Enable default light before disposing environment lights
@@ -1170,6 +1178,15 @@ export class SceneManager {
       light.dispose();
     }
     this.environmentLights = [];
+
+    // Orphan sweep: ImportMeshAsync / clearEnvironment can leave untracked lights
+    // (DirectionalLight UBOs vs PointLight pipelines → WebGPU validation errors).
+    const orphanLights = this.scene.lights.filter((light) => light !== this.defaultLight);
+    for (const light of orphanLights) {
+      light.dispose();
+    }
+
+    markSceneMaterialsLightDirty(this.scene);
   }
 
   /**
@@ -1287,6 +1304,9 @@ export class SceneManager {
         this.defaultLight.setEnabled(true);
       }
     }
+
+    // Rebuild light pipelines on surviving materials (character/sky) for WebGL + WebGPU.
+    markSceneMaterialsLightDirty(this.scene);
   }
 
   public dispose(): void {

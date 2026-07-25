@@ -908,19 +908,21 @@ export const ASSETS = {
       spawnRotation: new BABYLON.Vector3(0, 0, 0)
     },
     {
-      // Gaussian-splat environment showcasing hybrid click-to-move. The .ply is the
-      // visible splat, the .glb is the invisible physics/click collider, and the .nav
-      // is a prebaked Recast navmesh. All three are authored in the same untransformed
-      // space, so SceneManager skips the GLB X-invert/lightmap paths (scale stays 1).
+      // Gaussian-splat environment (not a standard mesh world). Roles:
+      //   .ply  — visible Gaussian splat (no physics, not pickable)
+      //   .collision.glb — dedicated invisible Havok + click-to-move collider
+      //   .nav  — prebaked Recast navmesh
+      // Authored in the same untransformed space; SceneManager skips GLB X-invert/lightmap.
+      // Physics bodies attach only to colliderMesh inside loadSplatEnvironment — never to the splat.
       name: 'Tropical Compound',
       isDefault: true,
-      model: '', // unused for splat environments
+      model: '', // unused for splat environments (splat gate owns load)
       cameraOffset: new BABYLON.Vector3(0, 0.5, -4.5),
       splat: {
         url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.ply'
       },
       colliderMesh: {
-        url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.glb'
+        url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.collision.glb'
       },
       navmesh: {
         url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.nav'
@@ -971,8 +973,8 @@ export const ASSETS = {
           lightType: 'HEMISPHERIC' satisfies LightType,
           name: 'TheCaveHemisphericLight',
           direction: new BABYLON.Vector3(0, 1, 0),
-          diffuseColor: new BABYLON.Color3(0.95, 0.95, 0.98),
-          intensity: 0.0
+          diffuseColor: new BABYLON.Color3(0.55, 0.62, 0.72),
+          intensity: 0.55
         }
       ]
     }
