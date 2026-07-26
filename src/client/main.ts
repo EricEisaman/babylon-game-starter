@@ -4,7 +4,8 @@
  */
 
 import '@babylonjs/core/Legacy/legacy';
-import '@babylonjs/loaders/legacy/legacy';
+import '@babylonjs/loaders/glTF/glTFFileLoader';
+import '@babylonjs/loaders/SPLAT/splatFileLoader';
 import '@babylonjs/materials/legacy/legacy';
 import {
   CreateSoundAsync,
