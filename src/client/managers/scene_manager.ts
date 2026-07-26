@@ -319,6 +319,10 @@ export class SceneManager {
       this.discardEnvironmentHiddenTracking();
       this.disposeNavigationFeatures();
 
+      // Apply camera before mesh I/O so top-down / cycle modes still win if splat/GLB load fails.
+      CameraManager.setOffset(environment.cameraOffset ?? CONFIG.CAMERA.OFFSET);
+      this.applyEnvironmentCameraMode(environment);
+
       if (environment.splat) {
         // Splat environments load the visible splat + invisible collider + prebaked
         // navmesh in the same untransformed space (no X-invert, no lightmap). Physics
@@ -394,12 +398,6 @@ export class SceneManager {
 
       // Do not resume physics or show the world here: wait until the playable character is
       // attached and physics is resumed (SettingsUI.changeEnvironment or CharacterLoader).
-
-      // Apply the follow camera offset for this environment (falls back to the global default).
-      CameraManager.setOffset(environment.cameraOffset ?? CONFIG.CAMERA.OFFSET);
-
-      // Configure the per-environment camera mode (third person / top down / cycle).
-      this.applyEnvironmentCameraMode(environment);
 
       // Apply environment spawn rotation if transition rotation was not provided
       if (!transitionRotationApplied && this.characterController) {
