@@ -287,6 +287,11 @@ export class SceneManager {
     try {
       this.discardEnvironmentHiddenTracking();
 
+      // Apply camera offset before mesh I/O so it still wins if ImportMeshAsync fails.
+      if (environment.cameraOffset !== undefined) {
+        CameraManager.setOffset(environment.cameraOffset);
+      }
+
       const result = await BABYLON.ImportMeshAsync(environment.model, this.scene);
 
       // Process node materials for environment meshes
@@ -352,11 +357,6 @@ export class SceneManager {
 
       // Do not resume physics or show the world here: wait until the playable character is
       // attached and physics is resumed (SettingsUI.changeEnvironment or CharacterLoader).
-
-      // Apply environment-specific camera offset if configured
-      if (environment.cameraOffset !== undefined) {
-        CameraManager.setOffset(environment.cameraOffset);
-      }
 
       // Apply environment spawn rotation if transition rotation was not provided
       if (!transitionRotationApplied && this.characterController) {
