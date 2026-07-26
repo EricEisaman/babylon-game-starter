@@ -6,10 +6,13 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /api/multiplayer/health
+    healthCheckPath: /
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      # Optional: override Chat Slayer upstream (https origin). Defaults from deploy/chat-proxy.env.defaults.
+      # - key: CHAT_UPSTREAM_URL
+      #   value: https://chat-slayer.onrender.com
