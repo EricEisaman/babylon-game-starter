@@ -1142,23 +1142,51 @@ export class SettingsUI {
     this.sceneManager.clearItems();
     this.sceneManager.clearParticles();
 
-    await this.sceneManager.loadEnvironment(environmentName);
+    try {
+      await this.sceneManager.loadEnvironment(environmentName);
 
-    await this.sceneManager.setupEnvironmentItems();
+      await this.sceneManager.setupEnvironmentItems();
 
-    this.sceneManager.repositionCharacter();
+      this.sceneManager.repositionCharacter();
 
-    this.sceneManager.forceActivateSmoothFollow();
+      this.sceneManager.forceActivateSmoothFollow();
 
-    if (this.sceneManager.getCurrentCharacterName() !== null) {
-      this.sceneManager.showPlayerMeshResumePhysicsAndRevealEnvironment();
+      if (this.sceneManager.getCurrentCharacterName() !== null) {
+        this.sceneManager.showPlayerMeshResumePhysicsAndRevealEnvironment();
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('environment-changed', { detail: { name: environmentName } })
+      );
+
+      this.syncEnvironmentDropdown(environmentName);
+    } catch (error) {
+      console.error(`[SettingsUI] Environment switch to "${environmentName}" failed`, error);
+      this.syncEnvironmentDropdown(previousEnvironmentName);
+
+      // World was already cleared; restore the previous environment when possible.
+      if (previousEnvironmentName && previousEnvironmentName !== environmentName) {
+        try {
+          await this.sceneManager.loadEnvironment(previousEnvironmentName);
+          await this.sceneManager.setupEnvironmentItems();
+          this.sceneManager.repositionCharacter();
+          this.sceneManager.forceActivateSmoothFollow();
+          if (this.sceneManager.getCurrentCharacterName() !== null) {
+            this.sceneManager.showPlayerMeshResumePhysicsAndRevealEnvironment();
+          }
+          window.dispatchEvent(
+            new CustomEvent('environment-changed', {
+              detail: { name: previousEnvironmentName }
+            })
+          );
+        } catch (restoreError) {
+          console.error(
+            `[SettingsUI] Failed to restore previous environment "${previousEnvironmentName}"`,
+            restoreError
+          );
+        }
+      }
     }
-
-    window.dispatchEvent(
-      new CustomEvent('environment-changed', { detail: { name: environmentName } })
-    );
-
-    this.syncEnvironmentDropdown(environmentName);
   }
 
   public static async changeEnvironment(
