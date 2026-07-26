@@ -100,8 +100,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unnecessary-condition': 'off',
       '@typescript-eslint/prefer-optional-chain': 'off',
       '@typescript-eslint/prefer-for-of': 'off',
-      // Navigator.platform remains the most reliable signal for some iPad heuristics; see STYLE.md.
-      '@typescript-eslint/no-deprecated': 'off',
+      // Enabled so Babylon @deprecated APIs surface; navigator.platform uses line allowlists (STYLE.md).
+      '@typescript-eslint/no-deprecated': 'error',
       '@typescript-eslint/no-non-null-assertion': 'off'
     }
   }

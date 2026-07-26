@@ -5,6 +5,7 @@
 import { ASSETS } from '../config/assets';
 import { CONFIG } from '../config/game_config';
 import { clampCoordComponent } from '../sync/multiplayer_wire_guards';
+import { disposeImportedLights } from '../utils/engine_lights';
 import { deserializeQuaternion } from '../utils/multiplayer_serialization';
 import { fixParticleSystemTexture } from '../utils/particle_texture_url';
 
@@ -154,6 +155,7 @@ async function importRemoteCharacter(
   NodeMaterialManager.initialize(scene);
 
   const result = await BABYLON.ImportMeshAsync(character.model, scene);
+  disposeImportedLights(result);
   if (token !== entry.loadSeq) {
     result.meshes.forEach((m) => {
       m.dispose();

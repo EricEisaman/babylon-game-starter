@@ -8,7 +8,7 @@
 
 <p align="center">
 
-[![Release](https://img.shields.io/badge/release-v1.7.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
+[![Release](https://img.shields.io/badge/release-v1.8.0-blue)](https://github.com/EricEisaman/babylon-game-starter/releases)
 [![Live demo](https://img.shields.io/badge/Live_demo-GitHub_Pages-2ea44f)](https://ericeisaman.github.io/babylon-game-starter/)
 [![CI](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml/badge.svg)](https://github.com/EricEisaman/babylon-game-starter/actions/workflows/typecheck.yml)
 [![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-BB464B?logo=babylon.js&logoColor=white)](https://www.babylonjs.com)
@@ -20,7 +20,29 @@
 
 Babylon Game Starter provides a complete, ready-to-run foundation for building interactive 3D browser games. It ships with physics-based character movement, an environment system, collectibles, inventory, a behavior trigger system (proximity and fall-out-of-map), particle effects, an AudioV2-powered sound engine, and full mobile control support — all driven by configuration files. The same client can be bundled for the **Babylon.js Playground** via `playground.json`.
 
-**Current release: [v1.7.0](#v170)** — Open Graph / Twitter Card metadata in unified branding, injected at build time for social link previews.
+**Current release: [v1.8.0](#v180)** — Tropical Compound collision shell, iPad hybrid input UX, Vite-only multiplayer against production, playground `ImportMeta` fix.
+
+---
+
+## v1.8.0
+
+Released **July 2026**. Minor version: splat-environment physics and local/playground multiplayer DX; default mesh-environment APIs and multiplayer wire format are unchanged.
+
+### Added
+
+- **Tropical Compound `*.collision.glb`** — splat-env `colliderMesh` points at the dedicated SplatWalk collision shell for Havok + click picks (Gaussian `.ply` visual unchanged). See [MILESTONES.md](MILESTONES.md) / [USERS_GUIDE.md](USERS_GUIDE.md#environments).
+- **Reactive iPad + keyboard hybrid detection** — live `DeviceDetector` heuristics + key latch; Settings **Screen Controls** can appear when hybrid becomes true; HUD presets follow the same source of truth.
+
+### Changed
+
+- **`npm run dev` multiplayer** — with `VITE_MULTIPLAYER_HOST` unset, the client probes `CONFIG.MULTIPLAYER.PRODUCTION_SERVER` first (no local Go required). Use `VITE_MULTIPLAYER_HOST=localhost:5000` for local fullstack.
+- **Splat vs mesh env docs** — [USERS_GUIDE.md](USERS_GUIDE.md) and [MILESTONES.md](MILESTONES.md) document the separate `loadSplatEnvironment` vs `setupEnvironmentPhysics` control flows.
+
+### Fixed
+
+- **Playground TypeScript** — `ImportMeta.env` ambient augmentation in [`vite_env.ts`](src/client/utils/vite_env.ts) so Monaco no longer fails on `Property 'env' does not exist` (keeps bare `import.meta.env` for Vite inlining).
+
+To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FEATURE_RELEASE.md) (`feature/**` tag or manual sync workflow).
 
 ---
 
@@ -60,7 +82,7 @@ Released **May 2026**. Minor version: installable PWA, unified branding config, 
 
 ### Changed
 
-- **Vite 8** — Build toolchain upgraded to Vite ^8.0.14; Node engines `>=20.19.0 || >=22.12.0`; CI uses Node 22.
+- **Vite 8** — Build toolchain on Vite 8.1.5; Node engines `>=20.19.0 || >=22.12.0`; CI uses Node 22.
 
 To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FEATURE_RELEASE.md) (`feature/**` tag or manual sync workflow).
 
@@ -99,7 +121,7 @@ To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FE
 - **Optional state simulation** — SynapticLab demo with `?sim=1`, behavior-driven meter updates, and DOM overlays
 - **Physics-based movement** — Havok integration for character movement, jumping, and boost
 - **Environment system** — Switchable 3D worlds with music, particles, items, sky, overlays, optional fall-respawn hooks
-- **Gaussian-splat environments + click-to-move** — Optional splat worlds with hybrid navmesh navigation (Recast): tap-to-walk runs alongside the existing WASD/jump/boost physics controls; see [MILESTONES.md](MILESTONES.md)
+- **Gaussian-splat environments + click-to-move** — Optional splat worlds (e.g. Tropical Compound): visible `.ply` splat, dedicated `*.collision.glb` for Havok/picks (not the splat), prebaked Recast `.nav`, hybrid tap-to-walk beside WASD/jump/boost; see [MILESTONES.md](MILESTONES.md) and [USERS_GUIDE.md](USERS_GUIDE.md#environments)
 - **Camera modes** — Per-environment third-person follow, top-down, or user-cyclable (`2` key / Settings "Camera View")
 - **Collectibles and inventory** — Pickup, credits, inventory, and temporary item effects
 - **Behavior system** — Proximity triggers, fall-out-of-world respawn, glow, `adjustCredits`, and environment `portal` actions
@@ -114,13 +136,13 @@ To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FE
 
 | Package             | Version |
 | ------------------- | ------- |
-| `@babylonjs/core`   | ^9.1.0  |
-| `@babylonjs/gui`    | ^9.1.0  |
-| `@babylonjs/havok`  | ^1.3.12 |
-| `@babylonjs/loaders`| ^9.1.0  |
-| `@babylonjs/materials` | ^9.1.0 |
-| `vite`              | ^8.0.14 |
-| `typescript`        | ^5.3.3  |
+| `@babylonjs/core`   | ^9.18.0 |
+| `@babylonjs/gui`    | ^9.18.0 |
+| `@babylonjs/havok`  | ^1.3.13 |
+| `@babylonjs/loaders`| ^9.18.0 |
+| `@babylonjs/materials` | ^9.18.0 |
+| `vite`              | 8.1.5   |
+| `typescript`        | ^5.9.3  |
 
 ---
 
@@ -132,6 +154,14 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+For local **WebGPU** testing (Chromium with WebGPU enabled; falls back to WebGL if unsupported):
+
+```sh
+npm run dev:wgpu
+```
+
+That sets `VITE_ENGINE=webgpu` for the Vite process only — it does not change the default `CONFIG.PERFORMANCE.ENGINE` (`'webgl'`). See `.env.example`.
 
 ### Optional extensions (dev)
 
@@ -147,7 +177,7 @@ Or set `CONFIG.SIMULATION.ENABLED: true` in [`src/client/config/game_config.ts`]
 
 See [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md), [docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md), and [docs/evaluation/README.md](docs/evaluation/README.md).
 
-**Multiplayer (local):** run `npm run dev:fullstack` to start Vite and the Go API together (Go restarts automatically when you save `src/server/multiplayer/**` — see `nodemon.multiplayer.json`). Or use two terminals: `npm run dev:multiplayer` then `npm run dev`. With `VITE_MULTIPLAYER_HOST` unset, the client uses same-origin `/api/multiplayer/*`, proxied to Go (see `vite.config.ts`). Override the backend with `.env.local` — see `.env.example`.
+**Multiplayer:** `npm run dev` alone joins the shared production backend (`CONFIG.MULTIPLAYER.PRODUCTION_SERVER`). To develop against local Go, set `VITE_MULTIPLAYER_HOST=localhost:5000` in `.env.local` and run `npm run dev:fullstack` (or `dev:multiplayer` + `dev`). See `.env.example`.
 
 ---
 
@@ -155,7 +185,8 @@ See [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md), [docs/AUTHORING_SNIPPETS.md](d
 
 | Command                     | Description                                                                 |
 | --------------------------- | ----------------------------------------------------------------------------- |
-| `npm run dev`               | Vite dev server (client root `src/client/`)                                 |
+| `npm run dev`               | Vite dev server (client root `src/client/`; default WebGL via `CONFIG.PERFORMANCE.ENGINE`) |
+| `npm run dev:wgpu`          | Same as `dev` with `VITE_ENGINE=webgpu` (Chromium + WebGPU; falls back to WebGL) |
 | `npm run dev:multiplayer`   | Go multiplayer on `:5000`, **restarts on `.go` / `go.mod` / `go.sum` changes** (nodemon) |
 | `npm run dev:multiplayer:once` | One-shot `go run` (no file watcher)                                    |
 | `npm run dev:fullstack`     | Watched Go API + Vite (`-k` stops both if one exits)                         |
@@ -166,7 +197,8 @@ See [docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md), [docs/AUTHORING_SNIPPETS.md](d
 | `npm run lint`              | ESLint (runs in CI)                                                           |
 | `npm run lint:fix`          | ESLint with `--fix`                                                           |
 | `npm run typecheck`         | `tsc --noEmit` for app and Node configs (runs in CI)                        |
-| `npm run export:playground` | Generate `playground.json` for the Babylon.js editor and smoke-check it     |
+| `npm run export:playground` | Generate `playground.json` (WebGL2) for the Babylon.js editor and smoke-check it |
+| `npm run export:playground:webgpu` | Generate `playground-wgpu.json` (WebGPU engine) and smoke-check it |
 | `npm run check:playground`  | Re-run the export smoke check standalone (walks every import from the entry)|
 | `npm run generate:pwa-assets` | Regenerate PWA icons and install screenshots from branding source art |
 | `npm run pwa:test`          | Build and validate full PWA installability (manifest + Lighthouse audits) |
@@ -211,7 +243,8 @@ eslint.config.js
 - **[BRANDING.md](BRANDING.md)** — Loading screen, favicon, PWA manifest, and [social link previews](BRANDING.md#social-link-previews) via `public/branding/config.json` and `static.publicUrl`
 - **[docs/SYNAPTIC_LAB.md](docs/SYNAPTIC_LAB.md)** — `?sim=1`, SynapticLab gameplay, overlays, and playground testing
 - **[docs/AUTHORING_SNIPPETS.md](docs/AUTHORING_SNIPPETS.md)** — Particle, NME, and overlay catalog authoring
-- **[USERS_GUIDE.md](USERS_GUIDE.md)** — Architecture, configuration, behaviors, fall respawn, condensed narrative notes
+- **[USERS_GUIDE.md](USERS_GUIDE.md)** — Architecture, configuration, splat vs mesh environments, behaviors, fall respawn
+- **[MILESTONES.md](MILESTONES.md)** — Splat navmesh / click-to-move / NPC roadmap (Tropical Compound showcase)
 - **[MULTIPLAYER.md](MULTIPLAYER.md)** — Multiplayer onboarding, configuration, testing, and troubleshooting
 - **[MULTIPLAYER_SYNCH.md](MULTIPLAYER_SYNCH.md)** — Normative wire contract, authority rules, and item-sync spec
 - **[PLAYGROUND.md](PLAYGROUND.md)** — Contributor guide for code that ships inside `playground.json` (ambient `BABYLON` global, static-imports-only rule, smoke-checker guardrails, export pipeline)

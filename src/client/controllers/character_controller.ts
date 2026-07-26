@@ -19,6 +19,9 @@ import type { CharacterState } from '../config/character_states';
 import type { ManagedAudioSound } from '../types/audio';
 import type { Character } from '../types/character';
 
+const DEFAULT_CAPSULE_HEIGHT = 1.8;
+const DEFAULT_CAPSULE_RADIUS = 0.6;
+
 export class CharacterController {
   private readonly scene: BABYLON.Scene;
   private readonly characterController: BABYLON.PhysicsCharacterController;
@@ -30,6 +33,16 @@ export class CharacterController {
   private inputDirection = new BABYLON.Vector3(0, 0, 0);
   /** Reused for zeroing physics velocity without per-call allocations. */
   private readonly zeroLinearVelocity = new BABYLON.Vector3(0, 0, 0);
+  private readonly downDirection = BABYLON.Vector3.Down();
+  private readonly supportInfo: BABYLON.CharacterSurfaceInfo = {
+    isSurfaceDynamic: false,
+    supportedState: BABYLON.CharacterSupportedState.UNSUPPORTED,
+    averageSurfaceNormal: new BABYLON.Vector3(),
+    averageSurfaceVelocity: new BABYLON.Vector3(),
+    averageAngularSurfaceVelocity: new BABYLON.Vector3()
+  };
+  private readonly movementResult = new BABYLON.Vector3();
+  private readonly zeroSurfaceVelocity = new BABYLON.Vector3(0, 0, 0);
   private targetRotationY = 0;
   /** True while click-to-move navigation is driving forward input/facing. */
   private navMoveActive = false;
@@ -46,9 +59,8 @@ export class CharacterController {
   private thrusterSound: ManagedAudioSound | null = null;
   public animationController: AnimationController;
 
-  // Mobile device detection - computed once at initialization
+  // Mobile device detection — iPad+keyboard is live (may latch after first key)
   private readonly isMobileDevice: boolean;
-  private readonly isIPadWithKeyboard: boolean;
   private physicsPaused = false;
   private currentCharacter: Character | null = null;
   private lastAppliedInvisibility: boolean | null = null;
@@ -58,26 +70,28 @@ export class CharacterController {
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
 
-    // Enhanced device detection
     this.isMobileDevice = DeviceDetector.isMobileDevice();
-    this.isIPadWithKeyboard = DeviceDetector.isIPadWithKeyboard();
+    // Prime hybrid monitoring (iPad-only key latch / orientation heuristics).
+    DeviceDetector.isIPadWithKeyboard();
 
     // Create character physics controller with default position (will be updated when character is loaded)
     this.characterController = new BABYLON.PhysicsCharacterController(
       new BABYLON.Vector3(0, 0, 0), // Default position, will be updated
       {
-        capsuleHeight: 1.8, // Default height, will be updated when character is loaded
-        capsuleRadius: 0.6 // Default radius, will be updated when character is loaded
+        capsuleHeight: DEFAULT_CAPSULE_HEIGHT,
+        capsuleRadius: DEFAULT_CAPSULE_RADIUS
       },
       scene
     );
+    this.characterController.maxStepHeight = CONFIG.PHYSICS.MAX_STEP_HEIGHT;
+    this.characterController.footOffset = DEFAULT_CAPSULE_HEIGHT * 0.5;
 
     // Create display capsule for debug
     this.displayCapsule = BABYLON.MeshBuilder.CreateCapsule(
       'CharacterDisplay',
       {
-        height: 1.8, // Default height, will be updated when character is loaded
-        radius: 0.6 // Default radius, will be updated when character is loaded
+        height: DEFAULT_CAPSULE_HEIGHT,
+        radius: DEFAULT_CAPSULE_RADIUS
       },
       scene
     );
@@ -288,7 +302,7 @@ export class CharacterController {
     }
 
     // Only update mobile input for iPads with keyboards, not for regular keyboard input
-    if (this.isIPadWithKeyboard) {
+    if (DeviceDetector.isIPadWithKeyboard()) {
       this.updateMobileInput();
     }
   }
@@ -318,7 +332,7 @@ export class CharacterController {
     }
 
     // Only update mobile input for iPads with keyboards, not for regular keyboard input
-    if (this.isIPadWithKeyboard) {
+    if (DeviceDetector.isIPadWithKeyboard()) {
       this.updateMobileInput();
     }
   }
@@ -330,7 +344,7 @@ export class CharacterController {
     }
 
     const mobileDirection = MobileInputManager.getInputDirection();
-    if (this.isIPadWithKeyboard) {
+    if (DeviceDetector.isIPadWithKeyboard()) {
       this.applyIPadMobileInput(mobileDirection);
     } else {
       this.applyStandardMobileInput(mobileDirection);
@@ -568,7 +582,7 @@ export class CharacterController {
         MobileInputManager.getInputDirection().length() > 0.1;
 
       // For iPads with keyboards, either input can trigger movement
-      if (this.isIPadWithKeyboard) {
+      if (DeviceDetector.isIPadWithKeyboard()) {
         return keyboardMoving || mobileMoving;
       } else {
         // For pure mobile, only mobile input matters
@@ -588,18 +602,25 @@ export class CharacterController {
     // Skip physics updates if paused
     if (this.physicsPaused) return;
 
-    const down = BABYLON.Vector3.Down();
-    const support = this.characterController.checkSupport(deltaTime, down);
+    this.characterController.checkSupportToRef(deltaTime, this.downDirection, this.supportInfo);
 
     const characterOrientation = BABYLON.Quaternion.FromEulerAngles(
       0,
       this.displayCapsule.rotation.y,
       0
     );
-    const desiredVelocity = this.calculateDesiredVelocity(deltaTime, support, characterOrientation);
+    const desiredVelocity = this.calculateDesiredVelocity(
+      deltaTime,
+      this.supportInfo,
+      characterOrientation
+    );
 
     this.characterController.setVelocity(desiredVelocity);
-    this.characterController.integrate(deltaTime, support, CONFIG.PHYSICS.CHARACTER_GRAVITY);
+    this.characterController.integrate(
+      deltaTime,
+      this.supportInfo,
+      CONFIG.PHYSICS.CHARACTER_GRAVITY
+    );
   };
 
   private calculateDesiredVelocity(
@@ -661,7 +682,7 @@ export class CharacterController {
     }
 
     const characterMass = character.mass;
-    let outputVelocity = currentVelocity.clone();
+    const outputVelocity = currentVelocity.clone();
 
     // If boost is active, allow input-based velocity modification while in air
     if (this.boostActive) {
@@ -671,15 +692,19 @@ export class CharacterController {
       const desiredVelocity = this.inputDirection
         .scale(massAdjustedSpeed)
         .applyRotationQuaternion(characterOrientation);
-      outputVelocity = this.characterController.calculateMovement(
+      const moved = this.characterController.calculateMovementToRef(
         deltaTime,
         forwardWorld,
         upWorld,
         currentVelocity,
-        BABYLON.Vector3.Zero(),
+        this.zeroSurfaceVelocity,
         desiredVelocity,
-        upWorld
+        upWorld,
+        this.movementResult
       );
+      if (moved) {
+        outputVelocity.copyFrom(this.movementResult);
+      }
     } else {
       // Maintain initial jump velocity while in air - no input-based velocity modification
       // Only apply gravity and minimal air resistance to preserve realistic physics
@@ -730,15 +755,17 @@ export class CharacterController {
     const desiredVelocity = this.inputDirection
       .scale(massAdjustedSpeed)
       .applyRotationQuaternion(characterOrientation);
-    const outputVelocity = this.characterController.calculateMovement(
+    const moved = this.characterController.calculateMovementToRef(
       deltaTime,
       forwardWorld,
       supportInfo.averageSurfaceNormal,
       currentVelocity,
       supportInfo.averageSurfaceVelocity,
       desiredVelocity,
-      upWorld
+      upWorld,
+      this.movementResult
     );
+    const outputVelocity = moved ? this.movementResult.clone() : currentVelocity.clone();
 
     outputVelocity.subtractInPlace(supportInfo.averageSurfaceVelocity);
 
@@ -874,13 +901,23 @@ export class CharacterController {
     // Set up custom animation handlers for the loaded character
     this.setupCustomAnimationHandlers();
 
-    // Update character-specific physics attributes
-    // Note: PhysicsCharacterController doesn't allow runtime updates of capsule dimensions
-    // The display capsule can be updated for visual feedback
-    this.displayCapsule.scaling.setAll(1); // Reset scaling
-    this.displayCapsule.scaling.y = character.height / 1.8; // Scale height
-    this.displayCapsule.scaling.x = character.radius / 0.6; // Scale radius
-    this.displayCapsule.scaling.z = character.radius / 0.6; // Scale radius
+    // Rebuild the Havok capsule for this character while keeping the foot planted.
+    this.characterController.setShapeOptions(
+      {
+        capsuleHeight: character.height,
+        capsuleRadius: character.radius
+      },
+      true
+    );
+    this.characterController.footOffset = character.height * 0.5;
+    this.characterController.characterMass = character.mass;
+    this.characterController.maxStepHeight = CONFIG.PHYSICS.MAX_STEP_HEIGHT;
+
+    // Keep the debug capsule proportional to the physics shape.
+    this.displayCapsule.scaling.setAll(1);
+    this.displayCapsule.scaling.y = character.height / DEFAULT_CAPSULE_HEIGHT;
+    this.displayCapsule.scaling.x = character.radius / DEFAULT_CAPSULE_RADIUS;
+    this.displayCapsule.scaling.z = character.radius / DEFAULT_CAPSULE_RADIUS;
 
     // Reset physics state for new character
     this.characterController.setVelocity(this.zeroLinearVelocity);
