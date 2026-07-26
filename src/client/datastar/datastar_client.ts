@@ -26,6 +26,8 @@
  */
 
 import { CONFIG } from '../config/game_config';
+import { isPlaygroundRuntime } from '../utils/playground_runtime';
+import { readViteEnv } from '../utils/vite_env';
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | JsonObject;
 
@@ -379,21 +381,6 @@ function normalizeMultiplayerHostInput(raw: string): string {
   return s.trim();
 }
 
-/** Subset of Vite `import.meta.env`; playground TS has no `ImportMetaEnv` type. */
-interface ViteEnvLike {
-  readonly DEV?: boolean;
-  readonly VITE_MULTIPLAYER_HOST?: string;
-}
-
-function readViteEnv(): ViteEnvLike | undefined {
-  try {
-    const meta = import.meta as { env?: ViteEnvLike };
-    return meta.env;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * Read an optional host override from the URL, as `?mp=host[:port]` or
  * `#mp=host[:port]`. This is the preferred knob for students running the
@@ -435,10 +422,11 @@ function readOverrideHost(): string {
  *
  *   1. `?mp=host` (or `#mp=host`) URL override — highest priority so
  *      instructors can steer a class without rebuilding.
- *   2. `VITE_MULTIPLAYER_HOST` build-time env — only ever set under Vite.
- *   3. Vite dev same-origin via the dev-server proxy.
- *   4. `CONFIG.MULTIPLAYER.PRODUCTION_SERVER` / `LOCAL_SERVER` probe in the
- *      order dictated by `PRODUCTION_FIRST`.
+ *   2. `VITE_MULTIPLAYER_HOST` build-time env — only ever set under Vite
+ *      (use `localhost:5000` when developing against local Go).
+ *   3. `CONFIG.MULTIPLAYER.PRODUCTION_SERVER` / `LOCAL_SERVER` probe in the
+ *      order dictated by `PRODUCTION_FIRST` (default: production first so
+ *      `npm run dev` joins the shared Render backend without running Go).
  *
  * Every `import.meta.env.*` read goes through `readViteEnv()` so this module
  * remains safe to run inside the Babylon playground where `import.meta.env`
@@ -480,31 +468,36 @@ async function determineMultiplayerUrl(): Promise<string> {
     );
   }
 
-  // `npm run dev`: same-origin requests hit the Vite proxy → Go on :5000 (no remote probe, no CORS).
-  if (viteEnv?.DEV === true && typeof window !== 'undefined') {
-    return `${window.location.origin}/api/multiplayer/stream`;
-  }
-
   const productionServer = CONFIG.MULTIPLAYER.PRODUCTION_SERVER;
   const localServer = CONFIG.MULTIPLAYER.LOCAL_SERVER;
   const tryProductionFirst = CONFIG.MULTIPLAYER.PRODUCTION_FIRST;
+  const onPlayground = isPlaygroundRuntime();
 
-  const primaryServer = tryProductionFirst ? productionServer : localServer;
-  const fallbackServer = tryProductionFirst ? localServer : productionServer;
+  // Playground can never reach localhost; skip that probe so failures stay actionable.
+  const serversToTry = onPlayground
+    ? [productionServer]
+    : tryProductionFirst
+      ? [productionServer, localServer]
+      : [localServer, productionServer];
 
-  const primaryUrl = await attemptServerConnection(primaryServer, timeoutMs);
-  if (primaryUrl) {
-    return primaryUrl;
+  for (const server of serversToTry) {
+    const url = await attemptServerConnection(server, timeoutMs);
+    if (url) {
+      return url;
+    }
   }
 
-  const fallbackUrl = await attemptServerConnection(fallbackServer, timeoutMs);
-  if (fallbackUrl) {
-    return fallbackUrl;
+  const tried = serversToTry.join(' and ');
+  if (onPlayground) {
+    throw new Error(
+      `Failed to connect to multiplayer server "${productionServer}" from the Babylon playground. ` +
+        `If DevTools shows CORS with no Access-Control-Allow-Origin, the host is often down ` +
+        `(Render x-render-routing: no-server) — redeploy and leave MULTIPLAYER_CORS_ALLOW_ORIGIN unset ` +
+        `(see RENDER_DEPLOYMENT.md). Or steer the class with #mp=your-host on the playground URL.`
+    );
   }
 
-  throw new Error(
-    `Failed to connect to multiplayer servers: ${primaryServer} and ${fallbackServer}`
-  );
+  throw new Error(`Failed to connect to multiplayer servers: ${tried}`);
 }
 
 /**
@@ -522,7 +515,14 @@ const WARMING_UP_THRESHOLD_MS = 5000;
  * `WARMING_UP_THRESHOLD_MS`, so the UI can explain a long first connect.
  */
 async function attemptServerConnection(server: string, timeoutMs: number): Promise<string | null> {
-  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  // Remote hosts must use https — probing http://*.onrender.com from http://localhost
+  // follows a 301 without CORS headers and looks like a CORS failure.
+  const isLoopback = server.startsWith('localhost') || server.startsWith('127.0.0.1');
+  const protocol = isLoopback
+    ? window.location.protocol === 'https:'
+      ? 'https:'
+      : 'http:'
+    : 'https:';
 
   const warmingUpTimer = setTimeout(() => {
     try {
@@ -560,9 +560,19 @@ async function attemptServerConnection(server: string, timeoutMs: number): Promi
       console.log(`[Datastar] ✓ Server available at ${server}`);
       return sseUrl;
     }
+
+    console.log(
+      `[Datastar] Server at ${server} health check returned HTTP ${String(response.status)}`
+    );
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.log(`[Datastar] Server at ${server} unavailable (${errorMsg})`);
+    // Browsers report a missing ACAO header as "Failed to fetch" even when the host
+    // is dead (e.g. Render x-render-routing: no-server) or CORS is pinned incorrectly.
+    console.log(
+      `[Datastar] Server at ${server} unavailable (${errorMsg}). ` +
+        `If this looks like CORS, confirm the host is deployed and MULTIPLAYER_CORS_ALLOW_ORIGIN is unset ` +
+        `(echo Origin) — see RENDER_DEPLOYMENT.md / MULTIPLAYER.md.`
+    );
   } finally {
     clearTimeout(warmingUpTimer);
   }
@@ -576,11 +586,9 @@ async function attemptServerConnection(server: string, timeoutMs: number): Promi
  */
 export function getDatastarClient(): DatastarClient {
   if (!globalDatastarClient) {
-    const viteEnv = readViteEnv();
-    const initialStream =
-      viteEnv?.DEV === true && typeof window !== 'undefined'
-        ? `${window.location.origin}/api/multiplayer/stream`
-        : 'http://127.0.0.1:5000/api/multiplayer/stream';
+    // Placeholder until ensureMultiplayerStreamUrlResolved() finishes; prefer production
+    // so a brief connect attempt does not hit the Vite → :5000 proxy by default.
+    const initialStream = `https://${CONFIG.MULTIPLAYER.PRODUCTION_SERVER}/api/multiplayer/stream`;
     globalDatastarClient = new DatastarClient(initialStream);
 
     ensureMultiplayerStreamUrlResolved()

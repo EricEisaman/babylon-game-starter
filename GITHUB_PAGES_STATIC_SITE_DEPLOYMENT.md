@@ -96,7 +96,7 @@ Published URL (project site): `https://<owner>.github.io/<repo>/`
 | Mode | Configuration |
 | ---- | ------------- |
 | **Disabled** | `CONFIG.MULTIPLAYER.ENABLED = false` in [`game_config.ts`](src/client/config/game_config.ts) |
-| **Shared demo** | Default `PRODUCTION_SERVER` (`bgs-mp.onrender.com`); no build env var |
+| **Shared demo** | Default `PRODUCTION_SERVER` (`babylon-game-starter.onrender.com`); no build env var |
 | **Custom host** | Repository variable `VITE_MULTIPLAYER_HOST` and add to workflow build job: `env: { VITE_MULTIPLAYER_HOST: ${{ vars.VITE_MULTIPLAYER_HOST }} }` |
 
 Custom servers must allow CORS from `https://<owner>.github.io` (path is not part of the origin). Health: `/api/multiplayer/health`.

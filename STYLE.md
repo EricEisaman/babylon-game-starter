@@ -47,7 +47,7 @@ The following rules are relaxed at project scope and documented here (they fight
 | `@typescript-eslint/no-unnecessary-condition` | DOM and engine APIs are often narrower in types than at runtime. |
 | `@typescript-eslint/prefer-optional-chain` | Stylistic; optional chaining is used where it reads clearly. |
 | `@typescript-eslint/prefer-for-of` | Indexed loops are sometimes clearer with Babylon collections. |
-| `@typescript-eslint/no-deprecated` | `navigator.platform` is still used for iPad heuristics where `userAgentData` is unavailable. |
+| `@typescript-eslint/no-deprecated` | **Enabled** (`error`). `navigator.platform` iPad heuristics use a line-level disable where `userAgentData` is unavailable. |
 | `@typescript-eslint/no-non-null-assertion` | Rare `!` uses are allowed when paired with prior bounds checks. |
 
 File- or line-level `eslint-disable` comments **MUST NOT** be used as a blanket substitute; any disable **MUST** cite a guide-recognized exception or a tracked third-party defect.

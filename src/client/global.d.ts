@@ -9,7 +9,7 @@ type ScenePerformanceStatsExport = import('./utils/scene_performance_stats').Sce
 type HavokRuntime = ConstructorParameters<typeof BABYLON.HavokPlugin>[1];
 type BabylonDebugApi = {
   BABYLON: typeof globalThis.BABYLON;
-  engine: () => BABYLON.Engine | null;
+  engine: () => BABYLON.AbstractEngine | null;
   scene: () => BABYLON.Scene | null;
   logSceneStats: () => ScenePerformanceStatsExport | undefined;
 };

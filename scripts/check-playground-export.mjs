@@ -16,10 +16,38 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = path.resolve(process.cwd());
-const manifestPaths = [
-  path.join(repoRoot, 'src', 'client', 'public', 'playground.json'),
-  path.join(repoRoot, 'src', 'client', 'playground', 'playground.json')
-];
+
+/**
+ * Parse `--engine=WebGL2|WebGPU` (default WebGL2 → playground.json).
+ * @returns {'WebGL2' | 'WebGPU'}
+ */
+function parseEngineArg() {
+  const raw = process.argv.find((arg) => arg.startsWith('--engine='));
+  if (!raw) {
+    return 'WebGL2';
+  }
+  const value = raw.slice('--engine='.length).trim();
+  if (value === 'WebGL2' || value === 'WebGPU') {
+    return value;
+  }
+  console.error(`Invalid --engine=${value}. Use WebGL2 or WebGPU.`);
+  process.exit(1);
+}
+
+/**
+ * @param {'WebGL2' | 'WebGPU'} engine
+ * @returns {string[]}
+ */
+function resolveManifestPaths(engine) {
+  const fileName = engine === 'WebGPU' ? 'playground-wgpu.json' : 'playground.json';
+  return [
+    path.join(repoRoot, 'src', 'client', 'public', fileName),
+    path.join(repoRoot, 'src', 'client', 'playground', fileName)
+  ];
+}
+
+const engine = parseEngineArg();
+const manifestPaths = resolveManifestPaths(engine);
 
 const IMPORT_RE = /(?:import|export)(?:\s+type)?\s+(?:[^'"`;]+?\s+from\s+)?['"]([^'"]+)['"]/g;
 
@@ -46,6 +74,13 @@ const NAMESPACE_BABYLON_IMPORT_RE =
 // PWA modules (service worker, workbox) are Vite-only. Playground uses
 // utils/pwa_runtime.ts stubs; nothing in the export graph may import pwa/.
 const PWA_IMPORT_PATH_RE = /(?:^|\/)pwa\//;
+
+// Vite `define` globals (e.g. __CHAT_PROXY_PREFIX__) are substituted at build
+// time but copied verbatim into playground.json — Monaco TS cannot resolve them.
+const VITE_DEFINE_GLOBAL_RE = /\b__[A-Z][A-Z0-9_]*__\b/;
+
+// Bare `import.meta.env.*` property access fails Monaco TS in the playground.
+const DIRECT_IMPORT_META_ENV_RE = /\bimport\.meta\.env\s*[.[]/;
 
 /**
  * Parse the doubly-wrapped playground JSON into the inner file manifest.
@@ -94,6 +129,84 @@ function pickManifestKey(files, resolvedNoExt) {
     return asIndex;
   }
   return null;
+}
+
+/** Drop comments so playground constraint regexes do not match documentation text. */
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+}
+
+const PLAYGROUND_CHAT_SYNC_KEYS = [
+  'enabled',
+  'serviceUrl',
+  'clientId',
+  'roomMode',
+  'gameRoomName'
+];
+
+/**
+ * Parse PLAYGROUND_CHAT_CONFIG field values from bundled TS source text.
+ * @param {string} source
+ */
+function parsePlaygroundChatConfig(source) {
+  /** @type {Record<string, boolean | string>} */
+  const config = {};
+  const enabledMatch = source.match(/enabled:\s*(true|false)/);
+  if (enabledMatch) {
+    config.enabled = enabledMatch[1] === 'true';
+  }
+  for (const key of PLAYGROUND_CHAT_SYNC_KEYS) {
+    if (key === 'enabled') {
+      continue;
+    }
+    const match = source.match(new RegExp(`${key}:\\s*'([^']*)'`));
+    if (match) {
+      config[key] = match[1];
+    }
+  }
+  return config;
+}
+
+/**
+ * Ensure embedded playground chat defaults match the deployed JSON file.
+ * @param {Record<string, string>} files
+ */
+async function checkPlaygroundChatConfigSync(files) {
+  const errors = [];
+  const deployedPath = path.join(repoRoot, 'src', 'client', 'public', 'chat', 'config.json');
+  const playgroundChatKey = 'config/playground_chat.ts';
+  const playgroundSource = files[playgroundChatKey];
+
+  if (typeof playgroundSource !== 'string') {
+    errors.push(
+      `"${playgroundChatKey}" is missing from the manifest but is required for playground chat.`
+    );
+    return errors;
+  }
+
+  let deployed;
+  try {
+    deployed = JSON.parse(await fs.readFile(deployedPath, 'utf8'));
+  } catch (err) {
+    errors.push(`Could not read ${path.relative(repoRoot, deployedPath)}: ${err.message}`);
+    return errors;
+  }
+
+  const embedded = parsePlaygroundChatConfig(playgroundSource);
+  for (const key of PLAYGROUND_CHAT_SYNC_KEYS) {
+    if (!(key in deployed)) {
+      continue;
+    }
+    if (embedded[key] !== deployed[key]) {
+      errors.push(
+        `config/playground_chat.ts ${key}=${JSON.stringify(embedded[key])} does not match ` +
+          `public/chat/config.json ${key}=${JSON.stringify(deployed[key])}. ` +
+          `Update PLAYGROUND_CHAT_CONFIG to mirror the deployed chat config.`
+      );
+    }
+  }
+
+  return errors;
 }
 
 function check(manifest) {
@@ -176,6 +289,24 @@ function check(manifest) {
           `See PLAYGROUND.md ("The ambient \`BABYLON\` global: never \`import * as BABYLON\`").`
       );
     }
+
+    if (VITE_DEFINE_GLOBAL_RE.test(source)) {
+      const match = source.match(VITE_DEFINE_GLOBAL_RE);
+      errors.push(
+        `${current}: Vite \`define\` global "${match?.[0] ?? '__FOO__'}" is forbidden in ` +
+          `playground-bundled code. The export copies raw TypeScript; Monaco cannot resolve ` +
+          `build-time globals. Use literal defaults or runtime detection instead — see ` +
+          `config/chat_proxy.ts and datastar_client.ts readViteEnv().`
+      );
+    }
+
+    if (DIRECT_IMPORT_META_ENV_RE.test(stripComments(source))) {
+      errors.push(
+        `${current}: bare \`import.meta.env.*\` access is forbidden in playground-bundled code. ` +
+          `Monaco TS has no Vite \`ImportMetaEnv\` types. Use \`readViteEnv()\` from ` +
+          `utils/vite_env.ts instead.`
+      );
+    }
   }
 
   return errors;
@@ -195,6 +326,7 @@ async function main() {
     }
 
     const errors = check(manifest);
+    errors.push(...(await checkPlaygroundChatConfigSync(manifest.files)));
     const rel = path.relative(repoRoot, manifestPath);
     if (errors.length === 0) {
       const fileCount = Object.keys(manifest.files).length;

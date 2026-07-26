@@ -34,13 +34,20 @@ export const CONFIG: GameConfig = {
     DRAG_SENSITIVITY: 0.02,
     ZOOM_MIN: -15,
     ZOOM_MAX: -2,
-    FOLLOW_SMOOTHING: 0.1
+    FOLLOW_SMOOTHING: 0.1,
+    // Default top-down camera offset/position (overridable per environment via `topDownCamera`).
+    // The -1 Z keeps the camera 1 unit behind the character instead of exactly overhead: a
+    // perfectly straight-down look gives the TargetCamera a degenerate up-vector and the
+    // rotation flips/spazzes. The slight tilt stays effectively top-down while staying stable.
+    TOP_DOWN_OFFSET: new BABYLON.Vector3(0, 20, -1)
   },
 
   // Physics Settings
   PHYSICS: {
     GRAVITY: new BABYLON.Vector3(0, -9.8, 0),
-    CHARACTER_GRAVITY: new BABYLON.Vector3(0, -18, 0)
+    CHARACTER_GRAVITY: new BABYLON.Vector3(0, -18, 0),
+    // Unity-style step height for PhysicsCharacterController (0 = disabled).
+    MAX_STEP_HEIGHT: 0.35
   },
 
   // Animation Settings
@@ -61,8 +68,9 @@ export const CONFIG: GameConfig = {
     SCENE_OPTIMIZER_TRACK_MS: 2500,
     HARDWARE_SCALING_MAX: 2,
     HARDWARE_SCALING_STEP: 0.25,
-    // WebGL is the default: WebGPU + PBR/light UBOs still hit edge cases in some scenes (bind group / Light0).
-    WEBGPU_WHEN_AVAILABLE: false
+    // 'webgl' | 'webgpu' — prefer webgl until fog/NME/splat paths are validated on WebGPU.
+    // Env/character imports strip glTF lights; light-dirty marks keep both engines UBO-safe.
+    ENGINE: 'webgl'
   },
 
   // Effects Settings
@@ -278,6 +286,21 @@ export const CONFIG: GameConfig = {
         actionId: 'inspector'
       },
       {
+        title: 'Click to Move',
+        uiElement: 'toggle',
+        visibility: 'all',
+        defaultValue: true, // On by default in splat envs; no-op elsewhere
+        actionId: 'click-to-move'
+      },
+      {
+        title: 'Camera View',
+        uiElement: 'dropdown',
+        visibility: 'all',
+        options: ['Third Person', 'Top Down'],
+        defaultValue: 'Third Person', // Only effective when the environment's cameraMode is 'cycle'
+        actionId: 'camera-mode'
+      },
+      {
         title: 'Update App',
         uiElement: 'button',
         visibility: 'all',
@@ -339,7 +362,7 @@ export const CONFIG: GameConfig = {
 
   MULTIPLAYER: {
     ENABLED: true,
-    PRODUCTION_SERVER: 'bgs-mp.onrender.com',
+    PRODUCTION_SERVER: 'babylon-game-starter.onrender.com',
     LOCAL_SERVER: 'localhost:5000',
     // Render free-tier services sleep after ~15 min idle and take 10-30 s to
     // wake. The first probe after a cold start can easily exceed 15 s on

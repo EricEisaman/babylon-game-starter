@@ -11,6 +11,7 @@ import { HUDManager } from '../managers/hud_manager';
 import { getMultiplayerManager } from '../managers/multiplayer_manager';
 import { hideAllRemotePeers } from '../managers/remote_peer_proxy';
 import { CharacterLock } from '../utils/character_lock';
+import { DeviceDetector } from '../utils/device_detector';
 import { EnvironmentLock } from '../utils/environment_lock';
 import {
   applyPwaUpdate,
@@ -66,6 +67,9 @@ export class SettingsUI {
   private static outsideCloseBinding: OutsideCloseBinding | null = null;
   private static pwaUpdateUnsubscribe: (() => void) | null = null;
   private static pwaInstallUnsubscribe: (() => void) | null = null;
+  private static hybridUnsubscribe: (() => void) | null = null;
+  /** Last Screen Controls toggle; null means use section default (visible). */
+  private static screenControlsVisible: boolean | null = null;
 
   private static shouldShowPwaSection(section: SettingsSection): boolean {
     if (section.hiddenWhen === 'no-pwa-update') {
@@ -79,60 +83,15 @@ export class SettingsUI {
     }
     return true;
   }
-  private static isMobileDevice(): boolean {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent
-    );
-  }
-
-  private static isIPad(): boolean {
-    // Modern iPad detection (including iPad Pro)
-    const userAgent = navigator.userAgent;
-    const isIPadUA = /iPad/i.test(userAgent);
-    const isMacWithTouch = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-    const isIPadPro = /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1;
-
-    return isIPadUA || isMacWithTouch || isIPadPro;
-  }
-
-  private static isIPadWithKeyboard(): boolean {
-    // Check if it's an iPad first
-    if (!this.isIPad()) {
-      return false;
-    }
-
-    // Multiple detection methods for iPad with keyboard
-    const isLandscape = window.innerHeight < window.innerWidth;
-    const hasExternalKeyboard = this.detectExternalKeyboard();
-    const hasKeyboardEvents = this.detectKeyboardEvents();
-
-    // Show if any of these conditions are met
-    return isLandscape || hasExternalKeyboard || hasKeyboardEvents;
-  }
-
-  private static detectExternalKeyboard(): boolean {
-    // Check for external keyboard indicators
-    // This is a simplified check - in real scenarios you might need more sophisticated detection
-    return (
-      navigator.maxTouchPoints === 0 || (navigator.maxTouchPoints === 1 && window.innerWidth > 1024)
-    );
-  }
-
-  private static detectKeyboardEvents(): boolean {
-    // Check if keyboard events have been detected recently
-    // This would require tracking keyboard events over time
-    // For now, we'll use a simpler approach
-    return false; // Placeholder for future keyboard event tracking
-  }
 
   private static shouldShowSection(visibility: VisibilityType): boolean {
     switch (visibility) {
       case 'all':
         return true;
       case 'mobile':
-        return this.isMobileDevice();
+        return DeviceDetector.isMobileDevice();
       case 'iPadWithKeyboard':
-        return this.isIPadWithKeyboard();
+        return DeviceDetector.isIPadWithKeyboard();
       case 'playground':
         return this.isPlaygroundRuntime();
       default:
@@ -159,6 +118,7 @@ export class SettingsUI {
     switch (actionId) {
       case 'screen-controls':
         if (typeof value === 'boolean') {
+          this.screenControlsVisible = value;
           MobileInputManager.setVisibility(value);
         }
         break;
@@ -190,6 +150,16 @@ export class SettingsUI {
       case 'inspector':
         if (typeof value === 'boolean') {
           this.toggleInspector(value);
+        }
+        break;
+      case 'click-to-move':
+        if (typeof value === 'boolean') {
+          this.sceneManager?.setClickToMoveEnabled(value);
+        }
+        break;
+      case 'camera-mode':
+        if (typeof value === 'string') {
+          this.sceneManager?.setCameraView(value === 'Top Down' ? 'topDown' : 'thirdPerson');
         }
         break;
       case 'pwa-update':
@@ -239,6 +209,12 @@ export class SettingsUI {
     });
     this.pwaInstallUnsubscribe?.();
     this.pwaInstallUnsubscribe = onPwaInstallOfferChanged(() => {
+      if (this.isPanelOpen) {
+        this.regenerateSections();
+      }
+    });
+    this.hybridUnsubscribe?.();
+    this.hybridUnsubscribe = DeviceDetector.subscribeIPadWithKeyboard(() => {
       if (this.isPanelOpen) {
         this.regenerateSections();
       }
@@ -628,8 +604,8 @@ export class SettingsUI {
           defaultValue = section.defaultValue;
         }
         if (section.title === 'Screen Controls') {
-          // For Screen Controls, always default to true (visible) since controls are shown by default
-          defaultValue = true;
+          // Preserve user toggle across regenerate; default visible when unset
+          defaultValue = this.screenControlsVisible ?? true;
         }
 
         sectionsHTML += `
@@ -2052,6 +2028,8 @@ export class SettingsUI {
     this.pwaUpdateUnsubscribe = null;
     this.pwaInstallUnsubscribe?.();
     this.pwaInstallUnsubscribe = null;
+    this.hybridUnsubscribe?.();
+    this.hybridUnsubscribe = null;
 
     // Remove ALL settings buttons and panels (more aggressive)
     const allButtons = document.querySelectorAll('#settings-button');

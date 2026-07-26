@@ -7,7 +7,15 @@
 // requests will fail CORS / 403. See ../chat-slayer/CLIENT_GUIDE.md and
 // ../chat-slayer/RENDER_DEPLOYMENT.md.
 
+import {
+  CHAT_PROXY_PREFIX,
+  getChatDirectUpstreamUrl,
+  isChatSameOriginProxyAvailable
+} from '../config/chat_proxy';
+import { PLAYGROUND_CHAT_CONFIG } from '../config/playground_chat';
+
 import { withAppBasePath } from './branding_config';
+import { isPlaygroundRuntime } from './playground_runtime';
 import { isQueryFlagEnabled } from './query_hook';
 
 import type { ChatConfig, ChatRoomMode, ResolvedChatConfig } from '../types/chat';
@@ -46,15 +54,15 @@ interface ResolvedChatUrls {
  * forward chunked streams.
  */
 function resolveChatServiceUrls(configured: string): ResolvedChatUrls {
-  const proxyPrefix = __CHAT_PROXY_PREFIX__;
-  const directUpstream = __CHAT_DIRECT_UPSTREAM_URL__;
+  const proxyPrefix = CHAT_PROXY_PREFIX;
+  const directUpstream = getChatDirectUpstreamUrl();
 
   if (configured !== proxyPrefix) {
     const url = normalizeServiceUrl(configured);
     return { serviceUrl: url, streamServiceUrl: url };
   }
 
-  if (!__CHAT_SAME_ORIGIN_PROXY_AVAILABLE__) {
+  if (!isChatSameOriginProxyAvailable()) {
     return { serviceUrl: directUpstream, streamServiceUrl: directUpstream };
   }
 
@@ -136,6 +144,11 @@ export async function loadChatConfig(): Promise<ResolvedChatConfig> {
   }
 
   loadPromise = (async () => {
+    if (isPlaygroundRuntime()) {
+      cachedConfig = resolveChatConfig(PLAYGROUND_CHAT_CONFIG);
+      return cachedConfig;
+    }
+
     try {
       const response = await fetch(withAppBasePath('/chat/config.json'), { cache: 'no-store' });
       if (!response.ok) {

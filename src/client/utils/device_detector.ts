@@ -1,9 +1,37 @@
 /**
- * Device detection utilities for determining device type and capabilities
+ * Device detection for mobile / iPad / iPad+keyboard hybrid UX.
+ *
+ * Hybrid (iPad with keyboard) starts touch-first, then becomes true when sync
+ * heuristics match or the first real keydown latches proof. Listeners only
+ * attach on iPad to avoid playground desktop noise.
  */
+
+const VIEWPORT_KEYBOARD_RATIO = 0.8;
+
+const PHYSICAL_NAV_KEYS = new Set([
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  ' ',
+  'Space',
+  'Shift',
+  'ShiftLeft',
+  'ShiftRight'
+]);
+
+type HybridListener = (isIPadWithKeyboard: boolean) => void;
+
 export class DeviceDetector {
+  private static keyboardLatched = false;
+  private static lastHybrid = false;
+  private static listeners = new Set<HybridListener>();
+  private static monitoringStarted = false;
+  private static keydownHandler: ((event: KeyboardEvent) => void) | null = null;
+  private static resizeRafId: number | null = null;
+
   /**
-   * Detects if the current device is a mobile device
+   * Detects if the current device is a mobile / touch-primary device.
    */
   public static isMobileDevice(): boolean {
     return (
@@ -14,81 +42,119 @@ export class DeviceDetector {
   }
 
   /**
-   * Detects if the current device is an iPad
+   * Detects if the current device is an iPad (including iPadOS desktop UA).
    */
   public static isIPad(): boolean {
-    // More specific iPad detection
     return (
       /iPad/i.test(navigator.userAgent) ||
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- iPad heuristic; see STYLE.md
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 0)
     );
   }
 
   /**
-   * Detects if the current iPad device has a keyboard attached
+   * Live hybrid read: iPad + (latched key proof or sync dock/landscape heuristics).
+   * Touch-first until evidence; call sites should not snapshot once forever.
    */
   public static isIPadWithKeyboard(): boolean {
-    if (!this.isIPad()) return false;
-
-    // Check for keyboard presence using various methods
-    const hasKeyboard = this.checkForKeyboardPresence();
-    const hasExternalKeyboard = this.checkForExternalKeyboard();
-
-    return hasKeyboard || hasExternalKeyboard;
+    this.ensureMonitoring();
+    return this.computeHybrid();
   }
 
   /**
-   * Checks for keyboard presence by comparing viewport and screen heights
+   * Subscribe to hybrid flag changes. Invokes immediately with the current value.
+   * @returns Unsubscribe function
    */
-  private static checkForKeyboardPresence(): boolean {
-    // Method 1: Check if virtual keyboard is likely present
-    // This is not 100% reliable but gives us a good indication
-    const viewportHeight = window.innerHeight;
-    const screenHeight = window.screen.height;
-    const keyboardLikelyPresent = viewportHeight < screenHeight * 0.8;
-
-    return keyboardLikelyPresent;
-  }
-
-  /**
-   * Checks for external keyboard by monitoring keyboard events
-   */
-  private static checkForExternalKeyboard(): boolean {
-    // Method 2: Check for external keyboard events
-    // We'll track if we receive keyboard events that suggest an external keyboard
-    let keyboardEventCount = 0;
-    const keyboardThreshold = 3; // Number of events to consider keyboard present
-
-    const checkKeyboardEvents = (event: KeyboardEvent) => {
-      // Only count events that are likely from a physical keyboard
-      // (not virtual keyboard events which often have different characteristics)
-      if (
-        event.key.length === 1 ||
-        ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Shift'].includes(event.key)
-      ) {
-        keyboardEventCount++;
-
-        if (keyboardEventCount >= keyboardThreshold) {
-          // Remove the listener once we've confirmed keyboard presence
-          document.removeEventListener('keydown', checkKeyboardEvents);
-          if (keyboardDetectionTimeout) {
-            clearTimeout(keyboardDetectionTimeout);
-            keyboardDetectionTimeout = null;
-          }
-          return true;
-        }
-      }
-      return false;
+  public static subscribeIPadWithKeyboard(listener: HybridListener): () => void {
+    this.ensureMonitoring();
+    this.listeners.add(listener);
+    listener(this.computeHybrid());
+    return () => {
+      this.listeners.delete(listener);
     };
+  }
 
-    // Add listener for a short period to detect keyboard
-    document.addEventListener('keydown', checkKeyboardEvents);
+  private static computeHybrid(): boolean {
+    if (!this.isIPad()) {
+      return false;
+    }
+    if (this.keyboardLatched) {
+      return true;
+    }
+    return this.syncKeyboardLikely();
+  }
 
-    // Use setTimeout instead of scene observable for keyboard detection
-    let keyboardDetectionTimeout: number | null = window.setTimeout(() => {
-      document.removeEventListener('keydown', checkKeyboardEvents);
-    }, 5000);
+  /** Landscape or viewport-vs-screen shrink (Magic Keyboard docked / software keyboard). */
+  private static syncKeyboardLikely(): boolean {
+    const isLandscape = window.innerHeight < window.innerWidth;
+    const viewportShrunk = window.innerHeight < window.screen.height * VIEWPORT_KEYBOARD_RATIO;
+    return isLandscape || viewportShrunk;
+  }
 
-    return false; // Will be updated by the event listener
+  private static ensureMonitoring(): void {
+    if (this.monitoringStarted || typeof window === 'undefined') {
+      return;
+    }
+    this.monitoringStarted = true;
+    this.lastHybrid = this.computeHybrid();
+
+    if (!this.isIPad()) {
+      return;
+    }
+
+    this.keydownHandler = (event: KeyboardEvent) => {
+      if (this.keyboardLatched) {
+        return;
+      }
+      if (!this.isPhysicalKeyboardEvidence(event)) {
+        return;
+      }
+      this.keyboardLatched = true;
+      this.detachKeydown();
+      this.publishIfChanged();
+    };
+    document.addEventListener('keydown', this.keydownHandler, { passive: true });
+
+    const scheduleRecompute = (): void => {
+      if (this.resizeRafId !== null) {
+        return;
+      }
+      this.resizeRafId = window.requestAnimationFrame(() => {
+        this.resizeRafId = null;
+        this.publishIfChanged();
+      });
+    };
+    window.addEventListener('resize', scheduleRecompute, { passive: true });
+    window.addEventListener('orientationchange', scheduleRecompute, { passive: true });
+  }
+
+  private static isPhysicalKeyboardEvidence(event: KeyboardEvent): boolean {
+    const key = event.key;
+    if (typeof key !== 'string' || key.length === 0) {
+      return false;
+    }
+    if (key.length === 1) {
+      return true;
+    }
+    return PHYSICAL_NAV_KEYS.has(key);
+  }
+
+  private static detachKeydown(): void {
+    if (!this.keydownHandler) {
+      return;
+    }
+    document.removeEventListener('keydown', this.keydownHandler);
+    this.keydownHandler = null;
+  }
+
+  private static publishIfChanged(): void {
+    const next = this.computeHybrid();
+    if (next === this.lastHybrid) {
+      return;
+    }
+    this.lastHybrid = next;
+    for (const listener of this.listeners) {
+      listener(next);
+    }
   }
 }

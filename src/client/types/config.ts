@@ -36,11 +36,17 @@ export interface CameraConfig {
   readonly ZOOM_MIN: number;
   readonly ZOOM_MAX: number;
   readonly FOLLOW_SMOOTHING: number;
+  readonly TOP_DOWN_OFFSET: BABYLON.Vector3;
 }
 
 export interface PhysicsConfig {
   readonly GRAVITY: BABYLON.Vector3;
   readonly CHARACTER_GRAVITY: BABYLON.Vector3;
+  /**
+   * Max step-up height for PhysicsCharacterController (meters).
+   * `0` disables step climbing (Babylon default); typical values 0.2–0.4.
+   */
+  readonly MAX_STEP_HEIGHT: number;
 }
 
 export interface AnimationConfig {
@@ -64,10 +70,11 @@ export interface PerformanceConfig {
   readonly HARDWARE_SCALING_MAX: number;
   readonly HARDWARE_SCALING_STEP: number;
   /**
-   * Prefer WebGPUEngine when the browser exposes WebGPU; falls back to WebGL Engine.
-   * Default off: some scenes still hit WebGPU material/bind-group edge cases; enable when validated.
+   * Rendering backend: `'webgl'` forces WebGL; `'webgpu'` tries WebGPU then falls back to WebGL.
+   * Default `'webgl'` until fog/NME/splat are validated on WebGPU. Env light hygiene is dual-engine.
+   * Vite override: `VITE_ENGINE` / `npm run dev:wgpu` (does not change this config default).
    */
-  readonly WEBGPU_WHEN_AVAILABLE: boolean;
+  readonly ENGINE: 'webgl' | 'webgpu';
 }
 
 export interface MultiplayerConfig {

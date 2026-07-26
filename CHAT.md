@@ -50,7 +50,6 @@ Chat Slayer validates the `X-Chat-Slayer-Client-Id` request header against the *
 
 For the shared `chat-slayer.onrender.com` deployment, use `"clientId": "web-demo"`. That entry allows these **CORS origins** (scheme + host only — **never** a path) for `web-demo`:
 
-- `https://bgs-mp.onrender.com`
 - `https://babylon-game-starter.onrender.com`
 - `https://babylon-game-starter.netlify.app`
 - `https://ericeisaman.github.io` (GitHub Pages project site for this repo)
@@ -59,11 +58,16 @@ For the shared `chat-slayer.onrender.com` deployment, use `"clientId": "web-demo
 
 | Game deploy URL | `serviceUrl` | `clientId` | CORS origin for `ALLOWED_CLIENTS` |
 |---|---|---|---|
-| `https://bgs-mp.onrender.com` | `/chat-api` | `web-demo` | `https://bgs-mp.onrender.com` |
+| `https://babylon-game-starter.onrender.com` | `/chat-api` | `web-demo` | `https://babylon-game-starter.onrender.com` |
 | `https://babylon-game-starter.netlify.app` | `/chat-api` (client uses direct Chat Slayer on Netlify — see below) | `web-demo` | `https://babylon-game-starter.netlify.app` |
 | `https://ericeisaman.github.io/babylon-game-starter/` | `/chat-api` (client uses direct Chat Slayer on Pages) | `web-demo` | `https://ericeisaman.github.io` |
+| `https://playground.babylonjs.com` | direct Chat Slayer (embedded config; no host proxy) | `web-demo` | `https://playground.babylonjs.com` |
 
 The `/chat-api` proxy removes browser CORS errors; it does **not** bypass Chat Slayer’s client-id or origin checks.
+
+### Babylon playground
+
+The exported snippet cannot fetch `/chat/config.json` from the playground host. [`config/playground_chat.ts`](src/client/config/playground_chat.ts) embeds the same defaults as [`public/chat/config.json`](src/client/public/chat/config.json); [`chat_config.ts`](src/client/utils/chat_config.ts) skips the fetch on `playground.babylonjs.com` and resolves `serviceUrl: "/chat-api"` to direct Chat Slayer upstream. Ensure `https://playground.babylonjs.com` is listed under your `clientId` in Chat Slayer `ALLOWED_CLIENTS`.
 
 ### Registration vs preconfigured users
 
@@ -91,7 +95,7 @@ When the browser calls Chat Slayer **cross-origin** (GitHub Pages, or a full `ht
 
 **Proxied hosts (Render Docker):** keep `"serviceUrl": "/chat-api"` in [`chat/config.json`](src/client/public/chat/config.json). Render nginx forwards `/chat-api/` to Chat Slayer same-origin, including long-lived SSE.
 
-**Static hosts (Netlify, GitHub Pages):** keep `"serviceUrl": "/chat-api"` in config, but the client **automatically uses the direct Chat Slayer upstream** at runtime on `*.netlify.app` and `*.github.io` (see [`chat_config.ts`](src/client/utils/chat_config.ts)). Netlify’s HTTP/2 redirect proxy cannot forward chunked SSE (`ERR_HTTP2_PROTOCOL_ERROR` on `/chat-api/demo/stream`); short POST actions may work through the proxy, but the live stream must go direct — same idea as multiplayer connecting straight to `bgs-mp.onrender.com`. Add your host-only origin to Chat Slayer `ALLOWED_CLIENTS`. Vite dev still proxies `/chat-api` ([`vite.config.ts`](vite.config.ts)).
+**Static hosts (Netlify, GitHub Pages):** keep `"serviceUrl": "/chat-api"` in config, but the client **automatically uses the direct Chat Slayer upstream** at runtime on `*.netlify.app` and `*.github.io` (see [`chat_config.ts`](src/client/utils/chat_config.ts)). Netlify’s HTTP/2 redirect proxy cannot forward chunked SSE (`ERR_HTTP2_PROTOCOL_ERROR` on `/chat-api/demo/stream`); short POST actions may work through the proxy, but the live stream must go direct — same idea as multiplayer connecting straight to `babylon-game-starter.onrender.com`. Add your host-only origin to Chat Slayer `ALLOWED_CLIENTS`. Vite dev still proxies `/chat-api` ([`vite.config.ts`](vite.config.ts)).
 
 ### Proxy upstream override
 

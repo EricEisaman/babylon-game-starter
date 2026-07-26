@@ -19,6 +19,9 @@ import type { CharacterState } from '../config/character_states';
 import type { ManagedAudioSound } from '../types/audio';
 import type { Character } from '../types/character';
 
+const DEFAULT_CAPSULE_HEIGHT = 1.8;
+const DEFAULT_CAPSULE_RADIUS = 0.6;
+
 export class CharacterController {
   private readonly scene: BABYLON.Scene;
   private readonly characterController: BABYLON.PhysicsCharacterController;
@@ -30,7 +33,19 @@ export class CharacterController {
   private inputDirection = new BABYLON.Vector3(0, 0, 0);
   /** Reused for zeroing physics velocity without per-call allocations. */
   private readonly zeroLinearVelocity = new BABYLON.Vector3(0, 0, 0);
+  private readonly downDirection = BABYLON.Vector3.Down();
+  private readonly supportInfo: BABYLON.CharacterSurfaceInfo = {
+    isSurfaceDynamic: false,
+    supportedState: BABYLON.CharacterSupportedState.UNSUPPORTED,
+    averageSurfaceNormal: new BABYLON.Vector3(),
+    averageSurfaceVelocity: new BABYLON.Vector3(),
+    averageAngularSurfaceVelocity: new BABYLON.Vector3()
+  };
+  private readonly movementResult = new BABYLON.Vector3();
+  private readonly zeroSurfaceVelocity = new BABYLON.Vector3(0, 0, 0);
   private targetRotationY = 0;
+  /** True while click-to-move navigation is driving forward input/facing. */
+  private navMoveActive = false;
   private keysDown = new Set<string>();
   private cameraController: SmoothFollowCameraController | null = null;
   private boostActive = false;
@@ -44,9 +59,8 @@ export class CharacterController {
   private thrusterSound: ManagedAudioSound | null = null;
   public animationController: AnimationController;
 
-  // Mobile device detection - computed once at initialization
+  // Mobile device detection — iPad+keyboard is live (may latch after first key)
   private readonly isMobileDevice: boolean;
-  private readonly isIPadWithKeyboard: boolean;
   private physicsPaused = false;
   private currentCharacter: Character | null = null;
   private lastAppliedInvisibility: boolean | null = null;
@@ -56,26 +70,28 @@ export class CharacterController {
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
 
-    // Enhanced device detection
     this.isMobileDevice = DeviceDetector.isMobileDevice();
-    this.isIPadWithKeyboard = DeviceDetector.isIPadWithKeyboard();
+    // Prime hybrid monitoring (iPad-only key latch / orientation heuristics).
+    DeviceDetector.isIPadWithKeyboard();
 
     // Create character physics controller with default position (will be updated when character is loaded)
     this.characterController = new BABYLON.PhysicsCharacterController(
       new BABYLON.Vector3(0, 0, 0), // Default position, will be updated
       {
-        capsuleHeight: 1.8, // Default height, will be updated when character is loaded
-        capsuleRadius: 0.6 // Default radius, will be updated when character is loaded
+        capsuleHeight: DEFAULT_CAPSULE_HEIGHT,
+        capsuleRadius: DEFAULT_CAPSULE_RADIUS
       },
       scene
     );
+    this.characterController.maxStepHeight = CONFIG.PHYSICS.MAX_STEP_HEIGHT;
+    this.characterController.footOffset = DEFAULT_CAPSULE_HEIGHT * 0.5;
 
     // Create display capsule for debug
     this.displayCapsule = BABYLON.MeshBuilder.CreateCapsule(
       'CharacterDisplay',
       {
-        height: 1.8, // Default height, will be updated when character is loaded
-        radius: 0.6 // Default radius, will be updated when character is loaded
+        height: DEFAULT_CAPSULE_HEIGHT,
+        radius: DEFAULT_CAPSULE_RADIUS
       },
       scene
     );
@@ -232,6 +248,10 @@ export class CharacterController {
     return INPUT_KEYS.RESET_CAMERA.some((key) => key === k);
   };
 
+  private isCameraModeKey = (k: string): boolean => {
+    return INPUT_KEYS.CAMERA_MODE.some((key) => key === k);
+  };
+
   private isLeftKey = (k: string): boolean => {
     return INPUT_KEYS.LEFT.some((key) => key === k);
   };
@@ -277,10 +297,12 @@ export class CharacterController {
       this.cycleHUDPosition();
     } else if (this.isResetCameraKey(key)) {
       this.resetCameraToDefaultOffset();
+    } else if (this.isCameraModeKey(key)) {
+      this.cameraController?.toggleViewMode();
     }
 
     // Only update mobile input for iPads with keyboards, not for regular keyboard input
-    if (this.isIPadWithKeyboard) {
+    if (DeviceDetector.isIPadWithKeyboard()) {
       this.updateMobileInput();
     }
   }
@@ -310,7 +332,7 @@ export class CharacterController {
     }
 
     // Only update mobile input for iPads with keyboards, not for regular keyboard input
-    if (this.isIPadWithKeyboard) {
+    if (DeviceDetector.isIPadWithKeyboard()) {
       this.updateMobileInput();
     }
   }
@@ -322,7 +344,7 @@ export class CharacterController {
     }
 
     const mobileDirection = MobileInputManager.getInputDirection();
-    if (this.isIPadWithKeyboard) {
+    if (DeviceDetector.isIPadWithKeyboard()) {
       this.applyIPadMobileInput(mobileDirection);
     } else {
       this.applyStandardMobileInput(mobileDirection);
@@ -450,6 +472,16 @@ export class CharacterController {
   };
 
   private updateRotation(): void {
+    // Click-to-move: face the movement direction set by setNavigationMove, bypassing the
+    // camera-driven rotation (which would otherwise turn the capsule to face away from the camera).
+    if (this.navMoveActive) {
+      const rotationSmoothing = this.currentCharacter?.rotationSmoothing ?? 0.2;
+      // Shortest-path wrap so the capsule never spins the long way around.
+      const delta = this.shortestAngleDelta(this.targetRotationY, this.displayCapsule.rotation.y);
+      this.displayCapsule.rotation.y += delta * rotationSmoothing;
+      return;
+    }
+
     // If camera is controlling rotation, don't interfere
     if (this.cameraController?.isRotatingCharacter === true) {
       // Update target rotation to match current rotation to prevent jerking
@@ -473,8 +505,19 @@ export class CharacterController {
       this.targetRotationY += rotationSpeed;
     }
 
+    // Shortest-path wrap so handoffs (navigation end, manual takeover, camera) never spin the
+    // long way around when displayCapsule.rotation.y has drifted beyond +/-PI.
     this.displayCapsule.rotation.y +=
-      (this.targetRotationY - this.displayCapsule.rotation.y) * rotationSmoothing;
+      this.shortestAngleDelta(this.targetRotationY, this.displayCapsule.rotation.y) *
+      rotationSmoothing;
+  }
+
+  /** Smallest signed angle (radians, -PI..PI) to rotate from `current` to `target`. */
+  private shortestAngleDelta(target: number, current: number): number {
+    let delta = target - current;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    return delta;
   }
 
   private updatePosition(): void {
@@ -506,7 +549,8 @@ export class CharacterController {
       return;
     }
 
-    const isMoving = this.isAnyMovementKeyPressed();
+    // Click-to-move counts as moving so the walk clip plays while navigating.
+    const isMoving = this.isAnyMovementKeyPressed() || this.navMoveActive;
 
     // Update animation controller with character state
     this.animationController.updateAnimation(isMoving, this.state);
@@ -514,8 +558,9 @@ export class CharacterController {
     // Update blend weights if currently blending
     this.animationController.updateBlend();
 
-    // Check for walk activation to trigger character rotation
-    if (isMoving && this.cameraController) {
+    // Check for walk activation to trigger character rotation. Skipped during click-to-move:
+    // that lerp would face the capsule away from the camera and fight the nav facing.
+    if (isMoving && !this.navMoveActive && this.cameraController) {
       this.cameraController.checkForWalkActivation();
     }
   }
@@ -537,7 +582,7 @@ export class CharacterController {
         MobileInputManager.getInputDirection().length() > 0.1;
 
       // For iPads with keyboards, either input can trigger movement
-      if (this.isIPadWithKeyboard) {
+      if (DeviceDetector.isIPadWithKeyboard()) {
         return keyboardMoving || mobileMoving;
       } else {
         // For pure mobile, only mobile input matters
@@ -557,18 +602,25 @@ export class CharacterController {
     // Skip physics updates if paused
     if (this.physicsPaused) return;
 
-    const down = BABYLON.Vector3.Down();
-    const support = this.characterController.checkSupport(deltaTime, down);
+    this.characterController.checkSupportToRef(deltaTime, this.downDirection, this.supportInfo);
 
     const characterOrientation = BABYLON.Quaternion.FromEulerAngles(
       0,
       this.displayCapsule.rotation.y,
       0
     );
-    const desiredVelocity = this.calculateDesiredVelocity(deltaTime, support, characterOrientation);
+    const desiredVelocity = this.calculateDesiredVelocity(
+      deltaTime,
+      this.supportInfo,
+      characterOrientation
+    );
 
     this.characterController.setVelocity(desiredVelocity);
-    this.characterController.integrate(deltaTime, support, CONFIG.PHYSICS.CHARACTER_GRAVITY);
+    this.characterController.integrate(
+      deltaTime,
+      this.supportInfo,
+      CONFIG.PHYSICS.CHARACTER_GRAVITY
+    );
   };
 
   private calculateDesiredVelocity(
@@ -630,7 +682,7 @@ export class CharacterController {
     }
 
     const characterMass = character.mass;
-    let outputVelocity = currentVelocity.clone();
+    const outputVelocity = currentVelocity.clone();
 
     // If boost is active, allow input-based velocity modification while in air
     if (this.boostActive) {
@@ -640,15 +692,19 @@ export class CharacterController {
       const desiredVelocity = this.inputDirection
         .scale(massAdjustedSpeed)
         .applyRotationQuaternion(characterOrientation);
-      outputVelocity = this.characterController.calculateMovement(
+      const moved = this.characterController.calculateMovementToRef(
         deltaTime,
         forwardWorld,
         upWorld,
         currentVelocity,
-        BABYLON.Vector3.Zero(),
+        this.zeroSurfaceVelocity,
         desiredVelocity,
-        upWorld
+        upWorld,
+        this.movementResult
       );
+      if (moved) {
+        outputVelocity.copyFrom(this.movementResult);
+      }
     } else {
       // Maintain initial jump velocity while in air - no input-based velocity modification
       // Only apply gravity and minimal air resistance to preserve realistic physics
@@ -699,15 +755,17 @@ export class CharacterController {
     const desiredVelocity = this.inputDirection
       .scale(massAdjustedSpeed)
       .applyRotationQuaternion(characterOrientation);
-    const outputVelocity = this.characterController.calculateMovement(
+    const moved = this.characterController.calculateMovementToRef(
       deltaTime,
       forwardWorld,
       supportInfo.averageSurfaceNormal,
       currentVelocity,
       supportInfo.averageSurfaceVelocity,
       desiredVelocity,
-      upWorld
+      upWorld,
+      this.movementResult
     );
+    const outputVelocity = moved ? this.movementResult.clone() : currentVelocity.clone();
 
     outputVelocity.subtractInPlace(supportInfo.averageSurfaceVelocity);
 
@@ -843,13 +901,23 @@ export class CharacterController {
     // Set up custom animation handlers for the loaded character
     this.setupCustomAnimationHandlers();
 
-    // Update character-specific physics attributes
-    // Note: PhysicsCharacterController doesn't allow runtime updates of capsule dimensions
-    // The display capsule can be updated for visual feedback
-    this.displayCapsule.scaling.setAll(1); // Reset scaling
-    this.displayCapsule.scaling.y = character.height / 1.8; // Scale height
-    this.displayCapsule.scaling.x = character.radius / 0.6; // Scale radius
-    this.displayCapsule.scaling.z = character.radius / 0.6; // Scale radius
+    // Rebuild the Havok capsule for this character while keeping the foot planted.
+    this.characterController.setShapeOptions(
+      {
+        capsuleHeight: character.height,
+        capsuleRadius: character.radius
+      },
+      true
+    );
+    this.characterController.footOffset = character.height * 0.5;
+    this.characterController.characterMass = character.mass;
+    this.characterController.maxStepHeight = CONFIG.PHYSICS.MAX_STEP_HEIGHT;
+
+    // Keep the debug capsule proportional to the physics shape.
+    this.displayCapsule.scaling.setAll(1);
+    this.displayCapsule.scaling.y = character.height / DEFAULT_CAPSULE_HEIGHT;
+    this.displayCapsule.scaling.x = character.radius / DEFAULT_CAPSULE_RADIUS;
+    this.displayCapsule.scaling.z = character.radius / DEFAULT_CAPSULE_RADIUS;
 
     // Reset physics state for new character
     this.characterController.setVelocity(this.zeroLinearVelocity);
@@ -1012,6 +1080,97 @@ export class CharacterController {
 
   public resetInputDirection(): void {
     this.inputDirection.setAll(0);
+  }
+
+  // --- Hybrid click-to-move navigation hooks ------------------------------
+  //
+  // Click-to-move never bypasses physics: it only sets the capsule's facing and
+  // applies full forward input, so the existing ground/air velocity, friction,
+  // gravity, rotation-smoothing and animation pipeline drives the capsule exactly
+  // as it does for WASD. Manual input always wins (see ClickToMoveController,
+  // which cancels navigation the moment manual movement is detected).
+
+  /** True when the player is currently providing manual movement (keyboard or touch). */
+  public hasActiveManualMovementInput(): boolean {
+    return this.isAnyMovementKeyPressed();
+  }
+
+  /**
+   * Called when a click-to-move path begins. Resets the camera's walk-activation state so the
+   * tap's POINTERUP does not pause smooth-follow or trigger the face-away-from-camera lerp.
+   */
+  public notifyNavigationStarted(): void {
+    this.cameraController?.forceActivateSmoothFollow();
+  }
+
+  /**
+   * Faces `dirWorld` (horizontal) and applies full forward input so navigation
+   * drives the capsule through the standard physics pipeline.
+   */
+  public setNavigationMove(dirWorld: BABYLON.Vector3): void {
+    this.navMoveActive = true;
+    // Babylon is left-handed: capsule forward is +Z, so face = atan2(x, z).
+    this.targetRotationY = Math.atan2(dirWorld.x, dirWorld.z);
+    this.inputDirection.x = 0;
+    this.inputDirection.z = 1;
+  }
+
+  /** Releases navigation control after the path completes and halts forward input. */
+  public stopNavigationMove(): void {
+    if (!this.navMoveActive) {
+      return;
+    }
+    this.navMoveActive = false;
+    this.inputDirection.x = 0;
+    this.inputDirection.z = 0;
+    this.settleFacingAfterNavigation();
+  }
+
+  /**
+   * Releases navigation control because manual input took over. Rebuilds
+   * inputDirection from the currently held keys so the leftover navigation forward
+   * input does not bleed into manual movement (touch input self-corrects each frame).
+   */
+  public cancelNavigationForManualInput(): void {
+    if (!this.navMoveActive) {
+      return;
+    }
+    this.navMoveActive = false;
+    this.settleFacingAfterNavigation();
+    if (!this.isMobileDevice) {
+      this.syncInputDirectionFromHeldKeys();
+    }
+  }
+
+  /**
+   * Normalizes the capsule's facing into [-PI, PI] and re-syncs `targetRotationY` so the handoff
+   * from navigation to camera/manual control starts with zero residual delta. Without this, the
+   * accumulated `rotation.y` (which can drift a full turn past +/-PI while following a winding path)
+   * would unwind the long way once the general rotation lerp takes over.
+   */
+  private settleFacingAfterNavigation(): void {
+    let y = this.displayCapsule.rotation.y;
+    while (y > Math.PI) y -= 2 * Math.PI;
+    while (y < -Math.PI) y += 2 * Math.PI;
+    this.displayCapsule.rotation.y = y;
+    this.targetRotationY = y;
+  }
+
+  private syncInputDirectionFromHeldKeys(): void {
+    let z = 0;
+    if (INPUT_KEYS.FORWARD.some((key) => this.keysDown.has(key))) {
+      z = 1;
+    } else if (INPUT_KEYS.BACKWARD.some((key) => this.keysDown.has(key))) {
+      z = -1;
+    }
+    let x = 0;
+    if (INPUT_KEYS.STRAFE_LEFT.some((key) => this.keysDown.has(key))) {
+      x = -1;
+    } else if (INPUT_KEYS.STRAFE_RIGHT.some((key) => this.keysDown.has(key))) {
+      x = 1;
+    }
+    this.inputDirection.x = x;
+    this.inputDirection.z = z;
   }
 
   public getCurrentState(): string {

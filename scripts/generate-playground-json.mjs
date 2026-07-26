@@ -5,6 +5,25 @@ import path from 'node:path';
 const repoRoot = path.resolve(process.cwd());
 const srcRoot = path.join(repoRoot, 'src', 'client');
 
+/** @typedef {'WebGL2' | 'WebGPU'} PlaygroundEngine */
+
+/**
+ * Parse `--engine=WebGL2|WebGPU` (default WebGL2).
+ * @returns {PlaygroundEngine}
+ */
+function parseEngineArg() {
+  const raw = process.argv.find((arg) => arg.startsWith('--engine='));
+  if (!raw) {
+    return 'WebGL2';
+  }
+  const value = raw.slice('--engine='.length).trim();
+  if (value === 'WebGL2' || value === 'WebGPU') {
+    return value;
+  }
+  console.error(`Invalid --engine=${value}. Use WebGL2 or WebGPU.`);
+  process.exit(1);
+}
+
 // Every folder under src/client/ whose *.ts files must be bundled into the
 // playground snippet. Keep this in sync with the transitive imports of the
 // entry file below: if `managers/multiplayer_bootstrap.ts` imports
@@ -28,10 +47,17 @@ const exportRoots = [
 
 const entryFile = 'index.ts';
 
-const outputFiles = [
-  path.join(srcRoot, 'public', 'playground.json'),
-  path.join(srcRoot, 'playground', 'playground.json'),
-];
+/**
+ * @param {PlaygroundEngine} engine
+ * @returns {string[]}
+ */
+function resolveOutputFiles(engine) {
+  const fileName = engine === 'WebGPU' ? 'playground-wgpu.json' : 'playground.json';
+  return [
+    path.join(srcRoot, 'public', fileName),
+    path.join(srcRoot, 'playground', fileName),
+  ];
+}
 
 async function walkTsFiles(absDir, relPrefix) {
   const entries = await fs.readdir(absDir, { withFileTypes: true });
@@ -83,15 +109,52 @@ async function readFileMap(files) {
   return map;
 }
 
+async function readImportMap() {
+  // The Babylon Playground V2 manifest resolves bare specifiers through this import map
+  // (specifier -> esm.sh URL). `recast-navigation` must be pinned to our installed version;
+  // otherwise the Playground falls back to the older copy bundled by Babylon's navigation
+  // plugin, which predates `importNavMesh` and breaks compilation.
+  const pkgRaw = await fs.readFile(path.join(repoRoot, 'package.json'), 'utf8');
+  const pkg = JSON.parse(pkgRaw);
+  const recastRange = pkg.dependencies?.['recast-navigation'] ?? '0.43.1';
+  const recastVersion = recastRange.replace(/^[^0-9]*/, '');
+  return {
+    'recast-navigation': `https://esm.sh/recast-navigation@${recastVersion}`,
+  };
+}
+
+/**
+ * @param {PlaygroundEngine} engine
+ */
+function buildEnvelopeMeta(engine) {
+  if (engine === 'WebGPU') {
+    return {
+      name: 'Babylon Game Starter (WebGPU)',
+      description:
+        'Generated from local source via npm run export:playground:webgpu (WebGPU engine)',
+      tags: 'babylon-game-starter,webgpu',
+    };
+  }
+  return {
+    name: 'Babylon Game Starter',
+    description: 'Generated from local source via npm run export:playground',
+    tags: 'babylon-game-starter',
+  };
+}
+
 async function generate() {
+  const engine = parseEngineArg();
+  const outputFiles = resolveOutputFiles(engine);
   const files = await collectSourceFiles();
   const fileMap = await readFileMap(files);
+  const imports = await readImportMap();
+  const meta = buildEnvelopeMeta(engine);
 
   const codeManifest = {
     v: 2,
     language: 'TS',
     entry: entryFile,
-    imports: {},
+    imports,
     files: fileMap,
   };
 
@@ -99,15 +162,15 @@ async function generate() {
   const payload = {
     code: codeString,
     unicode: Buffer.from(codeString, 'utf8').toString('base64'),
-    engine: 'WebGL2',
+    engine,
     version: 2,
   };
 
   const output = {
     payload: JSON.stringify(payload),
-    name: 'Babylon Game Starter',
-    description: 'Generated from local source via npm run export:playground',
-    tags: 'babylon-game-starter',
+    name: meta.name,
+    description: meta.description,
+    tags: meta.tags,
   };
 
   const serialized = JSON.stringify(output);
@@ -117,7 +180,7 @@ async function generate() {
     await fs.writeFile(outPath, serialized, 'utf8');
   }
 
-  console.log(`Generated playground JSON with ${files.length} TS files.`);
+  console.log(`Generated playground JSON (${engine}) with ${files.length} TS files.`);
   for (const outPath of outputFiles) {
     console.log(`Wrote ${path.relative(repoRoot, outPath)}`);
   }

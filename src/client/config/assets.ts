@@ -890,7 +890,7 @@ export const ASSETS = {
     },
     {
       name: 'Mansion',
-      isDefault: true,
+      isDefault: false,
       model:
         'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/environments/mansion/mansion.glb',
       lightmap: '',
@@ -905,6 +905,50 @@ export const ASSETS = {
         TYPE: 'SPHERE' satisfies SkyType
       },
       spawnPoint: new BABYLON.Vector3(0, 15, -20),
+      spawnRotation: new BABYLON.Vector3(0, 0, 0)
+    },
+    {
+      // Gaussian-splat environment (not a standard mesh world). Roles:
+      //   .ply  — visible Gaussian splat (no physics, not pickable)
+      //   .collision.glb — dedicated invisible Havok + click-to-move collider
+      //   .nav  — prebaked Recast navmesh
+      // Authored in the same untransformed space; SceneManager skips GLB X-invert/lightmap.
+      // Physics bodies attach only to colliderMesh inside loadSplatEnvironment — never to the splat.
+      name: 'Tropical Compound',
+      isDefault: true,
+      model: '', // unused for splat environments (splat gate owns load)
+      cameraOffset: new BABYLON.Vector3(0, 0.5, -4.5),
+      splat: {
+        url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.ply'
+      },
+      colliderMesh: {
+        url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.collision.glb'
+      },
+      navmesh: {
+        url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/splats/tropical_compound.nav'
+      },
+      clickToMove: true,
+      // Lets the player switch between third-person and top-down with the 2 key or Settings.
+      cameraMode: 'cycle',
+      // Starts overhead; the player can switch to third-person via the 2 key or Settings.
+      initialCameraView: 'topDown',
+      lightmap: '',
+      scale: 2,
+      // Drops the navmesh and physics-collider floor so they rest on the visible splat floor.
+      // Kept equal so click picks map exactly onto the navmesh; tune together if height is off.
+      navmeshOffsetY: -0.8,
+      floorMeshOffsetY: -0.8,
+      lightmappedMeshes: EMPTY_LIGHTMAPPED_MESHES,
+      physicsObjects: EMPTY_PHYSICS_OBJECTS,
+      sky: {
+        TEXTURE_URL:
+          'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/images/skies/light-blue-sky-over-grassy-plain.png',
+        ROTATION_Y: 0,
+        BLUR: 0.2,
+        TYPE: 'SPHERE' satisfies SkyType
+      },
+      // Snapped to the nearest navmesh point at load so the capsule starts on the floor.
+      spawnPoint: new BABYLON.Vector3(0, 2, 0),
       spawnRotation: new BABYLON.Vector3(0, 0, 0)
     },
     {
@@ -929,8 +973,8 @@ export const ASSETS = {
           lightType: 'HEMISPHERIC' satisfies LightType,
           name: 'TheCaveHemisphericLight',
           direction: new BABYLON.Vector3(0, 1, 0),
-          diffuseColor: new BABYLON.Color3(0.95, 0.95, 0.98),
-          intensity: 0.0
+          diffuseColor: new BABYLON.Color3(0.55, 0.62, 0.72),
+          intensity: 0.55
         }
       ]
     }

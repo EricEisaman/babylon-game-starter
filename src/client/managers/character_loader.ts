@@ -7,6 +7,7 @@
 import { ASSETS } from '../config/assets';
 import { CHARACTER_ANIM_META_KEY } from '../config/character_animation_meta';
 import { CONFIG } from '../config/game_config';
+import { disposeImportedLights } from '../utils/engine_lights';
 import {
   stampScenePerfConsoleContext,
   tryFlushDeferredScenePerfDevLog
@@ -114,6 +115,8 @@ export class CharacterLoader {
 
     BABYLON.ImportMeshAsync(character.model, this.scene)
       .then(async (result) => {
+        disposeImportedLights(result);
+
         // Process node materials for character meshes
         await NodeMaterialManager.processImportResult(result);
 
