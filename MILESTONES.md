@@ -12,17 +12,23 @@ controller without changing any WASD / jump / boost behavior.
 
 - **Assets** (`EricEisaman/assets/environment/splats/`):
   - `*.ply` — visible Gaussian splat (not pickable, no physics).
-  - `*.glb` — invisible collider mesh: source of Havok physics colliders and the
-    click-to-move pick target.
+  - `*.collision.glb` (preferred) or a dedicated collider `*.glb` — **separate**
+    invisible triangle mesh for Havok static MESH bodies and click-to-move
+    picks. Not the splat; not a standard environment `model`.
   - `*.nav` — prebaked Recast navmesh (a `recast-navigation` `exportNavMesh`
     binary) consumed at runtime via `importNavMesh`.
 - **Environment config** (`src/client/types/environment.ts`,
-  `src/client/config/assets.ts`): new optional `splat` / `colliderMesh` /
-  `navmesh` / `clickToMove` fields. "Tropical Compound" is the first showcase.
+  `src/client/config/assets.ts`): optional `splat` / `colliderMesh` /
+  `navmesh` / `clickToMove`. Presence of `splat` selects the splat load path.
+  "Tropical Compound" is the showcase (`tropical_compound.ply` +
+  `tropical_compound.collision.glb` + `tropical_compound.nav`).
 - **Loading** (`src/client/utils/splat_loader.ts`,
-  `src/client/managers/scene_manager.ts`): splat envs load the splat, collider,
-  and navmesh in the same untransformed left-handed space — the standard GLB
-  X-invert / scale and lightmap paths are skipped so all three stay aligned.
+  `src/client/managers/scene_manager.ts`): when `environment.splat` is set,
+  `loadSplatEnvironment` loads splat + collider + navmesh in the same
+  untransformed left-handed space (uniform scale, **no** GLB X-invert /
+  lightmap). Havok aggregates attach **only** to collider geometry.
+  Standard mesh envs still use `ImportMeshAsync(model)` +
+  `setupEnvironmentPhysics` — a separate control flow.
 - **Navigation** (`src/client/managers/navigation_manager.ts`): single owner of
   the Recast stack — `init` → `importNavMesh` → `NavMeshQuery` (player paths) +
   an NPC-ready `Crowd` (created now, empty until M2).
@@ -67,17 +73,19 @@ created by `NavigationManager` (mirrors the SplatWalk workbench's `Viewer.addNPC
 Nothing in M1 spawns agents; the crowd is built NPC-ready on navmesh load so M2 is
 additive and reuses the single Recast instance (no duplication).
 
-## M3 — SplatWalk-generated collider mesh (planned)
+## M3 — SplatWalk-generated collider mesh (in progress)
 
-Consume the collider/floor mesh that SplatWalk's pipeline will export alongside the
-splat and navmesh (auto-generated room/floor geometry, e.g. via its
-`build_room_floor_mesh` WASM path) instead of a separately hand-authored `.glb`.
+Consume the collider mesh that SplatWalk exports alongside the splat and navmesh
+(e.g. `*.collision.glb` from voxel / SDF-MC collision export) instead of a
+hand-authored floor-only `.glb`. Loaded only on the splat-env path via
+`colliderMesh` — never through `setupEnvironmentPhysics`.
 
-- **Asset source**: SplatWalk emits the collider mesh next to the `*.ply` / `*.nav`,
+- **Asset source**: SplatWalk emits the collider next to the `*.ply` / `*.nav`,
   so it is authored in the same coordinate space and stays aligned by construction.
 - **Reuse**: load it through the existing `colliderMesh` path in
   `src/client/utils/splat_loader.ts` / `SceneManager.loadSplatEnvironment`, reusing
-  the `scale` and `floorMeshOffsetY` knobs. When the asset is ready the change is
-  config-only (swap the `colliderMesh.url`).
+  the `scale` and `floorMeshOffsetY` knobs. Config-only URL swap when the asset is ready.
+- **Tropical Compound**: splat-env `colliderMesh` now points at
+  `tropical_compound.collision.glb` (Gaussian splat visual unchanged).
 - **Scope**: only the source of the collider geometry changes. The prebaked-navmesh
   consumption (M1) and the NPC crowd (M2) are unaffected.

@@ -157,7 +157,7 @@ The production `Dockerfile` copies a static **`multiplayer-server`** binary into
 ```typescript
 MULTIPLAYER: {
   ENABLED: true,
-  PRODUCTION_SERVER: 'bgs-mp.onrender.com',   // Your Render deployment
+  PRODUCTION_SERVER: 'babylon-game-starter.onrender.com',   // Your Render deployment
   LOCAL_SERVER: 'localhost:5000',             // Dev fallback
   CONNECTION_TIMEOUT_MS: 30000,               // 30 s covers Render free-tier cold starts
   PRODUCTION_FIRST: true                      // Try production first
@@ -186,11 +186,11 @@ MultiplayerManager.join('env', 'char')
          ↓
 getDatastarClient() → determineMultiplayerUrl()
          ↓
-Tries: https://bgs-mp.onrender.com/api/multiplayer/health
+Tries: https://babylon-game-starter.onrender.com/api/multiplayer/health
          ↓
 Health check succeeds
          ↓
-SSE: `https://bgs-mp.onrender.com/api/multiplayer/stream`
+SSE: `https://babylon-game-starter.onrender.com/api/multiplayer/stream`
          ↓
 ✅ Connected to multiplayer server
 ```
@@ -344,11 +344,27 @@ Then run `npm run deploy:prepare` to sync changes.
 
 ### Multiplayer Health Check Returns 404
 
-**Symptom**: `curl bgs-mp.onrender.com/api/multiplayer/health` → 404
+**Symptom**: `curl babylon-game-starter.onrender.com/api/multiplayer/health` → 404
 
-**Root cause**: Go service not running or Nginx routing incorrect
+**First check response headers.** If you see `x-render-routing: no-server`, the Render **web service itself is missing, suspended, or not deployed** — nginx/Go inside the container never ran, so CORS middleware never adds `Access-Control-Allow-Origin`. Browsers (including `https://playground.babylonjs.com`) report that as a CORS failure even though the real issue is a dead host.
+
+**Restore checklist when `x-render-routing: no-server`:**
+1. Open the Render dashboard for the service that owns `babylon-game-starter.onrender.com` (Blueprint name is often `babylon-game-starter` in [`render.yaml`](render.yaml)).
+2. If the service was deleted or suspended, recreate/unsuspend it and deploy from the Docker Blueprint (`Dockerfile` + `docker-entrypoint.sh`).
+3. Leave **`MULTIPLAYER_CORS_ALLOW_ORIGIN` unset** so the Go server echoes the request `Origin` (required for playground + static hosts). Do not pin it to a single Pages/Netlify origin unless you accept blocking the playground.
+4. Confirm:
+   ```bash
+   curl -i -H "Origin: https://playground.babylonjs.com" \
+     https://babylon-game-starter.onrender.com/api/multiplayer/health
+   ```
+   Expect **200**, `Access-Control-Allow-Origin: https://playground.babylonjs.com`, and JSON `{ "ok": true, ... }`.
+5. If you recreate under a new `*.onrender.com` hostname, update `CONFIG.MULTIPLAYER.PRODUCTION_SERVER` and run `npm run export:playground` (and `export:playground:webgpu` if you distribute that snippet). The old `bgs-mp.onrender.com` custom domain is retired.
+
+**If headers do not include `x-render-routing: no-server`** (service is up but health still 404):
+
+**Root cause**: Go service not running inside the container, or Nginx routing incorrect  
 **Solutions**:
-1. Check Render logs: `render logs multiplayer` (if separate service)
+1. Check Render logs for the web service (Go listen + nginx start from `docker-entrypoint.sh`)
 2. Verify nginx.conf has `/api/multiplayer/` location block
 3. Ensure port 5000 is available (not conflicting with Node API on 8787)
 
@@ -364,7 +380,7 @@ Then run `npm run deploy:prepare` to sync changes.
    proxy_set_header Connection "upgrade";
    ```
 2. Check browser console for actual error message
-3. Verify `bgs-mp.onrender.com` resolves correctly (DNS)
+3. Verify `babylon-game-starter.onrender.com` resolves correctly (DNS)
 
 ### Cold Start Timeout
 

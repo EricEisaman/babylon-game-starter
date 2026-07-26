@@ -218,7 +218,7 @@ export function createFogParticleSystem(
   if (shouldUseGpu(config)) {
     const gpuCapacity = Math.max(config.particleCount, 50000);
     const gpuSystem = new BABYLON.GPUParticleSystem(systemName, { capacity: gpuCapacity }, scene);
-    gpuSystem.activeParticleCount = config.particleCount;
+    gpuSystem.maxActiveParticleCount = config.particleCount;
     gpuSystem.manualEmitCount = config.particleCount;
     (gpuSystem as ParticlePositionGeneratorHost).particlePositionGenerator = positionGenerator;
     particleSystem = gpuSystem;

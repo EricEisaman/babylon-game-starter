@@ -14,7 +14,7 @@ The codebase uses **strict TypeScript** and ESLint; Babylon and DOM edges are ha
 
 | Area | What you get |
 | ---- | ------------ |
-| Scene | Load/switch GLB environments, sky, lights, ambient audio, BGM crossfade |
+| Scene | Load/switch **GLB** or **Gaussian-splat** environments, sky, lights, ambient audio, BGM crossfade |
 | Character | Havok character controller, jump/boost, animation blending, `CharacterLoader` |
 | Collectibles | `CollectiblesManager` — spawn from `assets.ts`, credits, physics pickup |
 | Inventory | `InventoryManager` + UI for storable items and timed effects |
@@ -43,7 +43,7 @@ The codebase uses **strict TypeScript** and ESLint; Babylon and DOM edges are ha
 | File | Role |
 | ---- | ---- |
 | [src/client/config/assets.ts](src/client/config/assets.ts) | Characters, environments (spawn, sky, items, particles, optional `fallRespawn`, …) |
-| [src/client/config/game_config.ts](src/client/config/game_config.ts) | Speeds, physics, HUD layout, performance, effects list |
+| [src/client/config/game_config.ts](src/client/config/game_config.ts) | Speeds, physics (`MAX_STEP_HEIGHT`), HUD, performance (`ENGINE`: `'webgl'` \| `'webgpu'`; Vite override via `VITE_ENGINE` / `npm run dev:wgpu`), effects list |
 | [src/client/config/input_keys.ts](src/client/config/input_keys.ts) | Keyboard bindings |
 | [src/client/config/mobile_controls.ts](src/client/config/mobile_controls.ts) | Touch UI layout |
 | [src/client/config/character_states.ts](src/client/config/character_states.ts) | Animation state metadata |
@@ -53,7 +53,7 @@ The codebase uses **strict TypeScript** and ESLint; Babylon and DOM edges are ha
 
 | Component | Responsibility |
 | --------- | -------------- |
-| **SceneManager** | Environment load/dispose, physics setup, BGM/ambient, items setup, `registerFallOutOfWorldForEnvironment`; cutscenes are driven from **SettingsUI** via **CutSceneManager** |
+| **SceneManager** | Environment load/dispose, physics setup, BGM/ambient, items setup, `registerFallOutOfWorldForEnvironment`; strips glTF import lights + orphan lights on env switch (WebGL/WebGPU UBO-safe); cutscenes are driven from **SettingsUI** via **CutSceneManager** |
 | **CharacterController** | Movement, jump, boost, rotation, capsule, effect modifiers |
 | **CharacterLoader** | GLB characters, spawn position, handoff to scene reveal / physics |
 | **CollectiblesManager** | Item meshes, collection impulse, credits, integration with behaviors |
@@ -129,17 +129,38 @@ sequenceDiagram
 
 ### Scene management
 
-Central orchestrator: physics (Havok), mesh import, sky, lights, particles, items, fall monitoring, camera offset. **Notable APIs:** `loadEnvironment`, `setupEnvironmentItems`, `resetToStartPosition`, `changeCharacter`, `showPlayerMeshResumePhysicsAndRevealEnvironment`.
+Central orchestrator: physics (Havok), environment load (standard GLB **or** splat path), sky, lights, particles, items, fall monitoring, camera offset. **Notable APIs:** `loadEnvironment`, `setupEnvironmentItems`, `resetToStartPosition`, `changeCharacter`, `showPlayerMeshResumePhysicsAndRevealEnvironment`.
+
+`loadEnvironment` branches on **`environment.splat`**:
+
+| | Standard mesh env | Gaussian-splat env |
+| - | ----------------- | ------------------ |
+| Gate | no `splat` | `splat` set |
+| Visual | `ImportMeshAsync(model)` (+ X-invert scale) | `loadSplat(.ply)` — visual only |
+| Physics | `setupEnvironmentPhysics` (lightmaps / `physicsObjects` / fallback) | Static Havok MESH on **`colliderMesh` only** inside `loadSplatEnvironment` |
+| Nav / click | n/a | Optional `.nav` + click-to-move picks on the collider |
 
 ### Character
 
-`CharacterController` + `CharacterLoader`: physics-driven locomotion, jump delay, boost multiplier from `assets.ts` per character, mobile + keyboard input via existing managers.
+`CharacterController` + `CharacterLoader`: physics-driven locomotion, jump delay, boost multiplier from `assets.ts` per character, mobile + keyboard input via existing managers. On splat envs with `clickToMove`, tap-to-walk uses the Recast navmesh for waypoints while the capsule still moves through Havok.
 
 ### Environments
 
 Each **Environment** in `assets.ts` may include `model`, `spawnPoint`, `spawnRotation`, optional `transitionPosition` / `transitionRotation`, `sky`, `particles`, `items`, `physicsObjects`, `lights`, `backgroundMusic`, `ambientSounds`, `cameraOffset`, `cutScene`, and optional **`fallRespawn`** (tuning only; respawn is always registered).
 
-**Gaussian-splat environments** (optional): set `splat` (visible `.ply`), `colliderMesh` (invisible `.glb` for Havok colliders + click-to-move pick target), `navmesh` (prebaked Recast `.nav`), and `clickToMove: true`. These three assets share one untransformed left-handed space, so the GLB X-invert and lightmap paths are skipped; `scale`, `navmeshOffsetY`, and `floorMeshOffsetY` tune alignment. See [MILESTONES.md](MILESTONES.md). "Tropical Compound" is the showcase.
+**Gaussian-splat environments** (optional; not a standard mesh world): when `splat` is set, `model` is unused. Configure:
+
+| Field | Role |
+| ----- | ---- |
+| `splat.url` | Visible Gaussian splat (`.ply` / `.spz` / `.splat`) — **no** physics, not pickable |
+| `colliderMesh.url` | Dedicated invisible triangle GLB (prefer `*.collision.glb` from SplatWalk) for Havok + click picks |
+| `navmesh.url` | Prebaked Recast `.nav` binary |
+| `clickToMove` | `true` to enable hybrid tap-to-walk (requires `navmesh` + `colliderMesh`) |
+| `scale`, `navmeshOffsetY`, `floorMeshOffsetY` | Uniform scale + independent Y nudges for nav vs collider alignment |
+
+Splat, collider, and navmesh are authored in one untransformed left-handed space; the splat path skips GLB X-invert and lightmap. Do **not** put the collision GLB in `model` or omit `splat` — that would take the standard mesh physics path (wrong for a splat). See [MILESTONES.md](MILESTONES.md).
+
+**Showcase — Tropical Compound** (default env): `tropical_compound.ply` + `tropical_compound.collision.glb` + `tropical_compound.nav`, `clickToMove: true`, `cameraMode: 'cycle'`, `initialCameraView: 'topDown'`.
 
 **Camera mode** (optional): `cameraMode` is `'thirdPerson'` (default), `'topDown'`, or `'cycle'`. In `'cycle'` the player switches views with the `2` key or the Settings "Camera View" dropdown; `initialCameraView` (`'thirdPerson'` | `'topDown'`) picks the starting view for cycle envs. Top-down is tuned with `topDownCamera` (offset/position, default `(0, 20, -1)`), `topDownLookAt` (default `true`), and `topDownFollow` (default `true`; `false` = fixed world position). `cameraOffset` is honored as the third-person follow offset and its reset baseline (the `1` key and post-load reset return to it, not the global default).
 

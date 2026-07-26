@@ -8,6 +8,7 @@ import { isSimulationActive } from '../simulation/simulation_bootstrap';
 import { StateSimulationManager } from '../simulation/state_simulation_manager';
 import { fromAbstractSound } from '../types/audio';
 import { InventoryUI } from '../ui/inventory_ui';
+import { disposeImportedLights } from '../utils/engine_lights';
 
 import { AudioManager } from './audio_manager';
 import { BehaviorManager } from './behavior_manager';
@@ -240,6 +241,7 @@ export class CollectiblesManager {
 
     try {
       const result = await BABYLON.ImportMeshAsync(itemConfig.url, this.scene);
+      disposeImportedLights(result);
 
       // Process node materials for item meshes
       // await NodeMaterialManager.processImportResult(result);
@@ -1083,9 +1085,10 @@ export class CollectiblesManager {
       );
 
       collectibleMeshes.forEach((mesh) => {
-        // Dispose physics body if it exists
-        if (mesh.physicsImpostor) {
-          mesh.physicsImpostor.dispose();
+        // Dispose Physics V2 body if it exists (create path uses PhysicsAggregate).
+        if (mesh.physicsBody) {
+          mesh.physicsBody.dispose();
+          mesh.physicsBody = null;
         }
         mesh.dispose();
       });
