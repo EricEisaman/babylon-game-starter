@@ -4,6 +4,11 @@
  */
 
 import '@babylonjs/core/Legacy/legacy';
+import '@babylonjs/loaders/glTF/2.0/Extensions/EXT_mesh_gpu_instancing';
+import '@babylonjs/loaders/glTF/2.0/Extensions/EXT_meshopt_compression';
+import '@babylonjs/loaders/glTF/2.0/Extensions/EXT_texture_webp';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_draco_mesh_compression';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_mesh_quantization';
 import '@babylonjs/loaders/glTF/2.0/glTFLoader';
 import '@babylonjs/loaders/SPLAT/splatFileLoader';
 import '@babylonjs/materials/legacy/legacy';
@@ -118,6 +123,11 @@ async function initializeRuntimeGlobals(): Promise<void> {
       decoder.wasmUrl = 'https://cdn.babylonjs.com/draco_wasm_wrapper_gltf.js';
       decoder.wasmBinaryUrl = 'https://cdn.babylonjs.com/draco_decoder_gltf.wasm';
       decoder.fallbackUrl = 'https://cdn.babylonjs.com/draco_decoder_gltf.js';
+    }
+
+    const meshopt = globalThis.BABYLON.MeshoptCompression?.Configuration?.decoder;
+    if (meshopt) {
+      meshopt.url = 'https://cdn.babylonjs.com/meshopt_decoder.js';
     }
   }
 

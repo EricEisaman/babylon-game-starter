@@ -60,6 +60,11 @@ function configurePlaygroundRuntimeGlobals(): void {
     decoder.wasmBinaryUrl = 'https://cdn.babylonjs.com/draco_decoder_gltf.wasm';
     decoder.fallbackUrl = 'https://cdn.babylonjs.com/draco_decoder_gltf.js';
   }
+
+  const meshopt = globalThis.BABYLON?.MeshoptCompression?.Configuration?.decoder;
+  if (meshopt) {
+    meshopt.url = 'https://cdn.babylonjs.com/meshopt_decoder.js';
+  }
 }
 
 class Playground {

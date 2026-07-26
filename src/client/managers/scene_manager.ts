@@ -403,8 +403,11 @@ export class SceneManager {
       if (!transitionRotationApplied && this.characterController) {
         this.characterController.setRotation(environment.spawnRotation);
       }
-    } catch {
+    } catch (error) {
+      console.error(`[SceneManager] loadEnvironment failed: ${environmentName}`, error);
+      this.environmentLoaded = false;
       this.recoverFromEnvironmentLoadFailure();
+      throw error;
     }
   }
 
