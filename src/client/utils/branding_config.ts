@@ -59,7 +59,7 @@ const DEFAULT_BRANDING: ResolvedBrandingConfig = {
 let cachedConfig: ResolvedBrandingConfig | null = null;
 let loadPromise: Promise<ResolvedBrandingConfig> | null = null;
 
-/** Infer GitHub Pages project-site base (e.g. `/babylon-game-starter/`) when Vite env is `/`. */
+/** Infer project-site base (e.g. `/babylon-game-starter/`) when Vite env is unavailable. */
 function inferBaseUrlFromLocation(): string {
   try {
     const { pathname } = window.location;
@@ -73,21 +73,18 @@ function inferBaseUrlFromLocation(): string {
   return '/';
 }
 
-/** Prefer Vite `BASE_URL` when present; infer GitHub Pages subpath base otherwise. */
+/**
+ * Prefer Vite `BASE_URL` whenever it is defined (including `'/'`).
+ * Infer from location only for playground / non-Vite runtimes where env is missing.
+ */
 function readViteBaseUrl(): string {
-  const base = readViteEnv()?.BASE_URL ?? '/';
-  try {
-    if (!base || base === '/') {
-      const inferred = inferBaseUrlFromLocation();
-      if (inferred !== '/') {
-        return inferred;
-      }
-    }
-  } catch {
-    return inferBaseUrlFromLocation();
+  const viteEnv = readViteEnv();
+  if (viteEnv && typeof viteEnv.BASE_URL === 'string') {
+    const base = viteEnv.BASE_URL;
+    return base.endsWith('/') ? base : `${base}/`;
   }
 
-  return base.endsWith('/') ? base : `${base}/`;
+  return inferBaseUrlFromLocation();
 }
 
 function withAppBasePath(path: string): string {
@@ -178,11 +175,29 @@ function applyLoadscreenBranding(config: ResolvedBrandingConfig): void {
   }
 
   if (imageEl instanceof HTMLImageElement) {
-    imageEl.src = withAppBasePath(config.image);
+    const defaultLogoSrc = withAppBasePath(DEFAULT_BRANDING.image);
+    const nextSrc = withAppBasePath(config.image);
+
+    imageEl.hidden = false;
+    imageEl.alt = config.title || DEFAULT_BRANDING.title;
     imageEl.width = config.imageWidth;
     imageEl.height = config.imageHeight;
     imageEl.style.width = `${config.imageWidth}px`;
     imageEl.style.height = `${config.imageHeight}px`;
+
+    if (!imageEl.dataset.brandingErrorBound) {
+      imageEl.dataset.brandingErrorBound = '1';
+      imageEl.addEventListener('error', () => {
+        const failedSrc = imageEl.currentSrc || imageEl.src;
+        if (failedSrc !== defaultLogoSrc && !failedSrc.endsWith(DEFAULT_BRANDING.image)) {
+          imageEl.src = defaultLogoSrc;
+          return;
+        }
+        imageEl.hidden = true;
+      });
+    }
+
+    imageEl.src = nextSrc;
   }
 
   if (titleEl) {
