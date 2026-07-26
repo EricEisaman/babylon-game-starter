@@ -206,8 +206,11 @@ export class CharacterLoader {
           }
         }
       })
-      .catch(() => {
-        // Ignore character loading errors for playground compatibility
+      .catch((error: unknown) => {
+        console.error(
+          `[CharacterLoader] Failed to load character "${character.name}" from ${character.model}`,
+          error
+        );
       })
       .finally(() => {
         if (revealEnvironmentAfterThisLoad) {
