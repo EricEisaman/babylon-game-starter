@@ -8,6 +8,7 @@ import '@babylonjs/loaders/glTF/2.0/Extensions/EXT_mesh_gpu_instancing';
 import '@babylonjs/loaders/glTF/2.0/Extensions/EXT_meshopt_compression';
 import '@babylonjs/loaders/glTF/2.0/Extensions/EXT_texture_webp';
 import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_draco_mesh_compression';
+import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_materials_pbrSpecularGlossiness';
 import '@babylonjs/loaders/glTF/2.0/Extensions/KHR_mesh_quantization';
 import '@babylonjs/loaders/glTF/2.0/glTFLoader';
 import '@babylonjs/loaders/SPLAT/splatFileLoader';
