@@ -16,10 +16,38 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = path.resolve(process.cwd());
-const manifestPaths = [
-  path.join(repoRoot, 'src', 'client', 'public', 'playground.json'),
-  path.join(repoRoot, 'src', 'client', 'playground', 'playground.json')
-];
+
+/**
+ * Parse `--engine=WebGL2|WebGPU` (default WebGL2 → playground.json).
+ * @returns {'WebGL2' | 'WebGPU'}
+ */
+function parseEngineArg() {
+  const raw = process.argv.find((arg) => arg.startsWith('--engine='));
+  if (!raw) {
+    return 'WebGL2';
+  }
+  const value = raw.slice('--engine='.length).trim();
+  if (value === 'WebGL2' || value === 'WebGPU') {
+    return value;
+  }
+  console.error(`Invalid --engine=${value}. Use WebGL2 or WebGPU.`);
+  process.exit(1);
+}
+
+/**
+ * @param {'WebGL2' | 'WebGPU'} engine
+ * @returns {string[]}
+ */
+function resolveManifestPaths(engine) {
+  const fileName = engine === 'WebGPU' ? 'playground-wgpu.json' : 'playground.json';
+  return [
+    path.join(repoRoot, 'src', 'client', 'public', fileName),
+    path.join(repoRoot, 'src', 'client', 'playground', fileName)
+  ];
+}
+
+const engine = parseEngineArg();
+const manifestPaths = resolveManifestPaths(engine);
 
 const IMPORT_RE = /(?:import|export)(?:\s+type)?\s+(?:[^'"`;]+?\s+from\s+)?['"]([^'"]+)['"]/g;
 

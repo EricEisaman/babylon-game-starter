@@ -2,9 +2,11 @@
 // SPLAT LOADER UTILITIES
 // ============================================================================
 //
-// Helpers for loading Gaussian-splat environments and their invisible collider
-// meshes. These keep SceneManager thin and the logic reusable for any future
-// splat environment.
+// Helpers for loading Gaussian-splat environments and their dedicated invisible
+// collider GLBs (e.g. SplatWalk `*.collision.glb`). SceneManager calls these
+// only on the splat path (`environment.splat` set) — never via
+// setupEnvironmentPhysics. The splat is visual-only; Havok attaches to the
+// collider mesh alone.
 //
 // Coordinate note: the splat, collider GLB, and prebaked navmesh of a splat
 // environment are authored together in the workbench's untransformed
@@ -14,6 +16,7 @@
 // apply offsets to "fix" alignment here.
 
 import { devLog } from './dev_log';
+import { disposeImportedLights } from './engine_lights';
 
 type ImportResult = Awaited<ReturnType<typeof BABYLON.ImportMeshAsync>>;
 
@@ -49,6 +52,7 @@ export async function loadSplat(
   scale = 1
 ): Promise<LoadedSplat> {
   const result: ImportResult = await BABYLON.ImportMeshAsync(url, scene);
+  disposeImportedLights(result);
   const meshes = result.meshes;
 
   for (const mesh of meshes) {
@@ -85,6 +89,7 @@ export async function loadInvisibleCollider(
   offsetY = 0
 ): Promise<LoadedCollider> {
   const result: ImportResult = await BABYLON.ImportMeshAsync(url, scene);
+  disposeImportedLights(result);
   const meshes = result.meshes;
 
   const geometryMeshes: BABYLON.Mesh[] = [];

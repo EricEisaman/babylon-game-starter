@@ -129,7 +129,7 @@ All client-side multiplayer tunables live in [`src/client/config/game_config.ts`
 ```typescript
 MULTIPLAYER: {
   ENABLED: true,
-  PRODUCTION_SERVER: 'bgs-mp.onrender.com',
+  PRODUCTION_SERVER: 'babylon-game-starter.onrender.com',
   LOCAL_SERVER: 'localhost:5000',
   CONNECTION_TIMEOUT_MS: 15000,     // Render cold-start tolerance
   PRODUCTION_FIRST: true,
@@ -153,13 +153,21 @@ The server reads these environment variables:
 
 ## Running it locally
 
-The simplest fullstack loop:
+**Default — Vite only against the shared production backend:**
+
+```bash
+npm run dev
+```
+
+With `VITE_MULTIPLAYER_HOST` unset and `PRODUCTION_FIRST: true`, the client health-probes `PRODUCTION_SERVER` (`babylon-game-starter.onrender.com`) over HTTPS, then falls back to `LOCAL_SERVER` if needed. No local Go process is required.
+
+**Against a local Go server** — set `VITE_MULTIPLAYER_HOST=localhost:5000` in `.env.local`, then:
 
 ```bash
 npm run dev:fullstack
 ```
 
-This runs Vite and the Go server together. Go restarts automatically on changes under `src/server/multiplayer/**` (see `nodemon.multiplayer.json`). Alternatively run them in two terminals:
+That runs Vite and Go together (Go restarts on changes under `src/server/multiplayer/**` — see `nodemon.multiplayer.json`). Or use two terminals:
 
 ```bash
 # Terminal 1 — Go multiplayer server on :5000
@@ -169,7 +177,7 @@ npm run dev:multiplayer
 npm run dev
 ```
 
-With `VITE_MULTIPLAYER_HOST` unset, the client talks to the server through Vite's proxy (same-origin `/api/multiplayer/*`) — see [`vite.config.ts`](vite.config.ts).
+Vite still proxies `/api/multiplayer/*` → `:5000` for convenience; the browser client uses the host from discovery / `VITE_MULTIPLAYER_HOST`, not the proxy, unless you point it there.
 
 ## Running in the Babylon playground
 
@@ -188,7 +196,7 @@ The exported `playground.json` is a self-contained copy of the client that stude
 3. Open <https://playground.babylonjs.com/> in a modern desktop browser.
 4. In the playground's top bar, use **Scene → Load** (or paste directly into the editor via **Scene → Paste** — UI labels occasionally change; any "load JSON" path works). Paste the file contents.
 5. In the top-right plugin menu, toggle on **Add WASM plugin → Havok**. This is required — `index.ts` assumes `HavokPhysics` has already been registered by the host, which is how `main.ts` handles it under Vite and how the playground toggle handles it here. Without this, physics bodies fail to construct and the scene will error out early.
-6. Click **Run**. The default behavior connects to the shared classroom server at `bgs-mp.onrender.com` (see `CONFIG.MULTIPLAYER.PRODUCTION_SERVER`).
+6. Click **Run**. The default behavior connects to the shared classroom server at `babylon-game-starter.onrender.com` (see `CONFIG.MULTIPLAYER.PRODUCTION_SERVER`).
 
 ### Cold-start caveat
 

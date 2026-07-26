@@ -39,11 +39,26 @@ import {
   collectScenePerformanceStats,
   formatScenePerformanceStats
 } from './utils/scene_performance_stats';
+import { readViteEnv } from './utils/vite_env';
 
 import { Playground } from './index';
 
+type RenderEnginePreference = 'webgl' | 'webgpu';
+
+/**
+ * Resolves the render backend: `VITE_ENGINE` (e.g. `npm run dev:wgpu`) overrides
+ * `CONFIG.PERFORMANCE.ENGINE`. Playground builds have no Vite env → config default.
+ */
+function resolveRenderEnginePreference(): RenderEnginePreference {
+  const envEngine = readViteEnv()?.VITE_ENGINE;
+  if (envEngine === 'webgpu' || envEngine === 'webgl') {
+    return envEngine;
+  }
+  return CONFIG.PERFORMANCE.ENGINE;
+}
+
 // Global variables
-let engine: BABYLON.Engine | null = null;
+let engine: BABYLON.AbstractEngine | null = null;
 let scene: BABYLON.Scene | null = null;
 
 async function loadInspectorIfDev(): Promise<void> {
@@ -52,26 +67,29 @@ async function loadInspectorIfDev(): Promise<void> {
   }
 }
 
-async function createEngine(canvas: HTMLCanvasElement): Promise<BABYLON.Engine> {
+async function createEngine(canvas: HTMLCanvasElement): Promise<BABYLON.AbstractEngine> {
   const engineOpts = {
     antialias: true,
     powerPreference: 'high-performance' as const
   };
 
-  if (CONFIG.PERFORMANCE.WEBGPU_WHEN_AVAILABLE) {
-    if (navigator.gpu) {
-      try {
-        const { WebGPUEngine } = await import('@babylonjs/core/Engines/webgpuEngine');
+  const preferredEngine = resolveRenderEnginePreference();
+  if (preferredEngine === 'webgpu') {
+    try {
+      const { WebGPUEngine } = await import('@babylonjs/core/Engines/webgpuEngine');
+      if (await WebGPUEngine.IsSupportedAsync) {
         const webgpu = new WebGPUEngine(canvas, {
           ...engineOpts,
           powerPreference: 'high-performance'
         });
         await webgpu.initAsync();
         devLog('[Main] WebGPU engine active');
-        return webgpu as unknown as BABYLON.Engine;
-      } catch (err) {
-        devLog('[Main] WebGPU unavailable, using WebGL', err);
+        // ESM WebGPUEngine vs UMD BABYLON.AbstractEngine (playground dual stack) diverge slightly in .d.ts.
+        return webgpu as unknown as BABYLON.AbstractEngine;
       }
+      devLog('[Main] WebGPU not supported, using WebGL');
+    } catch (err) {
+      devLog('[Main] WebGPU unavailable, using WebGL', err);
     }
   }
 
@@ -169,7 +187,7 @@ async function initialize(): Promise<void> {
 
     devLog('[Main] Canvas found');
 
-    // Create engine (WebGPU when available, else WebGL)
+    // Create engine from VITE_ENGINE or CONFIG.PERFORMANCE.ENGINE ('webgl' | 'webgpu')
     engine = await createEngine(canvas);
 
     devLog('[Main] Engine created');

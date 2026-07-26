@@ -63,7 +63,10 @@ function configurePlaygroundRuntimeGlobals(): void {
 }
 
 class Playground {
-  public static CreateScene(engine: BABYLON.Engine, canvas: HTMLCanvasElement): BABYLON.Scene {
+  public static CreateScene(
+    engine: BABYLON.AbstractEngine,
+    canvas: HTMLCanvasElement
+  ): BABYLON.Scene {
     configurePlaygroundRuntimeGlobals();
     void AudioManager.ensurePlaygroundAudioReady();
 

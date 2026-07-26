@@ -274,7 +274,17 @@
                 if (engine && scene) {
                     const lines = [];
                     if (LOCAL_DEV_DEBUG.overlays.stats.fields.engine) {
-                        lines.push(`<div>Engine: ${engine.webGLVersion === 2 ? 'WebGL 2' : 'WebGL 1'}</div>`);
+                        const className =
+                            typeof engine.getClassName === 'function'
+                                ? engine.getClassName()
+                                : engine.constructor?.name;
+                        let engineLabel = 'WebGL 1';
+                        if (className === 'WebGPUEngine') {
+                            engineLabel = 'WebGPU';
+                        } else if (engine.webGLVersion === 2) {
+                            engineLabel = 'WebGL 2';
+                        }
+                        lines.push(`<div>Engine: ${engineLabel}</div>`);
                     }
                     if (LOCAL_DEV_DEBUG.overlays.stats.fields.meshes) {
                         lines.push(`<div>Meshes: ${scene.meshes.length}</div>`);

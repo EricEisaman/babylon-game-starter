@@ -4,6 +4,7 @@
 
 import { CONFIG } from '../config/game_config';
 import { StateSimulationManager } from '../simulation/state_simulation_manager';
+import { DeviceDetector } from '../utils/device_detector';
 
 import { CollectiblesManager } from './collectibles_manager';
 
@@ -26,6 +27,7 @@ export class HUDManager {
   private static lastHudHeavyUpdate = 0;
   private static isMobile = false;
   private static isIPadWithKeyboard = false;
+  private static hybridUnsubscribe: (() => void) | null = null;
   private static simulationMeterContainer: HTMLDivElement | null = null;
   private static simulationMeterFills = new Map<string, HTMLDivElement>();
   private static simulationMetersEnabled = false;
@@ -50,17 +52,27 @@ export class HUDManager {
     this.startTime = Date.now();
     this.activeHudConfig = CONFIG.HUD;
 
-    // Detect device type once at initialization
-    this.isIPadWithKeyboard = navigator.userAgent.includes('iPad') && navigator.maxTouchPoints > 0;
-    this.isMobile =
-      !this.isIPadWithKeyboard &&
-      (/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        'ontouchstart' in window ||
-        navigator.maxTouchPoints > 0);
+    this.isMobile = DeviceDetector.isMobileDevice();
+    this.isIPadWithKeyboard = DeviceDetector.isIPadWithKeyboard();
 
     this.createHUD();
+    this.applyDeviceHudVisibility();
 
-    // Set initial visibility for all HUD elements based on device type
+    this.hybridUnsubscribe?.();
+    this.hybridUnsubscribe = DeviceDetector.subscribeIPadWithKeyboard((hybrid) => {
+      this.isIPadWithKeyboard = hybrid;
+      this.applyDeviceHudVisibility();
+    });
+
+    // Start the update loop
+    this.startUpdateLoop();
+  }
+
+  /**
+   * Applies HUD field visibility for desktop / mobile / iPad+keyboard presets.
+   * Touch-only iPad uses MOBILE until hybrid latches true.
+   */
+  private static applyDeviceHudVisibility(): void {
     this.activeHudConfig = this.isIPadWithKeyboard
       ? CONFIG.HUD.IPadWithKeyboard
       : this.isMobile
@@ -72,9 +84,6 @@ export class HUDManager {
     this.setElementVisibility('state', this.activeHudConfig.SHOW_STATE);
     this.setElementVisibility('boost', this.activeHudConfig.SHOW_BOOST_STATUS);
     this.setElementVisibility('credits', this.activeHudConfig.SHOW_CREDITS);
-
-    // Start the update loop
-    this.startUpdateLoop();
   }
 
   /**
@@ -579,6 +588,8 @@ export class HUDManager {
    */
   public static dispose(): void {
     this.disableSimulationMeters();
+    this.hybridUnsubscribe?.();
+    this.hybridUnsubscribe = null;
 
     if (this.hudContainer) {
       this.hudContainer.remove();
@@ -597,6 +608,8 @@ export class HUDManager {
    */
   public static cleanup(): void {
     this.disableSimulationMeters();
+    this.hybridUnsubscribe?.();
+    this.hybridUnsubscribe = null;
 
     // Remove any existing HUD containers
     const existingHUD = document.getElementById('game-hud');

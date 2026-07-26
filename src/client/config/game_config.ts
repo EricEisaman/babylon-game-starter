@@ -45,7 +45,9 @@ export const CONFIG: GameConfig = {
   // Physics Settings
   PHYSICS: {
     GRAVITY: new BABYLON.Vector3(0, -9.8, 0),
-    CHARACTER_GRAVITY: new BABYLON.Vector3(0, -18, 0)
+    CHARACTER_GRAVITY: new BABYLON.Vector3(0, -18, 0),
+    // Unity-style step height for PhysicsCharacterController (0 = disabled).
+    MAX_STEP_HEIGHT: 0.35
   },
 
   // Animation Settings
@@ -66,8 +68,9 @@ export const CONFIG: GameConfig = {
     SCENE_OPTIMIZER_TRACK_MS: 2500,
     HARDWARE_SCALING_MAX: 2,
     HARDWARE_SCALING_STEP: 0.25,
-    // WebGL is the default: WebGPU + PBR/light UBOs still hit edge cases in some scenes (bind group / Light0).
-    WEBGPU_WHEN_AVAILABLE: false
+    // 'webgl' | 'webgpu' — prefer webgl until fog/NME/splat paths are validated on WebGPU.
+    // Env/character imports strip glTF lights; light-dirty marks keep both engines UBO-safe.
+    ENGINE: 'webgl'
   },
 
   // Effects Settings
@@ -359,7 +362,7 @@ export const CONFIG: GameConfig = {
 
   MULTIPLAYER: {
     ENABLED: true,
-    PRODUCTION_SERVER: 'bgs-mp.onrender.com',
+    PRODUCTION_SERVER: 'babylon-game-starter.onrender.com',
     LOCAL_SERVER: 'localhost:5000',
     // Render free-tier services sleep after ~15 min idle and take 10-30 s to
     // wake. The first probe after a cold start can easily exceed 15 s on

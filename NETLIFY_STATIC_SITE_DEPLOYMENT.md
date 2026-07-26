@@ -17,7 +17,7 @@ For multiplayer, the client must connect to a remote multiplayer server or run w
      ```ts
      MULTIPLAYER: {
        ENABLED: false,
-       PRODUCTION_SERVER: 'bgs-mp.onrender.com',
+       PRODUCTION_SERVER: 'babylon-game-starter.onrender.com',
        LOCAL_SERVER: 'localhost:5000',
        CONNECTION_TIMEOUT_MS: 15000,
        PRODUCTION_FIRST: true,
@@ -27,9 +27,9 @@ For multiplayer, the client must connect to a remote multiplayer server or run w
    - The client detects `ENABLED: false` and skips multiplayer server discovery.
 
 2. **Shared Render multiplayer server**
-   - Use the default public server at `bgs-mp.onrender.com`.
+   - Use the default public server at `babylon-game-starter.onrender.com`.
    - This is the same behavior used by the Babylon playground exports in this repo.
-   - No additional build-time configuration is required if `CONFIG.MULTIPLAYER.PRODUCTION_SERVER` remains set to `bgs-mp.onrender.com`.
+   - No additional build-time configuration is required if `CONFIG.MULTIPLAYER.PRODUCTION_SERVER` remains set to `babylon-game-starter.onrender.com`.
 
 3. **Custom multiplayer server**
    - Point the client at your own multiplayer host.
@@ -109,7 +109,7 @@ status = 200
 
 The `/chat-api/*` redirect target is **generated** from [`src/deployment/chat-proxy.defaults.mjs`](src/deployment/chat-proxy.defaults.mjs) when you run prepare (default upstream shown above). Override with `CHAT_UPSTREAM_URL` in Netlify build environment variables before deploy if you use a non-default Chat Slayer host.
 
-When chat is enabled (`serviceUrl: "/chat-api"` in `chat/config.json`), the **`/chat-api/*`** redirect can proxy short Chat Slayer requests, but **not** the live SSE stream — Netlify’s HTTP/2 proxy fails on chunked responses (`ERR_HTTP2_PROTOCOL_ERROR`). The game client therefore connects to Chat Slayer **directly** on `*.netlify.app` (same pattern as multiplayer → `bgs-mp.onrender.com`). Keep the redirect for tooling/consistency; ensure `https://your-site.netlify.app` is in Chat Slayer `ALLOWED_CLIENTS`. Regenerate via `npm run deploy:prepare` on the **`netlify-deployment`** branch. See [CHAT.md](CHAT.md) and [src/deployment/DEPLOYMENT.md — Chat proxy](src/deployment/DEPLOYMENT.md#chat-proxy-chat-slayer).
+When chat is enabled (`serviceUrl: "/chat-api"` in `chat/config.json`), the **`/chat-api/*`** redirect can proxy short Chat Slayer requests, but **not** the live SSE stream — Netlify’s HTTP/2 proxy fails on chunked responses (`ERR_HTTP2_PROTOCOL_ERROR`). The game client therefore connects to Chat Slayer **directly** on `*.netlify.app` (same pattern as multiplayer → `babylon-game-starter.onrender.com`). Keep the redirect for tooling/consistency; ensure `https://your-site.netlify.app` is in Chat Slayer `ALLOWED_CLIENTS`. Regenerate via `npm run deploy:prepare` on the **`netlify-deployment`** branch. See [CHAT.md](CHAT.md) and [src/deployment/DEPLOYMENT.md — Chat proxy](src/deployment/DEPLOYMENT.md#chat-proxy-chat-slayer).
 
 `NODE_OPTIONS` raises the Node heap for Vite's production build; the `npm run build` script also sets the same heap limit so local and hosted builds behave consistently. The Babylon Inspector is loaded only in Vite development, so production builds should not bundle the Inspector's React/Fluent UI dependency graph.
 
@@ -147,8 +147,8 @@ Deploy the generated site through Netlify as usual:
 
 ### Using the shared default server
 
-- The built client will probe `https://bgs-mp.onrender.com/api/multiplayer/health`.
-- If the health check succeeds, it will connect to `https://bgs-mp.onrender.com/api/multiplayer/stream`.
+- The built client will probe `https://babylon-game-starter.onrender.com/api/multiplayer/health`.
+- If the health check succeeds, it will connect to `https://babylon-game-starter.onrender.com/api/multiplayer/stream`.
 - This server is shared and suitable for demos, but not for production-grade or large-class deployments.
 
 ### Using a custom server
@@ -167,8 +167,8 @@ Deploy the generated site through Netlify as usual:
 ## Notes for Netlify static sites
 
 - Netlify cannot host the Go multiplayer server for this repo as a backend service in a static site deployment.
-- If you require a live multiplayer server, use a remote host such as `bgs-mp.onrender.com` or your own server.
-- Use `?mp=<host>` or `#mp=<host>` URL overrides only for exported playground snippets and runtime steering; Netlify builds still respect the environment-set `VITE_MULTIPLAYER_HOST` before defaulting to `bgs-mp.onrender.com`.
+- If you require a live multiplayer server, use a remote host such as `babylon-game-starter.onrender.com` or your own server.
+- Use `?mp=<host>` or `#mp=<host>` URL overrides only for exported playground snippets and runtime steering; Netlify builds still respect the environment-set `VITE_MULTIPLAYER_HOST` before defaulting to `babylon-game-starter.onrender.com`.
 
 ## Troubleshooting
 
