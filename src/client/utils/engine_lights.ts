@@ -12,7 +12,10 @@ const WEBGPU_ENGINE_CLASS_NAME = 'WebGPUEngine';
  * True when the active Babylon engine is WebGPU.
  * Prefers getClassName(); falls back to constructor.name for dual-stack hosts.
  */
-export function isWebGpuEngine(engine: { getClassName?: () => string; constructor: { name: string } }): boolean {
+export function isWebGpuEngine(engine: {
+  getClassName?: () => string;
+  constructor: { name: string };
+}): boolean {
   if (typeof engine.getClassName === 'function') {
     return engine.getClassName() === WEBGPU_ENGINE_CLASS_NAME;
   }
