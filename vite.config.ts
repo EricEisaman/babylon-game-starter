@@ -154,7 +154,7 @@ export default defineConfig(async () => {
       }
     },
     build: {
-      target: 'ES2020',
+      target: 'es2020',
       outDir: distOutDir,
       sourcemap: true,
       emptyOutDir: true
