@@ -184,6 +184,13 @@ export const ASSETS = {
         'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/floating_island.glb',
       lightmap: '',
       scale: 1,
+      sky: {
+        TEXTURE_URL:
+          'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/images/skies/happy_fluffy_sky.png',
+        ROTATION_Y: 0,
+        BLUR: 0.2,
+        TYPE: 'SPHERE' satisfies SkyType
+      },
       lightmappedMeshes: EMPTY_LIGHTMAPPED_MESHES,
       physicsObjects: EMPTY_PHYSICS_OBJECTS,
       spawnPoint: new BABYLON.Vector3(0, 20, 0),
