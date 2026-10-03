@@ -39,6 +39,7 @@ const exportRoots = [
   'input',
   'managers',
   'simulation',
+  'shaders',
   'sync',
   'types',
   'ui',

@@ -178,6 +178,18 @@ export const ASSETS = {
   ] satisfies readonly Character[],
   ENVIRONMENTS: [
     {
+      name: 'Floating Island',
+      isDefault: true,
+      model:
+        'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/floating_island.glb',
+      lightmap: '',
+      scale: 1,
+      lightmappedMeshes: EMPTY_LIGHTMAPPED_MESHES,
+      physicsObjects: EMPTY_PHYSICS_OBJECTS,
+      spawnPoint: new BABYLON.Vector3(0, 20, 0),
+      spawnRotation: new BABYLON.Vector3(0, 0, 0)
+    },
+    {
       name: 'Level Test',
       model:
         'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/models/environments/levelTest/levelTest.glb',

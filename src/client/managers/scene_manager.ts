@@ -50,6 +50,7 @@ import { NodeMaterialManager } from './node_material_manager';
 import { OverlayManager } from './overlay_manager';
 import { SkyManager } from './sky_manager';
 import { VisualEffectsManager } from './visual_effects_manager';
+import { isWaterMesh, WaterManager } from './water_manager';
 
 import type { EffectType } from '../types/effects';
 import type { Environment, LightConfig, ColliderType } from '../types/environment';
@@ -61,6 +62,7 @@ export class SceneManager {
   private smoothFollowController: SmoothFollowCameraController | null = null;
   /** Active only for splat environments with click-to-move enabled. */
   private clickToMoveController: ClickToMoveController | null = null;
+  private waterManager: WaterManager | null = null;
   private currentEnvironment: string = (() => {
     const defaultEnv = ASSETS.ENVIRONMENTS.find((env) => env.isDefault);
     const name = defaultEnv?.name ?? ASSETS.ENVIRONMENTS[0]?.name;
@@ -334,6 +336,10 @@ export class SceneManager {
 
         // Process node materials for environment meshes
         await NodeMaterialManager.processImportResult(result);
+
+        this.waterManager?.dispose();
+        this.waterManager = new WaterManager(this.scene);
+        this.waterManager.applyToMeshes(result.meshes);
 
         // Rename the root node to "environment" for better organization
         if (result.meshes.length > 0) {
@@ -790,7 +796,7 @@ export class SceneManager {
 
     environment.lightmappedMeshes.forEach((lightmappedMesh) => {
       const mesh = this.scene.getMeshByName(lightmappedMesh.name);
-      if (!mesh) return;
+      if (!mesh || isWaterMesh(mesh)) return;
 
       // Add friction to ground meshes - CRITICAL: both objects need friction for it to work
       new BABYLON.PhysicsAggregate(mesh, BABYLON.PhysicsShapeType.MESH, { mass: 0, friction: 0.9 });
@@ -838,7 +844,7 @@ export class SceneManager {
       }
 
       const mesh = this.scene.getMeshByName(physicsObject.name);
-      if (mesh) {
+      if (mesh && !isWaterMesh(mesh)) {
         // Apply scaling if specified
         if (physicsObject.scale !== 1) {
           mesh.scaling.setAll(physicsObject.scale);
@@ -995,6 +1001,7 @@ export class SceneManager {
     allEnvironmentMeshes.forEach((mesh) => {
       if (
         mesh instanceof BABYLON.Mesh &&
+        !isWaterMesh(mesh) &&
         mesh.geometry != null &&
         mesh.geometry.getTotalVertices() > 0
       ) {
@@ -1054,6 +1061,8 @@ export class SceneManager {
   public clearEnvironment(): void {
     BehaviorManager.unregisterFallOutOfWorld();
     this.discardEnvironmentHiddenTracking();
+    this.waterManager?.dispose();
+    this.waterManager = null;
 
     // Clear all environment-related meshes
     const environmentMeshes = this.scene.meshes.filter(
@@ -1311,6 +1320,8 @@ export class SceneManager {
   }
 
   public dispose(): void {
+    this.waterManager?.dispose();
+    this.waterManager = null;
     this.sceneOptimizer?.stop();
     this.sceneOptimizer?.dispose();
     this.sceneOptimizer = null;
