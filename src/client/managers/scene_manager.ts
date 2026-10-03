@@ -55,6 +55,20 @@ import { isWaterMesh, WaterManager } from './water_manager';
 import type { EffectType } from '../types/effects';
 import type { Environment, LightConfig, ColliderType } from '../types/environment';
 
+function hasSkipPhysicsMetadata(mesh: BABYLON.AbstractMesh): boolean {
+  let node: BABYLON.Node | null = mesh;
+  while (node) {
+    const metadata = node.metadata as Record<string, unknown> | null;
+    const gltf = metadata?.gltf as Record<string, unknown> | undefined;
+    const extras = gltf?.extras as Record<string, unknown> | undefined;
+    if (extras?.skip_physics === true) {
+      return true;
+    }
+    node = node.parent;
+  }
+  return false;
+}
+
 export class SceneManager {
   private readonly scene: BABYLON.Scene;
   private readonly camera: BABYLON.TargetCamera;
@@ -450,6 +464,7 @@ export class SceneManager {
       colliderMeshes = collider.meshes;
       // Static MESH colliders so existing WASD/physics movement and gravity work.
       for (const mesh of collider.geometryMeshes) {
+        if (hasSkipPhysicsMetadata(mesh)) continue;
         new BABYLON.PhysicsAggregate(mesh, BABYLON.PhysicsShapeType.MESH, {
           mass: 0,
           friction: 0.9
@@ -798,9 +813,14 @@ export class SceneManager {
       const mesh = this.scene.getMeshByName(lightmappedMesh.name);
       if (!mesh || isWaterMesh(mesh)) return;
 
-      // Add friction to ground meshes - CRITICAL: both objects need friction for it to work
-      new BABYLON.PhysicsAggregate(mesh, BABYLON.PhysicsShapeType.MESH, { mass: 0, friction: 0.9 });
-      mesh.isPickable = false;
+      if (!hasSkipPhysicsMetadata(mesh)) {
+        // Add friction to ground meshes - CRITICAL: both objects need friction for it to work
+        new BABYLON.PhysicsAggregate(mesh, BABYLON.PhysicsShapeType.MESH, {
+          mass: 0,
+          friction: 0.9
+        });
+        mesh.isPickable = false;
+      }
 
       if (mesh.material != null) {
         if (mesh.material instanceof BABYLON.StandardMaterial) {
@@ -850,24 +870,26 @@ export class SceneManager {
           mesh.scaling.setAll(physicsObject.scale);
         }
 
-        const shapeType = this.getPhysicsShapeType(physicsObject.colliderType);
-        const options: { mass: number; friction?: number } = { mass: physicsObject.mass };
-        if (physicsObject.friction !== undefined) {
-          options.friction = physicsObject.friction;
-        }
-        const aggregate = new BABYLON.PhysicsAggregate(mesh, shapeType, options);
+        if (!hasSkipPhysicsMetadata(mesh)) {
+          const shapeType = this.getPhysicsShapeType(physicsObject.colliderType);
+          const options: { mass: number; friction?: number } = { mass: physicsObject.mass };
+          if (physicsObject.friction !== undefined) {
+            options.friction = physicsObject.friction;
+          }
+          const aggregate = new BABYLON.PhysicsAggregate(mesh, shapeType, options);
 
-        // ANIMATED-default-then-promote (MULTIPLAYER_SYNCH.md §6.2 rule 4): env physics
-        // objects like the RV Life cake must spawn kinematic on every client until env
-        // authority is established. `seedMotionTypesForEnv` promotes to DYNAMIC on the
-        // resolved owner. Mass=0 bodies are genuinely static and left untouched.
-        if (physicsObject.mass > 0 && aggregate.body && !aggregate.body.isDisposed) {
-          try {
-            aggregate.body.setMotionType(BABYLON.PhysicsMotionType.ANIMATED);
-            aggregate.body.setLinearVelocity(BABYLON.Vector3.Zero());
-            aggregate.body.setAngularVelocity(BABYLON.Vector3.Zero());
-          } catch {
-            /* body still initializing; seedMotionTypesForEnv will retry post-join. */
+          // ANIMATED-default-then-promote (MULTIPLAYER_SYNCH.md §6.2 rule 4): env physics
+          // objects like the RV Life cake must spawn kinematic on every client until env
+          // authority is established. `seedMotionTypesForEnv` promotes to DYNAMIC on the
+          // resolved owner. Mass=0 bodies are genuinely static and left untouched.
+          if (physicsObject.mass > 0 && aggregate.body && !aggregate.body.isDisposed) {
+            try {
+              aggregate.body.setMotionType(BABYLON.PhysicsMotionType.ANIMATED);
+              aggregate.body.setLinearVelocity(BABYLON.Vector3.Zero());
+              aggregate.body.setAngularVelocity(BABYLON.Vector3.Zero());
+            } catch {
+              /* body still initializing; seedMotionTypesForEnv will retry post-join. */
+            }
           }
         }
 
@@ -973,6 +995,9 @@ export class SceneManager {
     shapeType: BABYLON.PhysicsShapeType,
     options: { mass: number; friction?: number }
   ): BABYLON.PhysicsBody | null {
+    if (hasSkipPhysicsMetadata(mesh)) {
+      return null;
+    }
     if (mesh.physicsBody && !mesh.physicsBody.isDisposed) {
       return mesh.physicsBody;
     }
@@ -1002,6 +1027,7 @@ export class SceneManager {
       if (
         mesh instanceof BABYLON.Mesh &&
         !isWaterMesh(mesh) &&
+        !hasSkipPhysicsMetadata(mesh) &&
         mesh.geometry != null &&
         mesh.geometry.getTotalVertices() > 0
       ) {
