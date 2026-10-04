@@ -181,7 +181,7 @@ export const ASSETS = {
       name: 'Forest',
       isDefault: true,
       model:
-        'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/forest.glb',
+        'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/forest_lake.glb',
       lightmap: '',
       scale: 8,
       sky: {

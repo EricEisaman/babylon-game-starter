@@ -1,3 +1,4 @@
+import { lakeFragmentShader, lakeVertexShader } from '../shaders/lake';
 import { oceanFragmentShader, oceanVertexShader } from '../shaders/ocean';
 import { riverFragmentShader, riverVertexShader } from '../shaders/river';
 import { devLog } from '../utils/dev_log';
@@ -18,12 +19,16 @@ const RIVER_SHADER: WaterShaderDefinition = {
   vertexShader: riverVertexShader,
   fragmentShader: riverFragmentShader,
   uniforms: {
-    flowSpeed: 0.22,
+    flowSpeed: 0.32,
     flowScale: 0.55,
-    waveStrength: 0.55,
+    flowAxis: 0,
+    waveSpeed: 0.22,
+    waveScale: 0.55,
+    waveHeight: 0.2,
+    normalStrength: 1.0,
     foamAmount: 0.45,
     fresnelPower: 4.2,
-    opacity: 0.96,
+    opacity: 0.8,
     shallowColor: [0.08, 0.48, 0.56],
     deepColor: [0.025, 0.19, 0.29],
     foamColor: [0.58, 0.82, 0.82]
@@ -36,14 +41,34 @@ const OCEAN_SHADER: WaterShaderDefinition = {
   fragmentShader: oceanFragmentShader,
   uniforms: {
     waveSpeed: 0.55,
-    waveScale: 0.45,
-    waveHeight: 0.65,
-    foamAmount: 0.85,
-    fresnelPower: 3.6,
-    opacity: 0.88,
+    waveScale: 0.18,
+    waveHeight: 0.2,
+    normalStrength: 3.0,
+    foamAmount: 0.18,
+    fresnelPower: 5.0,
+    opacity: 0.8,
     deepColor: [0.015, 0.1, 0.24],
     surfaceColor: [0.04, 0.39, 0.58],
     foamColor: [0.77, 0.93, 0.94]
+  }
+};
+
+const LAKE_SHADER: WaterShaderDefinition = {
+  shaderKey: 'environmentLakeWater',
+  vertexShader: lakeVertexShader,
+  fragmentShader: lakeFragmentShader,
+  uniforms: {
+    waveSpeed: 0.1,
+    waveScale: 0.34,
+    waveHeight: 0.2,
+    normalStrength: 0.7,
+    causticScale: 0.8,
+    causticStrength: 0.07,
+    fresnelPower: 4.8,
+    opacity: 0.8,
+    deepColor: [0.025, 0.16, 0.22],
+    surfaceColor: [0.12, 0.42, 0.43],
+    reflectionColor: [0.78, 0.9, 0.82]
   }
 };
 
@@ -89,6 +114,11 @@ function getMeshProperties(mesh: BABYLON.AbstractMesh): MetadataRecord {
     {},
     ...hierarchy.reverse().map((entry) => getMetadataProperties(entry.metadata))
   );
+}
+
+function getRiverFlowAxis(mesh: BABYLON.AbstractMesh): number {
+  const extent = mesh.getBoundingInfo().boundingBox.extendSize;
+  return extent.x >= extent.z ? 0 : 1;
 }
 
 function parseColor(value: unknown): BABYLON.Color3 | null {
@@ -141,8 +171,13 @@ export class WaterManager {
 
   private readonly updateTime = (): void => {
     const time = (performance.now() - this.startTime) / 1000;
+    const camera = this.scene.activeCamera;
+    const cameraPosition = camera?.globalPosition ?? camera?.position;
     for (const material of this.materials) {
       material.setFloat('time', time);
+      if (cameraPosition) {
+        material.setVector3('cameraPosition', cameraPosition);
+      }
     }
   };
 
@@ -159,7 +194,14 @@ export class WaterManager {
       const properties = getMeshProperties(mesh);
       const customType = properties.type ?? properties.customType;
       const type = typeof customType === 'string' ? customType.toLowerCase() : '';
-      const definition = type === 'river' ? RIVER_SHADER : type === 'ocean' ? OCEAN_SHADER : null;
+      const definition =
+        type === 'river'
+          ? RIVER_SHADER
+          : type === 'ocean'
+            ? OCEAN_SHADER
+            : type === 'lake'
+              ? LAKE_SHADER
+              : null;
       if (!definition) {
         devLog('[WaterManager] No supported type metadata found for water mesh', {
           meshName: mesh.name,
@@ -177,19 +219,23 @@ export class WaterManager {
         this.scene,
         { vertex: definition.shaderKey, fragment: definition.shaderKey },
         {
-          attributes: ['position', 'normal'],
+          attributes: ['position'],
           uniforms: [
             'world',
-            'view',
-            'worldViewProjection',
+            'viewProjection',
             'time',
+            'cameraPosition',
             ...Object.keys(definition.uniforms)
           ],
           needAlphaBlending: true
         }
       );
       material.backFaceCulling = false;
-      applyUniforms(material, definition.uniforms, properties);
+      const uniforms =
+        type === 'river'
+          ? { ...definition.uniforms, flowAxis: getRiverFlowAxis(mesh) }
+          : definition.uniforms;
+      applyUniforms(material, uniforms, properties);
       mesh.material = material;
       this.materials.push(material);
       appliedCount += 1;

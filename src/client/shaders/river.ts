@@ -1,89 +1,59 @@
-export const riverVertexShader = `
-precision highp float;
-attribute vec3 position;
-attribute vec3 normal;
-uniform mat4 world;
-uniform mat4 view;
-uniform mat4 worldViewProjection;
-varying vec3 vWorldPosition;
-varying vec3 vViewNormal;
-varying vec3 vViewDirection;
+import { waterVertexShader, waterWaveFunctions } from './water_common';
 
-void main(void) {
-  vec4 worldPosition = world * vec4(position, 1.0);
-  vec3 worldNormal = normalize(mat3(world) * normal);
-  vWorldPosition = worldPosition.xyz;
-  vViewNormal = normalize(mat3(view) * worldNormal);
-  vViewDirection = normalize(-(view * worldPosition).xyz);
-  gl_Position = worldViewProjection * vec4(position, 1.0);
-}
-`;
+export const riverVertexShader = waterVertexShader;
 
 export const riverFragmentShader = `
 precision highp float;
 uniform float time;
+uniform float waveSpeed;
+uniform float waveScale;
+uniform float waveHeight;
+uniform float normalStrength;
 uniform float flowSpeed;
 uniform float flowScale;
-uniform float waveStrength;
+uniform float flowAxis;
 uniform float foamAmount;
 uniform float fresnelPower;
 uniform float opacity;
+uniform vec3 cameraPosition;
 uniform vec3 shallowColor;
 uniform vec3 deepColor;
 uniform vec3 foamColor;
 varying vec3 vWorldPosition;
-varying vec3 vViewNormal;
-varying vec3 vViewDirection;
+varying vec3 vLocalPosition;
 
-float hash21(vec2 point) {
-  point = fract(point * vec2(123.34, 456.21));
-  point += dot(point, point + 45.32);
-  return fract(point.x * point.y);
-}
-
-float noise(vec2 point) {
-  vec2 cell = floor(point);
-  vec2 local = fract(point);
-  local = local * local * (3.0 - 2.0 * local);
-  float lower = mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), local.x);
-  float upper = mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0, 1.0)), local.x);
-  return mix(lower, upper, local.y);
-}
-
-float riverDetail(vec2 point) {
-  float broad = noise(point * 0.42);
-  float medium = noise(point * 0.9 + vec2(13.7, -8.2));
-  return broad * 0.68 + medium * 0.32;
-}
+${waterWaveFunctions}
 
 void main(void) {
-  vec2 worldXZ = vWorldPosition.xz;
-  vec2 flowUV = vec2(
-    dot(worldXZ, vec2(0.94, 0.34)),
-    dot(worldXZ, vec2(-0.34, 0.94))
-  ) * flowScale;
+  vec2 wavePosition = vWorldPosition.xz * waveScale;
+  float longitudinal = mix(vLocalPosition.x, vLocalPosition.z, flowAxis);
+  float lateral = mix(vLocalPosition.z, vLocalPosition.x, flowAxis);
+  vec2 flowPosition = vec2(longitudinal, lateral) * flowScale;
   float travel = time * flowSpeed;
-  flowUV.x += sin(flowUV.y * 0.65 + travel * 0.08) * 0.42 - travel;
+  flowPosition.x += sin(flowPosition.y * 0.65 + travel * 0.08) * 0.42 - travel;
 
-  float longWave = sin(flowUV.x * 1.1 + sin(flowUV.y * 0.5) * 0.4);
-  float crossWave = sin(flowUV.y * 1.85 - flowUV.x * 0.18 - travel * 0.2);
-  float detail = riverDetail(flowUV * 0.72 + vec2(-travel * 0.08, 0.0));
-  float surface = longWave * 0.56 + crossWave * 0.15 + (detail - 0.5) * 0.2;
-  surface *= waveStrength;
-
-  float depth = smoothstep(-0.58, 0.68, surface);
-  float foamSignal = surface + (detail - 0.5) * foamAmount * 0.2;
-  float foam = smoothstep(0.28, 0.52, foamSignal) * foamAmount;
-  float fresnel = pow(1.0 - clamp(dot(normalize(vViewNormal), normalize(vViewDirection)), 0.0, 1.0), fresnelPower);
-  vec3 normal = normalize(vViewNormal);
-  vec3 viewDirection = normalize(vViewDirection);
-  vec3 lightDirection = normalize(vec3(-0.38, 0.82, 0.42));
-  float specular = pow(max(dot(reflect(-lightDirection, normal), viewDirection), 0.0), 64.0);
-
-  vec3 color = mix(deepColor, shallowColor, depth);
-  color = mix(color, foamColor, foam * 0.28);
-  color += shallowColor * fresnel * 0.16;
-  color += vec3(1.0, 0.98, 0.9) * specular * 0.12;
-  gl_FragColor = vec4(color, clamp(opacity + foam * 0.08, 0.0, 1.0));
+  float waveValue = getwaves(flowPosition);
+  float currentRidge = 0.5 + 0.5 * sin(
+    flowPosition.y * 1.8 + sin(flowPosition.x * 0.32)
+  );
+  vec3 normal = getWaterNormal(wavePosition, 0.01, normalStrength);
+  vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+  float belowWater = step(dot(normal, viewDirection), 0.0);
+  normal = mix(normal, -normal, belowWater);
+  float fresnel = 0.04 + 0.96 * pow(
+    1.0 - max(0.0, dot(normal, viewDirection)),
+    fresnelPower
+  );
+  vec3 reflectionDirection = normalize(reflect(-viewDirection, normal));
+  reflectionDirection.y = abs(reflectionDirection.y);
+  vec3 reflection = getAtmosphere(reflectionDirection) + getSun(reflectionDirection);
+  float depth = smoothstep(0.34, 0.68, waveValue);
+  float foam = smoothstep(0.62, 0.82, waveValue) * foamAmount *
+    mix(0.35, 1.0, currentRidge);
+  vec3 scattering = mix(deepColor, shallowColor, depth) * 0.2;
+  scattering = mix(scattering, deepColor * 0.16, belowWater);
+  vec3 color = fresnel * reflection + scattering;
+  color = mix(color, foamColor, foam * 0.42);
+  gl_FragColor = vec4(acesTonemap(color * 2.0), clamp(opacity, 0.0, 1.0));
 }
 `;

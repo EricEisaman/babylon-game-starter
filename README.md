@@ -130,6 +130,10 @@ To ship this line of work to deployment branches, follow [FEATURE_RELEASE.md](FE
 - **Playground export** — `npm run export:playground` produces `playground.json` for the Babylon.js web editor, **including multiplayer**. The export is smoke-checked by `scripts/check-playground-export.mjs` before it is written. See [*Running in the Babylon playground*](MULTIPLAYER.md#running-in-the-babylon-playground) for the classroom walkthrough, including the `?mp=host` runtime override.
 - **Installable PWA** — Offline-first asset caching, unified branding config, and install screenshots; see [BRANDING.md](BRANDING.md). Validate with `npm run pwa:test`.
 
+## Water Manager
+
+Tag imported meshes with the `water_` prefix and set GLTF metadata `type` to `ocean`, `river`, or `lake` to enable two-sided procedural water shaders. See [WATER_MANAGER.md](WATER_MANAGER.md) for wave defaults, per-type behavior, and metadata overrides.
+
 ---
 
 ## Tech stack
