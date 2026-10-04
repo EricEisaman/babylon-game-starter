@@ -184,6 +184,10 @@ export const ASSETS = {
         'https://raw.githubusercontent.com/EricEisaman/assets/main/environment/forest_lake.glb',
       lightmap: '',
       scale: 8,
+      backgroundMusic: {
+        url: 'https://raw.githubusercontent.com/EricEisaman/assets/main/audio/ambience/meadow.mp3',
+        volume: 0.09
+      },
       sky: {
         TEXTURE_URL:
           'https://raw.githubusercontent.com/EricEisaman/game-dev-1a/main/assets/images/skies/light-blue-sky-over-grassy-plain.png',
